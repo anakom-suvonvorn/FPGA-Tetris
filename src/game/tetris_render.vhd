@@ -308,18 +308,15 @@ begin
         end if;
         if s1_piece = '1' then
           c := bevel(piece_rgb(cur_color), s1_px, s1_py);
-        elsif s1_occ_bit = '1' then
-          if fx_blind = '1' then
-            cell := x"112";                       -- chaos BLIND: almost invisible
-          elsif game_over = '1' then
+        elsif s1_occ_bit = '1' and fx_blind = '0' then
+          -- (chaos BLIND: locked blocks are skipped completely, so the cell
+          --  is drawn exactly like an empty one - background and grid)
+          if game_over = '1' then
             cell := x"555";                       -- I lost: everything grey
           else
             cell := piece_rgb(s1_cell_col);
           end if;
           c := bevel(cell, s1_px, s1_py);
-          if fx_blind = '1' then
-            c := x"111";                          -- no bevel either: nothing gives it away
-          end if;
         elsif s1_ghost = '1' then
           -- outline only, in a dark version of the piece colour
           if s1_px = 0 or s1_py = 0 or s1_px = 15 or s1_py = 15 then

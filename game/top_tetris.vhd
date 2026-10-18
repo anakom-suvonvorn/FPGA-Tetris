@@ -22,8 +22,9 @@
 -- Versus rules: clearing 2 / 3 / 4 lines sends 1 / 2 / 4 garbage lines.
 -- Lines you clear first cancel garbage waiting for you (red meter left of
 -- the field). Last one standing wins.
--- CHAOS: every 10-20 s a task pops up on the right; do it with the task
--- switches before the time runs out -> attack the rival or get a bonus.
+-- CHAOS: every 10-17 s (random, no warning) a task pops up on the right; do
+-- it with the task switches before the time runs out -> attack the rival or
+-- get a bonus. The LOCK attack locks all buttons until you finish a task.
 --
 -- Structure (top-down design):
 --   top_tetris
@@ -96,6 +97,7 @@ architecture rtl of top_tetris is
   signal task_sw     : std_logic_vector(7 downto 0);
   signal a_left, a_right, a_rot, a_soft, a_hard : std_logic;
   signal c_left, c_right : std_logic;            -- after the MIRROR attack
+  signal g_left, g_right, g_rot, g_soft, g_hard : std_logic;  -- after the LOCK attack
   signal touch       : std_logic;
 
   -- game state
@@ -140,10 +142,13 @@ architecture rtl of top_tetris is
   signal t_count     : integer range 0 to 15;
   signal t_meter, t_zlo, t_zhi, t_prog : integer range 0 to 191;
   signal t_secs      : integer range 0 to 31;
-  signal t_att_id    : integer range 0 to 7;
+  signal t_offsecs     : integer range 0 to 7;
+  signal t_att_id    : integer range 0 to N_ATTACKS - 1;
   signal t_att_id31  : integer range 0 to 31;
   signal t_bonus_id  : integer range 0 to 2;
   signal fx_mirror, fx_flip, fx_blind, fx_bounce, fx_cat, fx_speed, fx_freeze : std_logic;
+  signal fx_locked   : std_logic;
+  signal fx_nbounce  : integer range 5 to 10;
   signal fx_garb, fx_next_bad, fx_next_i, fx_sink, fx_hit, fx_oiia : std_logic;
   signal ban_on      : std_logic;
   signal ban_id      : integer range 0 to 31;
@@ -186,6 +191,13 @@ begin
   -- chaos MIRROR: left and right swap places
   c_left  <= a_right when fx_mirror = '1' else a_left;
   c_right <= a_left  when fx_mirror = '1' else a_right;
+  -- chaos LOCK: no button does anything until I finish a task
+  g_left  <= c_left  and not fx_locked;
+  g_right <= c_right and not fx_locked;
+  g_rot   <= a_rot   and not fx_locked;
+  g_soft  <= a_soft  and not fx_locked;
+  g_hard  <= a_hard  and not fx_locked;
+  -- (the HANDS task still sees every press, locked or not)
   touch   <= a_left or a_right or a_rot or a_soft or a_hard;
 
   -- garbage comes from the rival's GARBAGE message or the GARBAGE attack (+3)
@@ -195,8 +207,8 @@ begin
   u_core : entity work.tetris_core
     port map (
       clk => clk, frame_tick => frame_tick, pause => pause_s,
-      act_left => c_left, act_right => c_right, act_rot => a_rot,
-      act_soft => a_soft, act_hard => a_hard,
+      act_left => g_left, act_right => g_right, act_rot => g_rot,
+      act_soft => g_soft, act_hard => g_hard,
       versus => link_ok, start_in => got_start, garb_in => garb_in, garb_in_n => garb_in_n,
       opp_lost => got_lost, start_out => start_out, lost_out => lost_out,
       garb_out => garb_out, garb_out_n => garb_out_n,
@@ -237,10 +249,10 @@ begin
     generic map (FIRST_DELAY => CHAOS_FIRST_DELAY, FORCE_TASK => CHAOS_FORCE_TASK)
     port map (
       clk => clk, frame_tick => frame_tick, enable => chaos_en, paused => pause_s,
-      versus => link_ok, sw => task_sw, touch => touch,
+      versus => link_ok, hurry => fx_locked, sw => task_sw, touch => touch,
       active => t_active, task => t_task, sel => t_sel, target => t_target,
       count => t_count, meter_pos => t_meter, zone_lo => t_zlo, zone_hi => t_zhi,
-      progress => t_prog, secs => t_secs,
+      progress => t_prog, secs => t_secs, hands_secs => t_offsecs,
       task_start => t_start, task_ok => t_ok, task_fail => t_fail,
       send_attack => t_send, attack_id => t_att_id, bonus => t_bonus, bonus_id => t_bonus_id
     );
@@ -250,9 +262,10 @@ begin
       clk => clk, frame_tick => frame_tick, enable => chaos_en, paused => pause_s,
       got_attack => got_att, got_id => got_att_id,
       sent_attack => t_send, sent_id => t_att_id,
-      bonus => t_bonus, bonus_id => t_bonus_id, task_fail => t_fail,
+      bonus => t_bonus, bonus_id => t_bonus_id, task_ok => t_ok, task_fail => t_fail,
       mirror => fx_mirror, flip => fx_flip, blind => fx_blind, bounce => fx_bounce,
-      cat => fx_cat, speed => fx_speed, freeze => fx_freeze,
+      n_bounce => fx_nbounce, cat => fx_cat, speed => fx_speed, freeze => fx_freeze,
+      locked => fx_locked,
       garbage => fx_garb, next_bad => fx_next_bad, next_i => fx_next_i, sink => fx_sink,
       hit_evt => fx_hit, oiia_evt => fx_oiia,
       banner_on => ban_on, banner_id => ban_id
@@ -261,10 +274,10 @@ begin
   u_crender : entity work.chaos_render
     port map (
       clk => clk, frame_tick => frame_tick, x => x, y => y, enable => chaos_s,
-      bounce => fx_bounce, cat => fx_cat,
+      bounce => fx_bounce, n_bounce => fx_nbounce, cat => fx_cat, locked => fx_locked,
       t_active => t_active, t_task => t_task, t_sel => t_sel, t_target => t_target,
       t_sw => task_sw, t_count => t_count, t_meter => t_meter, t_zone_lo => t_zlo,
-      t_zone_hi => t_zhi, t_progress => t_prog, t_secs => t_secs,
+      t_zone_hi => t_zhi, t_progress => t_prog, t_secs => t_secs, t_offsecs => t_offsecs,
       banner_on => ban_on, banner_id => ban_id,
       ov_on => ov_on, ov_rgb => ov_rgb
     );

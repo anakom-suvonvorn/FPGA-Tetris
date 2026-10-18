@@ -7,8 +7,8 @@
 --   fx_next_bad -> the next piece is an S or a Z     (next_color = 3 or 4)
 --   fx_freeze   -> the falling piece does not fall for 2 s worth of frames
 --   fx_speed    -> it falls much faster than normal
---   fx_sink     -> after the next lock, the 2 bottom rows are gone:
---                  cells = before + 4 (the new piece) - cells in rows 18, 19
+--   fx_sink     -> right away (no lock needed), the 2 bottom rows are gone:
+--                  cells = before - cells in rows 18, 19
 -- Run with:  tools\sim.bat tb_chaos_core
 -- ============================================================================
 library ieee;
@@ -136,14 +136,14 @@ begin
       errors := errors + 1;
     else report "fx_speed ok: fell " & integer'image(y1 - y0) & " rows in 48 frames"; end if;
 
-    -- sink: 2 bottom rows gone after the next lock
+    -- sink: 2 bottom rows gone at once, while the piece is still falling
     before := count_cells(occ, 0, ROWS - 1);
     bottom := count_cells(occ, ROWS - 2, ROWS - 1);
     pulse(sk);
-    drop_piece;
-    if count_cells(occ, 0, ROWS - 1) /= before + 4 - bottom then
+    for k in 1 to 20 loop wait until rising_edge(clk); end loop;
+    if count_cells(occ, 0, ROWS - 1) /= before - bottom then
       report "fx_sink: " & integer'image(count_cells(occ, 0, ROWS - 1)) & " cells, expected " &
-             integer'image(before + 4 - bottom) severity error;
+             integer'image(before - bottom) severity error;
       errors := errors + 1;
     else report "fx_sink ok: " & integer'image(bottom) & " cells of the bottom 2 rows removed"; end if;
 

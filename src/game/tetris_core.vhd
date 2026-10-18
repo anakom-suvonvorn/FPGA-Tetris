@@ -22,7 +22,10 @@
 --   S_ATTACK versus: lines -> garbage to send (cancelling garbage waiting
 --            for me first); if nothing was cleared, waiting garbage comes in:
 --   S_HOLE   pick the hole column,  S_GARB  push the field up, add grey rows
+--            (at most 3..5 rows per lock, picked at random)
 --   S_PICK   choose the next piece (7-bag), S_SPAWN put it at the top
+--   S_SINK   chaos bonus, straight from S_PLAY: drop the field 2 rows,
+--   S_SINK_CHK  then make sure the falling piece still fits
 --
 -- VERSUS: the other board talks to us through versus_link. START starts a
 -- round, GARBAGE adds to 'pending', LOST means we won (that check sits after
@@ -100,7 +103,8 @@ architecture rtl of tetris_core is
   type state_t is (S_IDLE, S_INIT, S_PICK, S_SPAWN, S_SPAWN_CHK,
                    S_PLAY, S_ROT, S_ROT_CHK, S_MOVE, S_MOVE_CHK,
                    S_DOWN, S_DOWN_CHK, S_GHOST, S_GHOST_CHK, S_LOCKCHK,
-                   S_LOCK, S_CLEAR, S_SCORE, S_ATTACK, S_HOLE, S_GARB, S_SINK);
+                   S_LOCK, S_CLEAR, S_SCORE, S_ATTACK, S_HOLE, S_GARB,
+                   S_SINK, S_SINK_CHK);
   signal state : state_t := S_IDLE;
 
   -- the playfield
@@ -160,7 +164,7 @@ architecture rtl of tetris_core is
 
   -- versus
   signal pending_r : integer range 0 to 31 := 0;     -- garbage waiting to come in
-  signal garb_left : integer range 0 to 8 := 0;      -- rows still to insert now
+  signal garb_left : integer range 0 to 5 := 0;      -- rows still to insert now
   signal hole      : integer range 0 to COLS - 1 := 0;
   signal result_r  : integer range 0 to 4 := 0;
   signal lose_age  : integer range 0 to 63 := 63;    -- frames since I lost (for DRAW)
@@ -174,7 +178,6 @@ architecture rtl of tetris_core is
   constant R_LOSE : integer := 2;
   constant R_DRAW : integer := 3;
   constant R_OVER : integer := 4;
-  constant MAX_GARB_PER_LOCK : integer := 8;
 
   constant FULL_ROW  : occ_row_t := (others => '1');
   constant EMPTY_OCC : occ_row_t := (others => '0');
@@ -370,7 +373,9 @@ begin
 
         -- ---------------------------------------------- waiting for a frame
         when S_PLAY =>
-          if frame_tick = '1' and pause = '0' then
+          if sink_left > 0 then
+            state <= S_SINK;                        -- chaos bonus SINK: right now
+          elsif frame_tick = '1' and pause = '0' then
             -- take this frame's actions (and any arriving right now)
             w_left  <= req_left  or act_left;
             w_right <= req_right or act_right;
@@ -595,10 +600,14 @@ begin
             garb_o   <= '1';
             garb_o_n <= atk;
           end if;
-          if sink_left > 0 then
-            state <= S_SINK;                        -- chaos bonus first
-          elsif cleared = 0 and p > 0 then
-            if p > MAX_GARB_PER_LOCK then n := MAX_GARB_PER_LOCK; else n := p; end if;
+          if cleared = 0 and p > 0 then
+            -- at most 3..5 rows (random) come in per lock, the rest waits
+            case lfsr(1 downto 0) is
+              when "00"   => n := 3;
+              when "11"   => n := 5;
+              when others => n := 4;
+            end case;
+            if p < n then n := p; end if;
             garb_left <= n;
             p         := p - n;
             state     <= S_HOLE;
@@ -641,10 +650,15 @@ begin
 
         -- chaos bonus SINK: the opposite of S_GARB. Every row takes the one
         -- ABOVE it, so the bottom row falls out and an empty row enters at
-        -- the top. One row per clock.
+        -- the top. One row per clock. It happens as soon as the bonus comes
+        -- (from S_PLAY), while the piece is still falling; the piece stays
+        -- where it is on the screen.
         when S_SINK =>
           if sink_left = 0 then
-            state <= S_PICK;
+            cand_sh <= cur_sh;                      -- now: does the piece still fit?
+            cand_x  <= cur_xr;
+            cand_y  <= cur_yr;
+            state   <= S_SINK_CHK;
           else
             for r in ROWS - 1 downto 1 loop
               occ_r(r) <= occ_r(r - 1);
@@ -653,6 +667,17 @@ begin
             occ_r(0)  <= EMPTY_OCC;
             col_r(0)  <= EMPTY_COL;
             sink_left <= sink_left - 1;
+          end if;
+
+        -- Rare case: a block hanging right above the piece moved down into
+        -- it. Then lift the piece one row at a time until it fits again.
+        -- (cur_yr follows cand_y, so S_GHOST works from the new place.)
+        when S_SINK_CHK =>
+          if collide = '0' or cand_y = -2 then
+            cur_yr <= cand_y;
+            state  <= S_GHOST;                      -- new ghost, then on as usual
+          else
+            cand_y <= cand_y - 1;
           end if;
 
       end case;

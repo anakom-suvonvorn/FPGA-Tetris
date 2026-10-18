@@ -4,12 +4,12 @@
 --
 -- HOW IT WORKS
 --   Two states:
---     WAIT  count down a random 10..20 s (the panel shows "TASK INCOMING")
+--     WAIT  count down a random 10..17 s (nothing is shown: it's a surprise)
 --     RUN   one task is running; it either succeeds or its time runs out
 --   Every task works on the 8 task switches sw(7..0) = SW13..SW6, and keeps
---   a few numbers that tetris_render / chaos_render draw in the right panel:
+--   a few numbers that chaos_render draws in the right panel:
 --     sel       which switch the task is about (FLIP, HOLD, TIMING)
---     target    the pattern (MATCH) or the number (BINARY)
+--     target    the pattern (MATCH) or the number (BINARY, HEX)
 --     meter_pos, zone_lo, zone_hi   the moving marker and green zone
 --                                   (HOLD, TIMING), 0..191 = panel width
 --     progress  how far the player got, 0..191
@@ -17,6 +17,13 @@
 --   On success it decides the reward: with a rival connected, 5 times in 8 an
 --   ATTACK on the rival (send_attack + attack_id), otherwise a BONUS for me
 --   (bonus + bonus_id). Without a rival it is always a bonus.
+--
+--   Every length of time is picked at random from a range when the task
+--   starts (rand_range in chaos_pkg): the time allowed, how long HANDS and
+--   HOLD must be kept up, the width of the green zone, the marker speed.
+--
+--   hurry = '1' (I am under the LOCK attack): don't wait, start a task now,
+--   and after a failed task start the next one right away too.
 --
 --   Switch flips are found by comparing sw with its value one clock ago
 --   (edge detection); everything else is updated once per frame.
@@ -37,6 +44,7 @@ entity chaos_task is
     enable      : in  std_logic;                      -- chaos on and a game running
     paused      : in  std_logic;
     versus      : in  std_logic;                      -- a rival is connected
+    hurry       : in  std_logic;                      -- LOCK attack: a task now, please
     sw          : in  std_logic_vector(7 downto 0);   -- SW13..SW6, synchronised
     touch       : in  std_logic;                      -- any button action (pulse)
     -- for the panel
@@ -49,13 +57,14 @@ entity chaos_task is
     zone_lo     : out integer range 0 to 191;
     zone_hi     : out integer range 0 to 191;
     progress    : out integer range 0 to 191;
-    secs        : out integer range 0 to 31;          -- seconds left (or until the next task)
+    secs        : out integer range 0 to 31;          -- seconds left
+    hands_secs  : out integer range 0 to 7;           -- HANDS: how long to keep off
     -- results (one-clock pulses)
     task_start  : out std_logic;
     task_ok     : out std_logic;
     task_fail   : out std_logic;
     send_attack : out std_logic;
-    attack_id   : out integer range 0 to 7;
+    attack_id   : out integer range 0 to N_ATTACKS - 1;
     bonus       : out std_logic;
     bonus_id    : out integer range 0 to 2
   );
@@ -76,15 +85,26 @@ architecture rtl of chaos_task is
   signal pos       : integer range 0 to 191 := 96;
   signal vel       : integer range -4 to 4 := 0;
   signal dir_up    : std_logic := '1';
+  signal step      : integer range 1 to 4 := 3;               -- TIMING marker speed
   signal zlo       : integer range 0 to 191 := 0;
   signal zw        : integer range 0 to 63 := 40;
-  -- HANDS and HOLD: frames counted towards success
-  signal good      : integer range 0 to 255 := 0;
+  -- HANDS and HOLD: frames counted towards success, and how many are needed
+  signal good      : integer range 0 to 511 := 0;
+  signal goal      : integer range 0 to 511 := 180;
+  signal pscale    : integer range 0 to 511 := 256;           -- progress = good * pscale / 256
 
   signal start_p, ok_p, fail_p, atk_p, bon_p : std_logic := '0';
-  signal atk_id    : integer range 0 to 7 := 0;
+  signal atk_id    : integer range 0 to N_ATTACKS - 1 := 0;
   signal bon_id    : integer range 0 to 2 := 0;
   signal prog      : integer range 0 to 191 := 0;
+
+  -- HANDS / HOLD: 4 possible goals (frames) and the matching progress scale
+  -- 256 * 180 / goal, so the bar is full (180) exactly when the goal is reached
+  type int4_t is array (0 to 3) of integer range 0 to 511;
+  constant HANDS_GOAL  : int4_t := (180, 240, 240, 300);    -- 3, 4, 4, 5 s
+  constant HANDS_SCALE : int4_t := (256, 192, 192, 154);
+  constant HOLD_GOAL   : int4_t := (180, 200, 220, 240);    -- 3 .. 4 s
+  constant HOLD_SCALE  : int4_t := (256, 230, 209, 192);
 
   function ones(v : std_logic_vector(7 downto 0)) return integer is
     variable n : integer range 0 to 8 := 0;
@@ -97,8 +117,10 @@ architecture rtl of chaos_task is
 begin
 
   process(clk)
-    variable rnd     : integer range 0 to 255;
+    variable rnd     : integer range 0 to 255;     -- two random bytes
+    variable rnd2    : integer range 0 to 255;
     variable t       : integer range 0 to 7;
+    variable g       : integer range 0 to 3;
     variable flipped : std_logic;
     variable success : boolean;
     variable p       : integer range -8 to 200;
@@ -107,6 +129,8 @@ begin
     if rising_edge(clk) then
       lfsr <= lfsr(14 downto 0) & (lfsr(15) xor lfsr(13) xor lfsr(12) xor lfsr(10));
       rnd  := to_integer(unsigned(lfsr(7 downto 0)));
+      rnd2 := to_integer(unsigned(lfsr(15 downto 8)));
+      g    := to_integer(unsigned(lfsr(12 downto 11)));
       sw_d <= sw;
       start_p <= '0'; ok_p <= '0'; fail_p <= '0'; atk_p <= '0'; bon_p <= '0';
       success := false;
@@ -119,7 +143,9 @@ begin
         null;                                          -- everything waits
       elsif running = '0' then
         -- ------------------------------------------------ WAIT for the next task
-        if frame_tick = '1' then
+        if hurry = '1' and frames > 0 then
+          frames <= 0;                                 -- LOCK attack: no waiting
+        elsif frame_tick = '1' then
           if frames > 0 then
             frames <= frames - 1;
           else
@@ -131,7 +157,7 @@ begin
               last_task <= t;
               running   <= '1';
               start_p   <= '1';
-              frames    <= TASK_FRAMES(t);
+              frames    <= rand_range(TASK_LO(t), TASK_HI(t), rnd2);
               sel_r     <= to_integer(unsigned(lfsr(10 downto 8)));
               -- a pattern / number that is not already on the switches
               if lfsr(15 downto 8) = sw or lfsr(15 downto 8) = x"00" then
@@ -144,9 +170,21 @@ begin
               pos    <= 96;
               vel    <= 0;
               dir_up <= '1';
-              zw     <= 40;
-              if t = T_TIMING then zw <= 28; end if;
-              zlo    <= rnd mod 150;
+              step   <= rand_range(2, 4, rnd2);
+              if t = T_HANDS then
+                goal   <= HANDS_GOAL(g);
+                pscale <= HANDS_SCALE(g);
+              else
+                goal   <= HOLD_GOAL(g);
+                pscale <= HOLD_SCALE(g);
+              end if;
+              if t = T_TIMING then
+                zw  <= rand_range(28, 44, rnd2);
+                zlo <= rand_range(0, 147, rnd);
+              else
+                zw  <= rand_range(40, 60, rnd2);
+                zlo <= rand_range(0, 131, rnd);
+              end if;
             end if;                                    -- else: try again next frame
           end if;
         end if;
@@ -160,13 +198,13 @@ begin
               if cnt_r = 9 then success := true; end if;
               cnt_r <= cnt_r + 1;
             end if;
-          when T_MATCH | T_BINARY =>
+          when T_MATCH | T_BINARY | T_HEX =>
             if sw = target_r then success := true; end if;
           when T_HANDS =>
             if touch = '1' then
               good <= 0;                               -- touched a button: start over
             elsif frame_tick = '1' then
-              if good = 239 then success := true; end if;
+              if good = goal - 1 then success := true; end if;
               good <= good + 1;
             end if;
           when T_HOLD =>
@@ -182,23 +220,25 @@ begin
               if p > 191 then p := 191; vel <= 0; end if;
               pos <= p;
               if pos >= zlo and pos < zlo + zw then
-                if good = 179 then success := true; end if;
+                if good = goal - 1 then success := true; end if;
                 good <= good + 1;
               end if;
             end if;
           when others =>                               -- T_TIMING
             if frame_tick = '1' then                   -- marker sweeps back and forth
               if dir_up = '1' then
-                if pos >= 188 then dir_up <= '0'; else pos <= pos + 3; end if;
+                if pos >= 191 - step then dir_up <= '0'; else pos <= pos + step; end if;
               else
-                if pos <= 3 then dir_up <= '1'; else pos <= pos - 3; end if;
+                if pos <= step then dir_up <= '1'; else pos <= pos - step; end if;
               end if;
             end if;
             if flipped = '1' then
               if pos >= zlo and pos < zlo + zw then
                 if cnt_r = 2 then success := true; end if;
                 cnt_r <= cnt_r + 1;
-                zlo   <= rnd mod 160;                  -- a new zone for the next hit
+                -- a new zone (place and width) for the next hit
+                zw  <= rand_range(28, 44, rnd2);
+                zlo <= rand_range(0, 147, rnd);
               else
                 cnt_r <= 0;                            -- missed: start over
               end if;
@@ -208,10 +248,10 @@ begin
         if success then
           running <= '0';
           ok_p    <= '1';
-          frames  <= 600 + rnd;                        -- next task in 10..14 s
+          frames  <= rand_range(GAP_LO, GAP_HI, rnd);  -- next task in 10..17 s
           if versus = '1' and to_integer(unsigned(lfsr(10 downto 8))) < 5 then
             atk_p  <= '1';
-            atk_id <= to_integer(unsigned(lfsr(13 downto 11)));
+            atk_id <= rand_range(0, N_ATTACKS - 1, rnd2);
           else
             bon_p <= '1';
             b := to_integer(unsigned(lfsr(12 downto 11)));
@@ -222,7 +262,7 @@ begin
           if frames = 0 then
             running <= '0';                            -- out of time
             fail_p  <= '1';
-            frames  <= 600 + rnd;
+            frames  <= rand_range(GAP_LO, GAP_HI, rnd);
           else
             frames <= frames - 1;
           end if;
@@ -232,19 +272,20 @@ begin
   end process;
 
   -- progress bar (0..191) for each task
-  process(task_r, cnt_r, target_r, sw, good)
+  process(task_r, cnt_r, target_r, sw, good, pscale)
     variable m : integer range 0 to 8;
+    variable q : integer range 0 to 511;
   begin
+    q := (good * pscale) / 256;                    -- 0..180 for HANDS / HOLD
+    if q > 180 then q := 180; end if;
     case task_r is
       when T_FLIP =>
         prog <= cnt_r * 19;
-      when T_MATCH | T_BINARY =>
+      when T_MATCH | T_BINARY | T_HEX =>
         m := 8 - ones(target_r xor sw);              -- switches already right
         prog <= m * 23;
-      when T_HANDS =>
-        prog <= (good * 3) / 4;
-      when T_HOLD =>
-        if good > 179 then prog <= 179; else prog <= good; end if;
+      when T_HANDS | T_HOLD =>
+        prog <= q;
       when others =>
         if cnt_r > 3 then prog <= 189; else prog <= cnt_r * 63; end if;
     end case;
@@ -260,6 +301,7 @@ begin
   zone_hi     <= zlo + zw;
   progress    <= prog;
   secs        <= frames / 60;
+  hands_secs  <= goal / 60;
   task_start  <= start_p;
   task_ok     <= ok_p;
   task_fail   <= fail_p;

@@ -7,7 +7,7 @@
 -- A "solver" process plays the tasks on board A like a person would, by
 -- moving the 8 task switches:
 --   FLIP    toggle the wanted switch 10 times
---   MATCH / BINARY   set the switches to the target
+--   MATCH / BINARY / HEX   set the switches to the target
 --   HANDS   don't touch anything (just wait)
 --   HOLD    switch on when the bar is below the middle of the zone, else off
 --   TIMING  flip the switch when the marker is inside the zone
@@ -15,10 +15,13 @@
 --
 -- Checks:
 --   * every task that starts is solved (task_ok, never task_fail)
---   * all 6 task types came up at least once
+--   * all 7 task types came up at least once
 --   * every attack sent by A arrives at B with the same number, and turns
 --     on the matching effect output of B's chaos_fx (or the pulse for
 --     instant ones); every bonus on A turns on A's effect
+--   * LOCK: B's buttons get locked, B's chaos_task starts a task at once
+--     (hurry), and when B's little solver finishes it, B is unlocked.
+--     B's tasks are always MATCH (FORCE_TASK) so its solver is one line.
 --
 -- Run with:  tools\sim.bat tb_chaos
 -- ============================================================================
@@ -48,7 +51,7 @@ architecture sim of tb_chaos is
   signal count      : integer range 0 to 15;
   signal meter, zlo, zhi, prog : integer range 0 to 191;
   signal secs       : integer range 0 to 31;
-  signal att_id     : integer range 0 to 7;
+  signal att_id     : integer range 0 to N_ATTACKS - 1;
   signal att_id31   : integer range 0 to 31;
   signal bon_id     : integer range 0 to 2;
 
@@ -61,6 +64,11 @@ architecture sim of tb_chaos is
   signal b_mirror, b_flip, b_blind, b_bounce, b_cat, b_speed : std_logic;
   signal b_garb, b_next_bad, b_ban_on : std_logic;
   signal b_ban_id   : integer range 0 to 31;
+
+  -- board B's own task (only used by the LOCK attack)
+  signal b_locked, b_active, b_t_ok : std_logic;
+  signal b_target, b_sw : std_logic_vector(7 downto 0) := (others => '0');
+  signal b_starts   : integer := 0;
 begin
 
   clk <= not clk after 10 ns when not done else clk;
@@ -79,18 +87,19 @@ begin
   u_task : entity work.chaos_task
     generic map (FIRST_DELAY => 20)
     port map (clk => clk, frame_tick => frame_tick, enable => '1', paused => '0',
-              versus => link_a, sw => sw, touch => '0',
+              versus => link_a, hurry => '0', sw => sw, touch => '0',
               active => active, task => task, sel => sel, target => target, count => count,
               meter_pos => meter, zone_lo => zlo, zone_hi => zhi, progress => prog, secs => secs,
-              task_start => t_start, task_ok => t_ok, task_fail => t_fail,
+              hands_secs => open, task_start => t_start, task_ok => t_ok, task_fail => t_fail,
               send_attack => t_send, attack_id => att_id, bonus => t_bonus, bonus_id => bon_id);
 
   u_fx_a : entity work.chaos_fx
     port map (clk => clk, frame_tick => frame_tick, enable => '1', paused => '0',
               got_attack => '0', got_id => 0, sent_attack => t_send, sent_id => att_id,
-              bonus => t_bonus, bonus_id => bon_id, task_fail => t_fail,
-              mirror => open, flip => open, blind => open, bounce => open, cat => open,
-              speed => open, freeze => a_freeze, garbage => open, next_bad => open,
+              bonus => t_bonus, bonus_id => bon_id, task_ok => t_ok, task_fail => t_fail,
+              mirror => open, flip => open, blind => open, bounce => open, n_bounce => open,
+              cat => open, speed => open, freeze => a_freeze, locked => open,
+              garbage => open, next_bad => open,
               next_i => a_next_i, sink => a_sink, hit_evt => open, oiia_evt => open,
               banner_on => open, banner_id => open);
 
@@ -113,11 +122,32 @@ begin
   u_fx_b : entity work.chaos_fx
     port map (clk => clk, frame_tick => frame_tick, enable => '1', paused => '0',
               got_attack => b_got_att, got_id => b_got_id, sent_attack => '0', sent_id => 0,
-              bonus => '0', bonus_id => 0, task_fail => '0',
+              bonus => '0', bonus_id => 0, task_ok => b_t_ok, task_fail => '0',
               mirror => b_mirror, flip => b_flip, blind => b_blind, bounce => b_bounce,
-              cat => b_cat, speed => b_speed, freeze => open, garbage => b_garb,
+              n_bounce => open, cat => b_cat, speed => b_speed, freeze => open,
+              locked => b_locked, garbage => b_garb,
               next_bad => b_next_bad, next_i => open, sink => open, hit_evt => open,
               oiia_evt => open, banner_on => b_ban_on, banner_id => b_ban_id);
+
+  -- B's task: never comes by itself (long first wait), only when locked
+  u_task_b : entity work.chaos_task
+    generic map (FIRST_DELAY => 1000, FORCE_TASK => T_MATCH)
+    port map (clk => clk, frame_tick => frame_tick, enable => '1', paused => '0',
+              versus => '0', hurry => b_locked, sw => b_sw, touch => '0',
+              active => b_active, task => open, sel => open, target => b_target, count => open,
+              meter_pos => open, zone_lo => open, zone_hi => open, progress => open, secs => open,
+              hands_secs => open, task_start => open, task_ok => b_t_ok, task_fail => open,
+              send_attack => open, attack_id => open, bonus => open, bonus_id => open);
+
+  -- B's solver: copy the target a little after a task starts
+  solver_b : process
+  begin
+    wait until rising_edge(clk) and b_active = '1';
+    b_starts <= b_starts + 1;
+    for k in 1 to 50 loop wait until rising_edge(clk); end loop;
+    b_sw <= b_target;
+    wait until b_active = '0';
+  end process;
 
   -- ------------------------------------------------------------ the solver
   solver : process
@@ -135,7 +165,7 @@ begin
             for k in 1 to 30 loop wait until rising_edge(clk); end loop;
             sw(sel) <= not sw(sel);
           end loop;
-        when T_MATCH | T_BINARY =>
+        when T_MATCH | T_BINARY | T_HEX =>
           for k in 1 to 200 loop wait until rising_edge(clk); end loop;
           sw <= target;
         when T_HANDS =>
@@ -201,6 +231,7 @@ begin
           when A_OIIA    => effect_seen := b_cat = '1';
           when A_SPEED   => effect_seen := b_speed = '1';
           when A_GARBAGE => effect_seen := b_garb = '1';
+          when A_LOCK    => effect_seen := b_locked = '1';
           when others    => effect_seen := b_next_bad = '1';
         end case;
         if not effect_seen or b_ban_on = '0' or b_ban_id /= id then
@@ -208,6 +239,17 @@ begin
           errors := errors + 1;
         else
           report "task " & integer'image(task) & " solved -> attack " & integer'image(id) & " hit board B";
+        end if;
+        if id = A_LOCK then
+          -- B must get a task right away, solve it, and be unlocked
+          wait until b_locked = '0' for 100 us;
+          if b_locked = '1' then
+            report "LOCK: board B never got unlocked" severity error;
+            errors := errors + 1;
+          else
+            report "LOCK: B got a task at once, solved it, unlocked (B tasks so far: " &
+                   integer'image(b_starts) & ")";
+          end if;
         end if;
       else
         n_bon := n_bon + 1;

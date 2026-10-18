@@ -5,11 +5,13 @@
 -- "nothing here" (ov_on = '0'). tetris_render puts it over its own picture.
 --
 --   * the TASK panel, right side       x 428..627, y 284..467
---       two text lines, the 8 task switches (SW13 left .. SW6 right),
---       target lights (MATCH), a meter with a green zone (HOLD, TIMING),
---       a progress bar and a time bar
+--       only while a task runs (otherwise just the words CHAOS MODE ON,
+--       so a task always comes as a surprise). Two text lines, the 8 task
+--       switches (SW13 left .. SW6 right), target lights (MATCH), a meter
+--       with a green zone (HOLD, TIMING), a progress bar and a time bar.
+--       The frame turns red while my buttons are LOCKED.
 --   * the BANNER under the field       x 176..423, y 444..467
---   * BOUNCERS: 4 squares bouncing around the field (attack)
+--   * BOUNCERS: 5..10 squares bouncing around the field (attack)
 --   * the OIIA CAT: a 64 x 64 cat bouncing over the field, "spinning"
 --     (attack). The spin is faked with 4 pictures: normal, squeezed to half
 --     width, mirrored, mirrored + squeezed - like a coin turning.
@@ -33,7 +35,9 @@ entity chaos_render is
     x, y       : in  unsigned(9 downto 0);
     enable     : in  std_logic;                     -- chaos switched on
     bounce     : in  std_logic;
+    n_bounce   : in  integer range 5 to 10;         -- how many bouncers
     cat        : in  std_logic;
+    locked     : in  std_logic;                     -- LOCK attack: red frame
     -- task panel
     t_active   : in  std_logic;
     t_task     : in  integer range 0 to N_TASKS - 1;
@@ -46,6 +50,7 @@ entity chaos_render is
     t_zone_hi  : in  integer range 0 to 191;
     t_progress : in  integer range 0 to 191;
     t_secs     : in  integer range 0 to 31;
+    t_offsecs    : in  integer range 0 to 7;          -- HANDS: seconds to keep off
     -- banner
     banner_on  : in  std_logic;
     banner_id  : in  integer range 0 to 31;
@@ -62,14 +67,20 @@ architecture rtl of chaos_render is
   constant BQ  : integer := 20;                                     -- bouncer size
   constant CS  : integer := 64;                                     -- cat size
 
-  -- bouncers: position + direction, 4 of them
-  type pos4_t is array (0 to 3) of integer range 0 to 639;
-  type spd4_t is array (0 to 3) of integer range 1 to 7;
-  constant SPX : spd4_t := (3, 2, 4, 3);
-  constant SPY : spd4_t := (2, 3, 3, 4);
-  signal bx : pos4_t := (250, 300, 330, 370);
-  signal by : pos4_t := (100, 200, 300, 150);
-  signal bdx, bdy : std_logic_vector(3 downto 0) := "0101";   -- '1' = moving right / down
+  -- bouncers: position + direction + speed + colour, 10 of them
+  -- (only the first n_bounce are drawn)
+  constant NB : integer := 10;
+  type posn_t is array (0 to NB - 1) of integer range 0 to 639;
+  type spdn_t is array (0 to NB - 1) of integer range 1 to 7;
+  type rgbn_t is array (0 to NB - 1) of rgb_t;
+  constant SPX : spdn_t := (3, 2, 4, 3, 5, 2, 4, 1, 3, 5);
+  constant SPY : spdn_t := (2, 3, 3, 4, 2, 5, 1, 4, 5, 3);
+  constant BCOL : rgbn_t := (x"F2F", x"2FF", x"FF2", x"FFF", x"F80",
+                             x"8F2", x"F44", x"48F", x"FAF", x"0F8");
+  signal bx : posn_t := (250, 300, 330, 370, 260, 350, 280, 310, 375, 245);
+  signal by : posn_t := (100, 200, 300, 150, 360, 90, 240, 130, 330, 200);
+  signal bdx : std_logic_vector(NB - 1 downto 0) := "0101100110";  -- '1' = moving right
+  signal bdy : std_logic_vector(NB - 1 downto 0) := "1001011010";  -- '1' = moving down
 
   -- the cat
   signal cx    : integer range 0 to 639 := 260;
@@ -100,11 +111,13 @@ architecture rtl of chaos_render is
   constant L1_TXT : lines_t := (
     to_codes("FLIP THE SWITCH "), to_codes("COPY THE LIGHTS "), to_codes("SET IN BINARY:  "),
     to_codes("HANDS OFF!      "), to_codes("KEEP THE BAR IN "), to_codes("FLIP IN GREEN   "),
-    to_codes("   CHAOS MODE   "));
+    to_codes("SET IN HEX:     "),
+    to_codes(" CHAOS MODE ON  "));
   constant L2_TXT : lines_t := (
     to_codes("SW00 TEN TIMES  "), to_codes("WITH SW13-SW6   "), to_codes("      000       "),
-    to_codes("NO BUTTONS 4 SEC"), to_codes("GREEN WITH SW00 "), to_codes("SW00  HITS: 0/3 "),
-    to_codes("NEXT TASK IN 00S"));
+    to_codes("NO BUTTONS 0 SEC"), to_codes("GREEN WITH SW00 "), to_codes("SW00  HITS: 0/3 "),
+    to_codes("       00       "),
+    to_codes("                "));
 begin
 
   -- ---------------------------------------------------------------- moving things
@@ -113,7 +126,7 @@ begin
     if rising_edge(clk) then
       if frame_tick = '1' then
         spin <= spin + 1;
-        for i in 0 to 3 loop
+        for i in 0 to NB - 1 loop
           if bdx(i) = '1' then
             if bx(i) + SPX(i) >= FX0 + FW - BQ then bdx(i) <= '0'; else bx(i) <= bx(i) + SPX(i); end if;
           else
@@ -140,17 +153,15 @@ begin
   end process;
 
   -- ---------------------------------------------------------------- text
-  process(t_active, t_task, t_sel, t_target, t_count, t_secs)
+  process(t_active, t_task, t_sel, t_target, t_count, t_offsecs)
     variable l1, l2 : std_logic_vector(95 downto 0);
     variable swn, v : integer range 0 to 255;
   begin
     swn := t_sel + 6;                              -- switch index 0..7 -> SW6..SW13
     v   := to_integer(unsigned(t_target));
     if t_active = '0' then
-      l1 := L1_TXT(N_TASKS);
+      l1 := L1_TXT(N_TASKS);                       -- just "CHAOS MODE ON"
       l2 := L2_TXT(N_TASKS);
-      l2 := put_digit(l2, 13, t_secs / 10);
-      l2 := put_digit(l2, 14, t_secs mod 10);
     else
       l1 := L1_TXT(t_task);
       l2 := L2_TXT(t_task);
@@ -168,6 +179,12 @@ begin
           l2 := put_digit(l2, 6, v / 100);
           l2 := put_digit(l2, 7, (v / 10) mod 10);
           l2 := put_digit(l2, 8, v mod 10);
+        when T_HEX =>
+          -- character codes 0..15 are '0'..'9','A'..'F': a hex digit is its own code
+          l2 := put_digit(l2, 7, to_integer(unsigned(t_target(7 downto 4))));
+          l2 := put_digit(l2, 8, to_integer(unsigned(t_target(3 downto 0))));
+        when T_HANDS =>
+          l2 := put_digit(l2, 11, t_offsecs);
         when others =>
           null;
       end case;
@@ -206,11 +223,20 @@ begin
 
       -- ------------------------------------------ the task panel
       r_panel <= '0';
-      if enable = '1' and xi >= PX0 - 4 and xi < PX0 + 196 and yi >= PY0 - 4 and yi < PY0 + 180 then
+      if enable = '1' and t_active = '0' then
+        -- no task: only the first text line ("CHAOS MODE ON"), no box
+        if xi >= PX0 and xi < PX0 + 192 and yi >= 290 and yi < 308 then
+          r_panel <= '1';
+        end if;
+      elsif enable = '1' and xi >= PX0 - 4 and xi < PX0 + 196 and yi >= PY0 - 4 and yi < PY0 + 180 then
         hit := '1';
         r_panel <= '1';
         if xi < PX0 - 2 or xi >= PX0 + 194 or yi < PY0 - 2 or yi >= PY0 + 178 then
-          c := x"A3C";                                -- purple frame
+          if locked = '1' then
+            c := x"F22";                              -- red frame: buttons locked
+          else
+            c := x"A3C";                              -- purple frame
+          end if;
         else
           c := x"101";                                -- dark inside
         end if;
@@ -243,9 +269,9 @@ begin
           if t_active = '1' and yi >= 406 and yi < 414 then
             if px < t_progress then c := x"3CE"; else c := x"123"; end if;
           end if;
-          -- time bar (12 px per second)
+          -- time bar (11 px per second, at most 17 s)
           if yi >= 422 and yi < 428 then
-            if px < t_secs * 12 then
+            if px < t_secs * 11 then
               if t_active = '1' and t_secs < 3 then c := x"F44"; else c := x"999"; end if;
             else
               c := x"222";
@@ -261,9 +287,9 @@ begin
         r_band <= '1';
         c := x"000";
       end if;
-      if banner_id <= 7 or banner_id = 19 then
+      if banner_id < BAN_SENT or banner_id = BAN_FAIL then
         r_ban_rgb <= x"F55";                           -- incoming / failed: red
-      elsif banner_id <= 15 then
+      elsif banner_id < BAN_BONUS then
         r_ban_rgb <= x"FD3";                           -- sent: gold
       else
         r_ban_rgb <= x"5E7";                           -- bonus: green
@@ -271,15 +297,10 @@ begin
 
       -- ------------------------------------------ bouncers
       if bounce = '1' then
-        for i in 0 to 3 loop
-          if xi >= bx(i) and xi < bx(i) + BQ and yi >= by(i) and yi < by(i) + BQ then
+        for i in 0 to NB - 1 loop
+          if i < n_bounce and xi >= bx(i) and xi < bx(i) + BQ and yi >= by(i) and yi < by(i) + BQ then
             hit := '1';
-            case i is
-              when 0      => c := x"F2F";
-              when 1      => c := x"2FF";
-              when 2      => c := x"FF2";
-              when others => c := x"FFF";
-            end case;
+            c   := BCOL(i);
           end if;
         end loop;
       end if;
@@ -316,7 +337,8 @@ begin
 
   -- text goes on top of the panel / band it belongs to
   ov_on  <= '1' when (r_panel = '1' and (t_l1 = '1' or t_l2 = '1')) or (r_band = '1' and t_ban = '1') else r_on;
-  ov_rgb <= x"FFF"     when r_panel = '1' and t_l1 = '1' else
+  ov_rgb <= x"C6F"     when r_panel = '1' and t_l1 = '1' and t_active = '0' else
+            x"FFF"     when r_panel = '1' and t_l1 = '1' else
             x"9BD"     when r_panel = '1' and t_l2 = '1' else
             r_ban_rgb  when r_band = '1' and t_ban = '1' else
             r_rgb;
