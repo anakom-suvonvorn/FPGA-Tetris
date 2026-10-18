@@ -18,3 +18,4 @@ vivado/
 # game build output, except the finished bitstream
 game/build/*
 !game/build/*.bit
+sim/media_sim.bin
