@@ -138,7 +138,7 @@ canvas { display: block; max-width: 100%; height: auto; border-radius: 4px; imag
 <main>
 <header>
   <h1>Tetris Duel Internals</h1>
-  <p>Visual companion to <code>docs/learn/05_game_walkthrough.md</code> (sections 1–8) and <code>06_versus_walkthrough.md</code> (sections 9–11). Every diagram here runs the same rules as the VHDL in <code>src/game/</code>. Press the buttons and watch what the hardware does.</p>
+  <p>Visual companion to <code>docs/learn/05_game_walkthrough.md</code> (sections 1–8), <code>06_versus_walkthrough.md</code> (sections 9–11) and <code>07_chaos_walkthrough.md</code> (sections 12–13). Every diagram here runs the same rules as the VHDL in <code>src/game/</code>. Press the buttons and watch what the hardware does.</p>
   <nav class="toc" aria-label="Sections">
     <a href="#coords">1 · coordinates</a>
     <a href="#collide">2 · collision check</a>
@@ -151,6 +151,8 @@ canvas { display: block; max-width: 100%; height: auto; border-radius: 4px; imag
     <a href="#msg">9 · link message</a>
     <a href="#garb">10 · garbage</a>
     <a href="#sd">11 · audio mixer</a>
+    <a href="#tasks">12 · chaos tasks</a>
+    <a href="#cat">13 · the spinning cat</a>
   </nav>
 </header>
 
@@ -202,7 +204,7 @@ canvas { display: block; max-width: 100%; height: auto; border-radius: 4px; imag
 <!-- ================================================================ 3 -->
 <section id="fsm">
   <h2><span class="tag">tetris_core · state_t</span>One frame through the state machine</h2>
-  <p>Each box is a <code>when S_… =&gt;</code> in the code. Each step below is <b>one clock</b> (20 ns). Pick a situation and step through it. The highlighted box is the state the machine is in during that clock. Every arrow is a possible change of state (the three states top right are new for versus: garbage). Dashed arrows are the "nothing to do, skip" paths. A curved arrow back into the same box means the state repeats for several clocks. Follow it from the top: a new piece flows down the middle into <code>S_GHOST</code>; the frame loop goes round the left and bottom; locking goes up the right side back to <code>S_PICK</code>.</p>
+  <p>Each box is a <code>when S_… =&gt;</code> in the code. Each step below is <b>one clock</b> (20 ns). Pick a situation and step through it. The highlighted box is the state the machine is in during that clock. Every arrow is a possible change of state (the four states on the right are new for versus garbage and the chaos SINK bonus). Dashed arrows are the "nothing to do, skip" paths. A curved arrow back into the same box means the state repeats for several clocks. Follow it from the top: a new piece flows down the middle into <code>S_GHOST</code>; the frame loop goes round the left and bottom; locking goes up the right side back to <code>S_PICK</code>.</p>
   <div class="stage">
     <div class="controls" role="group" aria-label="Scenario" id="scnBtns"></div>
     <div class="controls">
@@ -212,7 +214,7 @@ canvas { display: block; max-width: 100%; height: auto; border-radius: 4px; imag
       <button id="fsmReset">restart</button>
       <span class="clock" id="fsmClock"></span>
     </div>
-    <div class="scroll"><svg id="fsmSvg" viewBox="0 0 1040 625" style="min-width:800px;width:100%" role="img" aria-label="State machine diagram"></svg></div>
+    <div class="scroll"><svg id="fsmSvg" viewBox="0 0 1060 625" style="min-width:800px;width:100%" role="img" aria-label="State machine diagram"></svg></div>
     <div class="log" id="fsmLog" aria-live="polite"></div>
   </div>
 </section>
@@ -369,6 +371,39 @@ canvas { display: block; max-width: 100%; height: auto; border-radius: 4px; imag
       <button id="tlM" aria-pressed="true">music playing</button>
     </div>
     <div class="scroll"><svg id="tlSvg" viewBox="0 0 780 330" style="min-width:620px;width:100%" role="img" aria-label="Sound over time"></svg></div>
+  </div>
+</section>
+<!-- ================================================================ 12 -->
+<section id="tasks">
+  <h2><span class="tag">chaos_task · chaos_render</span>Try the chaos tasks</h2>
+  <p>This panel runs the same rules as <code>chaos_task.vhd</code> at 60 frames a second, and draws the same panel as <code>chaos_render.vhd</code>. Click the switches below (SW13 on the left, like the panel) to do the task. "press a button" stands for any Tetris button (it matters for HANDS). On the board you'd be doing this <i>while</i> playing Tetris.</p>
+  <div class="stage">
+    <div class="controls" role="group" aria-label="Task" id="tkBtns"></div>
+    <div class="row2">
+      <div class="scroll"><canvas id="tkCanvas" width="400" height="368" style="width:400px;max-width:100%" aria-label="Task panel"></canvas></div>
+      <div class="readout">
+        <div class="controls" id="tkSwitches" role="group" aria-label="Task switches"></div>
+        <div class="controls">
+          <button id="tkTouch">press a button</button>
+          <button id="tkRestart">new task</button>
+        </div>
+        <div class="log" id="tkLog"></div>
+        <p class="note" id="tkHow"></p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================================================================ 13 -->
+<section id="cat">
+  <h2><span class="tag">chaos_pkg · chaos_render</span>How the cat spins with only one picture</h2>
+  <p>The OIIA cat is one 16 × 16 picture in a ROM (3 bits per pixel: see-through, black, grey, white, pink), drawn 4× bigger (64 × 64). A real 3D spin would need many pictures. Instead <code>chaos_render</code> cycles through 4 ways of <b>reading the same picture</b>, 8 frames each. Normal → squeezed → mirrored → squeezed looks like a card turning around. All four are just different formulas for <code>sx</code>, the picture column to read for screen column <code>dx</code> (0..63):</p>
+  <div class="stage">
+    <div class="scroll"><canvas id="catCanvas" width="760" height="230" style="width:760px;max-width:100%" aria-label="The four cat pictures"></canvas></div>
+    <div class="controls">
+      <button id="catPlay" aria-pressed="true">spinning</button>
+      <span class="clock" id="catInfo"></span>
+    </div>
   </div>
 </section>
 </main>
@@ -649,7 +684,7 @@ canvas { display: block; max-width: 100%; height: auto; border-radius: 4px; imag
     S_PLAY: [580, 540], S_ROT: [420, 540], S_ROT_CHK: [260, 540], S_MOVE: [100, 540],
     S_MOVE_CHK: [100, 440], S_DOWN: [100, 345], S_DOWN_CHK: [100, 250],
     S_LOCK: [760, 440], S_CLEAR: [760, 345], S_SCORE: [760, 250],
-    S_ATTACK: [760, 155], S_HOLE: [920, 155], S_GARB: [920, 60]
+    S_ATTACK: [760, 155], S_HOLE: [920, 155], S_GARB: [920, 60], S_SINK: [920, 250]
   };
   const NW = 124, NH = 38;
   const T = n => [NODES[n][0], NODES[n][1] - NH / 2], B = n => [NODES[n][0], NODES[n][1] + NH / 2];
@@ -674,6 +709,8 @@ canvas { display: block; max-width: 100%; height: auto; border-radius: 4px; imag
     [[T("S_HOLE"), B("S_GARB")], "hole picked", 928, 112],
     [[[890, NODES.S_GARB[1] - NH / 2], [890, 24], [420, 24], T("S_PICK")], "rows done", 800, 36],
     [[[950, NODES.S_GARB[1] - NH / 2], [950, 6], [100, 6], T("S_IDLE")], "pushed out: lose", 790, 17],
+    [[[NODES.S_ATTACK[0] + NW / 2, 165], [840, 165], [840, 250], Lf("S_SINK")], "sink", 846, 214],
+    [[R("S_SINK"), [1040, 250], [1040, 24], [420, 24], T("S_PICK")], "rows gone", 990, 242],
     [[Lf("S_PLAY"), R("S_ROT")]],
     [[Lf("S_ROT"), R("S_ROT_CHK")]],
     [[Lf("S_ROT_CHK"), R("S_MOVE")]],
@@ -690,13 +727,13 @@ canvas { display: block; max-width: 100%; height: auto; border-radius: 4px; imag
   const LOOPS = {
     S_IDLE: ["bottomleft", "wait for start", 30, 116, "start"], S_PICK: ["bottom", "retry"], S_PLAY: ["right", "wait for frame_tick"],
     S_ROT_CHK: ["top", "next kick"], S_GHOST_CHK: ["left", "1 row lower"], S_LOCK: ["right", "next box row"],
-    S_CLEAR: ["right", "1 row / clock"], S_SCORE: ["right", "1 line / clock"],
+    S_CLEAR: ["right", "1 row / clock"], S_SCORE: ["left", "1 line / clock", 680, 292, "middle"], S_SINK: ["bottom", "1 row / clock"],
     S_HOLE: ["right", "retry", 998, 194, "middle"], S_GARB: ["right", "1 row / clock", 1000, 34, "middle"]
   };
   let nodeEls = {};
   function drawFsm() {
     const svg = document.getElementById("fsmSvg");
-    svg.setAttribute("viewBox", "0 0 1040 625");
+    svg.setAttribute("viewBox", "0 0 1060 625");
     svg.innerHTML = "";
     const defs = el("defs", {}, svg);
     const mk = el("marker", { id: "arr", viewBox: "0 0 10 10", refX: 9, refY: 5, markerWidth: 7, markerHeight: 7, orient: "auto-start-reverse" }, defs);
@@ -705,7 +742,7 @@ canvas { display: block; max-width: 100%; height: auto; border-radius: 4px; imag
     el("text", { x: 300, y: 450, class: "c-muted", "font-size": 12 }, svg, "once per frame");
     el("text", { x: 300, y: 466, class: "c-muted", "font-size": 11 }, svg, "(60 times a second)");
     el("text", { x: 830, y: 520, "text-anchor": "middle", class: "c-muted", "font-size": 12 }, svg, "lock · clear · score");
-    el("text", { x: 862, y: 212, class: "c-muted", "font-size": 12 }, svg, "versus: garbage");
+    el("text", { x: 862, y: 212, class: "c-muted", "font-size": 12 }, svg, "versus + chaos");
     el("text", { x: 180, y: 120, class: "c-muted", "font-size": 12 }, svg, "new game / new piece");
     el("text", { x: 180, y: 136, class: "c-accent", "font-size": 11, "font-weight": 600 }, svg, "rival LOST, in any state → S_IDLE (WIN!)");
     // edges
@@ -828,6 +865,19 @@ canvas { display: block; max-width: 100%; height: auto; border-radius: 4px; imag
       ["S_SPAWN", "new piece at (6, 0) → S_SPAWN_CHK"],
       ["S_SPAWN_CHK", "fits → S_GHOST"],
       ...tail(12)],
+    "chaos bonus: sink": [["S_LOCKCHK", "the piece locks (a SINK bonus came in earlier: sink_left = 2, pending = 0) → S_LOCK"],
+      ["S_LOCK", "4 box rows written into the field", 4],
+      ["S_CLEAR", "no full rows", 20],
+      ["S_CLEAR", "done → S_SCORE"],
+      ["S_SCORE", "score_left = 0 → S_ATTACK"],
+      ["S_ATTACK", "nothing to send; sink_left = 2 → S_SINK (garbage would wait for the next lock)"],
+      ["S_SINK", "every row takes the row ABOVE it, an empty row enters at the top: the bottom row is gone. sink_left = 1"],
+      ["S_SINK", "again: sink_left = 0"],
+      ["S_SINK", "sink_left = 0 → S_PICK"],
+      ["S_PICK", "next piece → S_SPAWN"],
+      ["S_SPAWN", "→ S_SPAWN_CHK"],
+      ["S_SPAWN_CHK", "fits → S_GHOST"],
+      ...tail(14)],
     "win: rival lost": [tick,
       ["S_ROT", "nothing → S_MOVE"],
       ["S_MOVE", "nothing → S_DOWN"],
@@ -1437,13 +1487,223 @@ canvas { display: block; max-width: 100%; height: auto; border-radius: 4px; imag
   }
   function drawSdAll() { drawSdTable(); drawBucket(); }
 
+  // ------------------------------------------------------------ 12. chaos tasks
+  const TASKS = [
+    { n: "FLIP", l1: "FLIP THE SWITCH", t: 480, how: "Flip the orange switch 10 times. chaos_task counts edges: sw(sel) xor sw_d(sel)." },
+    { n: "MATCH", l1: "COPY THE LIGHTS", t: 720, how: "Make the switches equal the yellow lights. Success when sw = target." },
+    { n: "BINARY", l1: "SET IN BINARY:", t: 900, how: "Set the number in binary: SW13 = 128, SW12 = 64 ... SW6 = 1. Success when sw = target." },
+    { n: "HANDS", l1: "HANDS OFF!", t: 600, how: "Don't press any button for 4 s (240 frames). Each press sets the counter 'good' back to 0." },
+    { n: "HOLD", l1: "KEEP THE BAR IN", t: 900, how: "Switch on = the bar's velocity goes up, off = it falls (velocity −1 per frame, max ±4). Keep it in the green for 180 frames in total." },
+    { n: "TIMING", l1: "FLIP IN GREEN", t: 720, how: "The marker sweeps 3 px per frame. Flip the orange switch while it is in the green: 3 hits in a row. A miss sets the count back to 0." }
+  ];
+  const TK = { task: 2, sw: 0x5A, swd: 0x5A, sel: 3, target: 173, cnt: 0, frames: 900, good: 0, pos: 96, vel: 0, up: true, zlo: 60, zw: 40, done: "", last: 0 };
+  function tkNew(t) {
+    TK.task = t; TK.cnt = 0; TK.good = 0; TK.pos = 96; TK.vel = 0; TK.up = true;
+    TK.sel = Math.floor(Math.random() * 8);
+    let tg = 1 + Math.floor(Math.random() * 255);
+    if (tg === TK.sw) tg = (~TK.sw) & 0xFF;
+    TK.target = tg;
+    TK.zw = t === 5 ? 28 : 40;
+    TK.zlo = Math.floor(Math.random() * 150);
+    TK.frames = TASKS[t].t;
+    TK.done = "";
+    document.querySelectorAll("#tkBtns button").forEach((b, i) => b.setAttribute("aria-pressed", i === t ? "true" : "false"));
+    document.getElementById("tkHow").textContent = TASKS[t].how;
+  }
+  function tkSuccess() {
+    const r = Math.random();
+    const ATT = ["MIRROR", "FLIP", "BLIND", "BOUNCERS", "OIIA CAT", "GARBAGE", "CURSED", "SPEED UP"];
+    const BON = ["FREEZE TIME", "SINK 2 ROWS", "I PIECE NEXT"];
+    TK.done = r < 5 / 8 ? "SENT: " + ATT[Math.floor(Math.random() * 8)] + "!" : "BONUS: " + BON[Math.floor(Math.random() * 3)];
+  }
+  function tkFlip(i) {                          // one switch changed (an edge)
+    if (TK.done) return;
+    TK.sw ^= (1 << i);
+    const flipped = i === TK.sel;
+    const t = TK.task;
+    if (t === 0 && flipped) { TK.cnt++; if (TK.cnt >= 10) tkSuccess(); }
+    if (t === 5 && flipped) {
+      if (TK.pos >= TK.zlo && TK.pos < TK.zlo + TK.zw) { TK.cnt++; TK.zlo = Math.floor(Math.random() * 160); if (TK.cnt >= 3) tkSuccess(); }
+      else TK.cnt = 0;
+    }
+    if ((t === 1 || t === 2) && TK.sw === TK.target) tkSuccess();
+    drawSwitches();
+  }
+  function tkFrame() {                          // once per frame, like frame_tick
+    if (TK.done) return;
+    const t = TK.task;
+    if (t === 3) { TK.good++; if (TK.good >= 240) tkSuccess(); }
+    if (t === 4) {
+      const on = (TK.sw >> TK.sel) & 1;
+      TK.vel = Math.max(-4, Math.min(4, TK.vel + (on ? 1 : -1)));
+      let p = TK.pos + TK.vel;
+      if (p < 0) { p = 0; TK.vel = 0; }
+      if (p > 191) { p = 191; TK.vel = 0; }
+      if (TK.pos >= TK.zlo && TK.pos < TK.zlo + TK.zw) { TK.good++; if (TK.good >= 180) tkSuccess(); }
+      TK.pos = p;
+    }
+    if (t === 5) {
+      if (TK.up) { if (TK.pos >= 188) TK.up = false; else TK.pos += 3; }
+      else { if (TK.pos <= 3) TK.up = true; else TK.pos -= 3; }
+    }
+    if (!TK.done) { TK.frames--; if (TK.frames <= 0) TK.done = "TASK FAILED"; }
+  }
+  function tkProgress() {
+    const t = TK.task;
+    if (t === 0) return TK.cnt * 19;
+    if (t === 1 || t === 2) { let x = TK.target ^ TK.sw, n = 0; for (let i = 0; i < 8; i++) n += (x >> i) & 1; return (8 - n) * 23; }
+    if (t === 3) return Math.floor(TK.good * 3 / 4);
+    if (t === 4) return Math.min(179, TK.good);
+    return Math.min(189, TK.cnt * 63);
+  }
+  function drawSwitches() {
+    const host = document.getElementById("tkSwitches");
+    host.querySelectorAll("button").forEach(b => {
+      const i = +b.dataset.i, on = (TK.sw >> i) & 1;
+      b.setAttribute("aria-pressed", on ? "true" : "false");
+      b.textContent = `SW${6 + i} ${on ? "▲" : "▼"}`;
+    });
+  }
+  function drawTaskPanel() {
+    const cv = document.getElementById("tkCanvas"), g = cv.getContext("2d");
+    const S = 2;                                 // 2 canvas px per screen px (panel is 200 x 184 screen px)
+    g.setTransform(S, 0, 0, S, 0, 0);
+    const hx = c => "#" + c.split("").map(d => d + d).join("");
+    g.fillStyle = hx("A3C"); g.fillRect(0, 0, 200, 184);
+    g.fillStyle = hx("101"); g.fillRect(2, 2, 196, 180);
+    const X = 4, Y = 4;                          // PX0 / PY0 in the panel's own coordinates
+    const t = TK.task, prog = tkProgress(), secs = Math.max(0, Math.floor(TK.frames / 60));
+    g.font = "bold 11px 'IBM Plex Mono', monospace"; g.textBaseline = "top";
+    g.fillStyle = "#fff"; g.fillText(TASKS[t].l1, X, Y + 4);
+    let l2 = "";
+    const swn = TK.sel + 6;
+    if (t === 0) l2 = `SW${swn} TEN TIMES`;
+    if (t === 1) l2 = "WITH SW13-SW6";
+    if (t === 2) l2 = `      ${String(TK.target).padStart(3, "0")}`;
+    if (t === 3) l2 = "NO BUTTONS 4 SEC";
+    if (t === 4) l2 = `GREEN WITH SW${swn}`;
+    if (t === 5) l2 = `SW${swn}  HITS: ${TK.cnt}/3`;
+    g.fillStyle = hx("9BD"); g.fillText(l2, X, Y + 24);
+    for (let k = 0; k < 8; k++) {
+      const i = 7 - k, x0 = X + k * 24;
+      if (t === 1) { g.fillStyle = (TK.target >> i) & 1 ? hx("FE3") : hx("332"); g.fillRect(x0 + 6, 54, 12, 8); }
+      g.fillStyle = ((t === 0 || t === 4 || t === 5) && i === TK.sel) ? hx("760") : hx("333");
+      g.fillRect(x0 + 7, 66, 10, 24);
+      g.fillStyle = hx("DDD");
+      if ((TK.sw >> i) & 1) g.fillRect(x0 + 7, 66, 10, 11); else g.fillRect(x0 + 7, 79, 10, 11);
+    }
+    if (t === 4 || t === 5) {
+      g.fillStyle = hx("222"); g.fillRect(X, 98, 192, 16);
+      g.fillStyle = hx("2A4"); g.fillRect(X + TK.zlo, 98, TK.zw, 16);
+      g.fillStyle = "#fff"; g.fillRect(X + TK.pos, 98, 4, 16);
+    }
+    g.fillStyle = hx("123"); g.fillRect(X, 122, 192, 8);
+    g.fillStyle = hx("3CE"); g.fillRect(X, 122, prog, 8);
+    g.fillStyle = hx("222"); g.fillRect(X, 138, 192, 6);
+    g.fillStyle = secs < 3 ? hx("F44") : hx("999"); g.fillRect(X, 138, Math.min(192, secs * 12), 6);
+    if (TK.done) {
+      g.fillStyle = "rgba(0,0,0,0.75)"; g.fillRect(2, 150, 196, 30);
+      g.fillStyle = TK.done.startsWith("TASK") ? hx("F55") : (TK.done.startsWith("SENT") ? hx("FD3") : hx("5E7"));
+      g.fillText(TK.done, X + 2, 160);
+    }
+    document.getElementById("tkLog").innerHTML =
+      `task ${t} (${TASKS[t].n}) · sel = ${TK.sel} (SW${TK.sel + 6}) · target = ${TK.target} = ${TK.target.toString(2).padStart(8, "0")} · ` +
+      `sw = ${TK.sw.toString(2).padStart(8, "0")} · progress ${prog}/191 · ${secs} s left` + (t === 4 ? ` · bar ${TK.pos}, velocity ${TK.vel}, good ${TK.good}/180` : "") + (t === 3 ? ` · good ${TK.good}/240` : "");
+  }
+  function initTasks() {
+    const tb = document.getElementById("tkBtns");
+    TASKS.forEach((T, i) => {
+      const b = document.createElement("button"); b.textContent = T.n;
+      b.addEventListener("click", () => { tkNew(i); drawTaskPanel(); });
+      tb.appendChild(b);
+    });
+    const sh = document.getElementById("tkSwitches");
+    for (let i = 7; i >= 0; i--) {
+      const b = document.createElement("button"); b.dataset.i = i;
+      b.addEventListener("click", () => { tkFlip(i); drawTaskPanel(); });
+      sh.appendChild(b);
+    }
+    document.getElementById("tkTouch").onclick = () => { if (TK.task === 3) TK.good = 0; };
+    document.getElementById("tkRestart").onclick = () => { tkNew(TK.task); };
+    tkNew(2);
+    drawSwitches();
+    let lastT = 0;
+    const loop = ts => {
+      if (ts - lastT >= 1000 / 60 - 1) { tkFrame(); drawTaskPanel(); lastT = ts; }
+      requestAnimationFrame(loop);
+    };
+    requestAnimationFrame(loop);
+  }
+
+  // ------------------------------------------------------------ 13. the cat
+  const CAT = ["..K..........K..", ".KGK........KGK.", ".KGGK......KGGK.", ".KGPGKKKKKKGPGK.",
+    ".KGGGGGGGGGGGGK.", "KGGGGGGGGGGGGGGK", "KGGKKGGGGGGKKGGK", "KGGKWGGGGGGKWGGK",
+    "KGGGGGGPPGGGGGGK", "KGGGWWGKKGWWGGGK", "KGGWWWWGGWWWWGGK", ".KGGWWWWWWWWGGK.",
+    ".KGGGWWWWWWGGGK.", "..KGGGGGGGGGGK..", "...KKGGGGGGKK...", ".....KKKKKK....."];
+  const CATCOL = { K: "#111", G: "#999", W: "#fff", P: "#f9b" };
+  // which picture column for screen column dx (0..63) in picture ph, or -1 = nothing
+  function catSx(ph, dx) {
+    if (ph === 0) return Math.floor(dx / 4);
+    if (ph === 2) return 15 - Math.floor(dx / 4);
+    if (dx < 16 || dx >= 48) return -1;
+    const sx = Math.floor((dx - 16) / 2);
+    return ph === 3 ? 15 - sx : sx;
+  }
+  function drawCatAt(g, ox, oy, ph, scale) {
+    for (let dy = 0; dy < 64; dy++) for (let dx = 0; dx < 64; dx++) {
+      const sx = catSx(ph, dx); if (sx < 0) continue;
+      const ch = CAT[Math.floor(dy / 4)][sx];
+      if (ch === ".") continue;
+      g.fillStyle = CATCOL[ch];
+      g.fillRect(ox + dx * scale, oy + dy * scale, scale, scale);
+    }
+  }
+  let catPlaying = true, catFrame = 0;
+  function initCat() {
+    const cv = document.getElementById("catCanvas"), g = cv.getContext("2d");
+    const FORM = ["sx = dx / 4", "sx = (dx − 16) / 2", "sx = 15 − dx / 4", "sx = 15 − (dx − 16) / 2"];
+    const NAME = ["0 · normal", "1 · squeezed", "2 · mirrored", "3 · mirrored + squeezed"];
+    const css = getComputedStyle(document.documentElement);
+    const draw = () => {
+      const fg = css.getPropertyValue("--fg").trim() || "#222", mu = css.getPropertyValue("--muted").trim() || "#666", cell = css.getPropertyValue("--cell").trim() || "#eee", acc = css.getPropertyValue("--accent").trim() || "#088";
+      g.clearRect(0, 0, 760, 230);
+      const ph = (catFrame >> 3) & 3;
+      for (let k = 0; k < 4; k++) {
+        const ox = 10 + k * 150, oy = 30;
+        g.fillStyle = cell; g.fillRect(ox - 4, oy - 4, 136, 136);
+        if (k === ph) { g.strokeStyle = acc; g.lineWidth = 3; g.strokeRect(ox - 4, oy - 4, 136, 136); }
+        drawCatAt(g, ox, oy, k, 2);
+        g.fillStyle = fg; g.font = "600 12px 'IBM Plex Mono', monospace"; g.fillText(NAME[k], ox - 2, 18);
+        g.fillStyle = mu; g.font = "11px 'IBM Plex Mono', monospace"; g.fillText(FORM[k], ox - 2, 186);
+      }
+      // the live one
+      g.fillStyle = cell; g.fillRect(616, 26, 136, 136);
+      drawCatAt(g, 620, 30, ph, 2);
+      g.fillStyle = fg; g.font = "600 12px 'IBM Plex Mono', monospace"; g.fillText("on screen", 618, 18);
+      g.fillStyle = mu; g.font = "11px 'IBM Plex Mono', monospace"; g.fillText("picture = spin(4..3)", 618, 186);
+      g.fillText("each lasts 8 frames", 618, 202);
+      document.getElementById("catInfo").textContent = `frame ${catFrame % 32} of 32 → picture ${ph}`;
+    };
+    document.getElementById("catPlay").onclick = () => {
+      catPlaying = !catPlaying;
+      document.getElementById("catPlay").setAttribute("aria-pressed", catPlaying ? "true" : "false");
+    };
+    let last = 0;
+    const loop = ts => {
+      if (catPlaying && ts - last >= 1000 / 60 - 1) { catFrame++; last = ts; draw(); }
+      requestAnimationFrame(loop);
+    };
+    draw();
+    requestAnimationFrame(loop);
+  }
+
   // ------------------------------------------------------------ wire-up
   function update() { drawWide(); readWide(); drawCollide(); drawLock(); drawScreen(); }
   drawFsm(); showFsm();
   buildClear(); drawClear();
   buildBcd(); drawBcd();
   drawLfsr();
-  drawMsg(); calcGarb(); drawSdAll(); drawTimeline();
+  drawMsg(); calcGarb(); drawSdAll(); drawTimeline(); initTasks(); initCat();
   update();
   inspect(FX0 + 4 * 16 + 7, FY0 + 1 * 16 + 7);
 })();

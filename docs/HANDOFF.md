@@ -106,6 +106,30 @@ Harmless warning in 03/04: uart_rx FSM has no reset.
 
 ## 5. What the user asked for next (in order)
 
+**GIT (from 2026-10-18):** repo D:\setupssignment, remote origin =
+github.com/anakom-suvonvorn/FPGA-Tetris. Branch `main` = stable (tag
+`v1-versus` = versus core). Branch `chaos` = layer 2 (commits 4122307,
+304be72; not pushed - ask the user before pushing). Merge chaos -> main after
+the user tests it on hardware. Commit as you go on a feature branch.
+tools/remap_doc_lines.py <doc> "<sec start>" "<sec end>" <git rev> <src> fixes
+L-number references in docs/learn after code changes (run it for every
+changed file / doc section before committing).
+
+**CHAOS LAYER DONE 2026-10-18 (layer 2, branch `chaos`)** in code + sim, NOT
+yet on hardware. SW21 (K3) chaos on; task switches SW6..SW13 = sw_task(0..7)
+(P12 N10 P10 M10 N4 L2 P3 N1; panel shows SW13 left - physical order not yet
+confirmed by the user). New: chaos_pkg (ids, durations, 20 banners, 16x16
+cat ROM), chaos_task (WAIT/RUN, 6 tasks FLIP MATCH BINARY HANDS HOLD TIMING,
+success -> attack 5/8 if versus else bonus), chaos_fx (8 attack timers,
+freeze, banner 150 frames), chaos_render (overlay: panel x428..627 y284..467,
+banner y444..467, 4 bouncers, 64px cat with 4-phase fake spin). Link type 4
+ATTACK. Core: fx_freeze/fx_speed/fx_next_bad/fx_next_i/fx_sink, S_SINK.
+Render: flip, blind, overlay last. Sound: 6 chaos SFX. 7-seg = task
+countdown. Build 66% LUTs, WNS +5.8. Sims PASS: tb_chaos, tb_chaos_core,
+tb_tetris_core, tb_versus; screenshots game/screenshot_chaos_*.png.
+Docs: docs/learn/07_chaos_walkthrough.md, visual guide sections 12-13 + S_SINK.
+Next: layer 3 media (flash read test first), layer 4 mini-games.
+
 **VERSUS CORE DONE 2026-10-17 (layer 1 of 4)** - in code + sim, NOT yet on
 hardware. Agreed plan with the user ("Tetris CHAOS edition"): layer 1 versus
 core (done), layer 2 chaos (attack/reward system, slide-switch mini-tasks,
