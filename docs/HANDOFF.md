@@ -106,7 +106,7 @@ Harmless warning in 03/04: uart_rx FSM has no reset.
 
 ## 5. What the user asked for next (in order)
 
-**GIT (from 2026-10-18):** repo D:\setupssignment, remote origin =
+**GIT (from 2026-10-18):** repo D:\setup\assignment, remote origin =
 github.com/anakom-suvonvorn/FPGA-Tetris. Branch `main` = stable (tag
 `v1-versus` = versus core). Branch `chaos` = layer 2 (commits 4122307,
 304be72; not pushed - ask the user before pushing). Merge chaos -> main after
