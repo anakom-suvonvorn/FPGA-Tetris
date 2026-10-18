@@ -55,7 +55,7 @@ Cost: logic use went from 28 % to 44 % of the chip; timing still fine
 
 ## 6.1 `versus_link.vhd`: the conversation
 
-### The message (L5–21)
+### The message (L5–22)
 
 Every message is **one byte**: the top 3 bits say *what* it is, the bottom 5
 bits carry a number.
@@ -77,7 +77,7 @@ Why one byte? It's the smallest thing `uart_tx` sends (one frame of 10
 bits, 87 µs at 115200 baud), so every message arrives whole or not at all,
 and there's no "which byte am I in" problem.
 
-### Constants and signals (L58–78)
+### Constants and signals (L63–86)
 
 `T_HEARTBEAT` ... `T_START`: the 4 type codes. Then the transmitter and
 receiver wires (`tx_data`, `tx_start`, ...), then three groups:
@@ -88,21 +88,21 @@ receiver wires (`tx_data`, `tx_start`, ...), then three groups:
 * **receive side:** `silence` counts frames since the last byte; `g_*` are
   the one-clock output pulses; `opp_h` is the last height heard.
 
-`msg(t, v)` (L80) builds a byte: `t & 5-bit v`.
+`msg(t, v)` (L90) builds a byte: `t & 5-bit v`.
 
-### Placing the UART blocks (L86–92)
+### Placing the UART blocks (L96–102)
 
 The exact `uart_tx` / `uart_rx` from tests 03 and 04, with the bit time as
 a generic (the testbench makes it 8 clocks instead of 434 to run faster).
 
-### Sending (L103–141)
+### Sending (L114–160)
 
 Two halves, the same pattern as `top_uart_echo`:
 
-1. **Remember** (L103–113): `send_start` / `send_lost` pulses set their
+1. **Remember** (L114–128): `send_start` / `send_lost` pulses set their
    flags. Every `HB_FRAMES` (6) frames, `hb_p` is set: 10 heartbeats per
    second.
-2. **Send** (L115–141) when the transmitter is free, **in priority order**:
+2. **Send** (L130–160) when the transmitter is free, **in priority order**:
    START, LOST, GARBAGE, HEARTBEAT. An `if / elsif` chain *is* a priority
    encoder: the first true condition wins, so a heartbeat can never delay a
    LOST.
@@ -112,14 +112,14 @@ it in the same clock: it's sent (→ 0) and new garbage arrives (+ n). Doing
 both on a variable in order, then writing the signal once at the end, gets
 both right. (The core uses the same trick for `pending`, 6.2.)
 
-### Receiving (L142–163)
+### Receiving (L161–185)
 
 On each `rx_valid` pulse: reset `silence` to 0, then `case` on the top 3
 bits: a heartbeat updates the rival height, the others become one-clock
 pulses with the 5-bit value. Unknown types are ignored. That's why adding
 chaos messages later won't break anything.
 
-**link_ok** (L171) = `silence < TIMEOUT_FRAMES`. Since the other board sends
+**link_ok** (L195) = `silence < TIMEOUT_FRAMES`. Since the other board sends
 a heartbeat every 6 frames, silence for 30 frames (0.5 s) means the cable
 is out or the other board is off. Then the core plays single player.
 
@@ -136,26 +136,26 @@ is out or the other board is off. Then the core plays single player.
 | `garb_in` + `garb_in_n`: garbage arrived | `garb_out` + `garb_out_n`: send this garbage |
 | `opp_lost`: the other board topped out | `height`, `pending`, `result` |
 
-`result` (L164–168): 0 nothing, 1 WIN, 2 LOSE, 3 DRAW, 4 GAME OVER
+`result` (L172–176): 0 nothing, 1 WIN, 2 LOSE, 3 DRAW, 4 GAME OVER
 (single player).
 
-### Starting together (S_IDLE, L280)
+### Starting together (S_IDLE, L294)
 
 Pressing start on either board sends START (`start_o` pulse → link →
 cable). The other board's `start_in` makes it leave S_IDLE too. Both
 boards start within ~0.1 ms of each other. A START that arrives while
 already playing is ignored, because only S_IDLE looks at it.
 
-### `pending`: garbage waiting for me (L251–256, L638–642)
+### `pending`: garbage waiting for me (L265–270, L696–700)
 
 `pending_r` holds the number of garbage lines that arrived but haven't come
 in yet (the red meter). Up to three things change it in one clock:
 S_INIT (→ 0), S_ATTACK (cancel / take some out), and new garbage arriving.
 So, like `gsum` above, the process copies it into variable `p` at the start
-(L256), every part works on `p`, and the end of the process writes it back
-once (L642), after adding newly arrived garbage (L638–641).
+(L270), every part works on `p`, and the end of the process writes it back
+once (L700), after adding newly arrived garbage (L696–699).
 
-### S_ATTACK (L559): turning lines into garbage
+### S_ATTACK (L580): turning lines into garbage
 
 Runs after S_SCORE, every time a piece locks.
 
@@ -183,7 +183,7 @@ Then: anything left to send → `garb_out` pulse. And if I **cleared
 nothing** while garbage waits, up to `MAX_GARB_PER_LOCK` (8) lines come in
 now → S_HOLE.
 
-### S_HOLE (L587) and S_GARB (L596): garbage rising from the bottom
+### S_HOLE (L610) and S_GARB (L619): garbage rising from the bottom
 
 S_HOLE picks the hole column, a random 0..9 from the LFSR (4 bits, retry if
 ≥ 10, the same trick as S_PICK).
@@ -212,7 +212,7 @@ anything, shifting would push it off the field, so **I lose**.
 * **Lose** (no room to spawn, or garbage push-out): `over_r`, `playing_r = 0`,
   `lost_o` pulse (→ LOST message), `result_r` = LOSE (or GAME OVER if no
   link), `lose_age = 0`.
-* **Win** (L621): when `opp_lost` arrives while I'm playing → `result_r = WIN`,
+* **Win** (L679): when `opp_lost` arrives while I'm playing → `result_r = WIN`,
   stop, go to S_IDLE. This is written **after** the `case`, so it overrides
   whatever state the `case` chose in that clock ("last assignment wins").
   Receiving LOST means "you won", **at once**: the game stops in that clock,
@@ -242,7 +242,7 @@ anything, shifting would push it off the field, so **I lose**.
   alone and loses much later, that late LOST must not turn my old LOSE into
   a DRAW.
 
-### Stack height (L646–660)
+### Stack height (L704–718)
 
 A separate clocked process scans rows 19 → 0. Each non-empty row
 overwrites `h`, so after the loop `h` = 20 − (highest non-empty row).
@@ -301,24 +301,24 @@ each character 24 × 32, 4 characters = 96 px wide.
 
 New inputs: `lines_bcd`, `result`, `pending`, `opp_height`, `link_ok`.
 
-**Nine text layers** (L138–155), each a separate copy of `text_layer`
+**Nine text layers** (L143–160), each a separate copy of `text_layer`
 placed at a fixed spot: NEXT, LEVEL, LINES, the line number, RIVAL, the link
 status, PRESS START, the result word, GAME OVER. Fixed text comes from
 constants (`TXT_NEXT`...), because VHDL-93 doesn't allow a function call in
 a port map (our rule from Part 1). Changing text is chosen by signals:
 
-* `num_chars` (L129): the 4 BCD digits, with "00" added to make 6-bit codes.
-* `link_chars` (L131): " LINKED" or "NO LINK".
-* `res_chars` (L132): "WIN!" / "LOSE" / "DRAW" chosen with `with result select`.
+* `num_chars` (L134): the 4 BCD digits, with "00" added to make 6-bit codes.
+* `link_chars` (L136): " LINKED" or "NO LINK".
+* `res_chars` (L137): "WIN!" / "LOSE" / "DRAW" chosen with `with result select`.
 
 **Stage 1 additions:**
-* garbage meter (L239): the 8 px column left of the field, filled
+* garbage meter (L247): the 8 px column left of the field, filled
   if `y ≥ 400 − 16 × pending`, so it grows upwards, 16 px per waiting line;
-* rival bar (L252): same idea with `opp_height`;
-* dark bands (L265): rows behind the result text and PRESS START, so the
+* rival bar (L260): same idea with `opp_height`;
+* dark bands (L273): rows behind the result text and PRESS START, so the
   text is readable over blocks.
 
-**Stage 2 additions** (L315 on): inside the field, the banner is drawn
+**Stage 2 additions** (L332 on): inside the field, the banner is drawn
 *last*, so it covers blocks. Result colours: gold WIN!, red LOSE / GAME
 OVER, white DRAW. The field frame turns gold when you win. Outside the
 field, new layers: the meter (red on dark red), the rival bar (grey, red
@@ -329,7 +329,7 @@ the labels.
 
 ## 6.5 `tetris_sound.vhd`: music and effects
 
-### A note is a counter (L57–80, L234–257)
+### A note is a counter (L66–89, L268–291)
 
 A square wave at frequency f flips every 25,000,000 / f clocks. A4 = 440 Hz
 → flip every 56,818 clocks. `half_period(n)` is that table for the 18 notes
@@ -345,11 +345,11 @@ elsif m_cnt >= half_period(mus_now) - 1 then
 Note 0 means silence: the counter and output stay at 0. Two generators: one
 for music (`m_sq`), one for effects (`s_sq`).
 
-### The melody (L92–111)
+### The melody (L101–120)
 
 Two ROMs side by side: `MUS_NOTE` (which note) and `MUS_LEN` (how many
 eighth notes), 40 steps = the 8-bar Tetris theme ("Korobeiniki"), bar by bar
-in the comments. The player (L212–230), once per frame:
+in the comments. The player (L246–264), once per frame:
 
 * when a note runs out: load the next one, length = eighths ×
   `eighth_frames(level)` (12 frames = 0.2 s at level 0, down to 6 at level
@@ -359,7 +359,7 @@ in the comments. The player (L212–230), once per frame:
 
 It only runs while `playing = '1'` and restarts at every game.
 
-### Effects (L113–138, L177–210)
+### Effects (L122–166, L205–244)
 
 Each effect is up to 4 (note, frames) steps in two 2-D arrays (`fx_t`, an
 array indexed by two numbers). Events start them: a lock click, a rising
@@ -368,7 +368,7 @@ win / lose jingles, a start beep. Starts are detected as **edges**: the
 process keeps last clock's `playing` and `result` (`playing_d`,
 `result_d`). "Was 0, is now 1" = the game just started.
 
-### Mixing to one pin: the bucket trick (sigma-delta) (L259–279)
+### Mixing to one pin: the bucket trick (sigma-delta) (L293–313)
 
 The visual guide's section 11 shows all of this step by step, with a bucket
 you can fill clock by clock. Here is the same in text.
@@ -447,9 +447,9 @@ output keeps correcting itself and never drifts from the right average.
 ## 6.6 `top_tetris.vhd`
 
 * **Generic `LINK_CLKS_PER_BIT`**: 434 normally (115200 baud).
-* **Four switches** through one 2-FF synchronizer as a 4-bit bus (L127):
+* **Four switches** through one 2-FF synchronizer as a 4-bit bus (L165):
   pause, music, sound effects, and SW22 = "use USB".
-* **Link source** (L165): `rx_line <= usb_rx when usb_s = '1' else link_rx;`.
+* **Link source** (L216): `rx_line <= usb_rx when usb_s = '1' else link_rx;`.
   A 2-to-1 mux picks which wire the link listens to. It *sends* on both
   wires always: the J5 pin and the USB line. Nobody listening is harmless.
 * **Pull-ups** in `pins.xdc` on both receive pins: an unplugged J5 pin then

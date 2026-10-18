@@ -13,6 +13,9 @@ every message the board sends, and lets you type commands:
     g 3      send 3 garbage lines
     l        send LOST    (the board wins)
     h 12     pretend my stack is 12 rows high (the RIVAL bar)
+    x 4      send chaos ATTACK number 4 (needs SW21 chaos on, on the board):
+             0 mirror  1 flip  2 blind  3 bouncers  4 OIIA cat
+             5 garbage 6 cursed next  7 speed
     a        auto mode on/off: stack grows, random garbage every few seconds
     q        quit
 
@@ -20,6 +23,7 @@ Message format (same as src/game/versus_link.vhd): one byte,
 bits 7..5 = type, bits 4..0 = value.
     type 0 HEARTBEAT (value = stack height)   type 1 GARBAGE (value = lines)
     type 2 LOST                               type 3 START
+    type 4 ATTACK (value = chaos attack number)
 """
 import random
 import sys
@@ -31,8 +35,9 @@ try:
 except ImportError:
     sys.exit("pyserial is missing:  python -m pip install pyserial")
 
-T_HEARTBEAT, T_GARBAGE, T_LOST, T_START = 0, 1, 2, 3
-NAMES = {0: "HEARTBEAT", 1: "GARBAGE", 2: "LOST", 3: "START"}
+T_HEARTBEAT, T_GARBAGE, T_LOST, T_START, T_ATTACK = 0, 1, 2, 3, 4
+NAMES = {0: "HEARTBEAT", 1: "GARBAGE", 2: "LOST", 3: "START", 4: "ATTACK"}
+ATTACKS = ["MIRROR", "FLIP", "BLIND", "BOUNCERS", "OIIA CAT", "GARBAGE", "CURSED NEXT", "SPEED"]
 
 
 def msg(t, v=0):
@@ -87,6 +92,9 @@ class Opponent:
                 elif t == T_LOST:
                     print("  <- board says LOST (it topped out: I win)")
                     self.playing = False
+                elif t == T_ATTACK:
+                    name = ATTACKS[v] if v < len(ATTACKS) else str(v)
+                    print(f"  <- board ATTACKS me with {name}!")
                 elif t == T_START:
                     print("  <- board says START (new round)")
                     self.playing = True
@@ -124,11 +132,15 @@ class Opponent:
             elif cmd == "h":
                 self.height = max(0, min(20, arg or 0))
                 print(f"  my height is now {self.height}")
+            elif cmd == "x":
+                n = max(0, min(7, arg or 0))
+                self.send(T_ATTACK, n)
+                print(f"  -> ATTACK {n} ({ATTACKS[n]})")
             elif cmd == "a":
                 self.auto = not self.auto
                 print(f"  auto mode {'ON' if self.auto else 'OFF'}")
             else:
-                print("  commands: s, g <n>, l, h <n>, a, q")
+                print("  commands: s, g <n>, l, h <n>, x <n>, a, q")
         self.running = False
         time.sleep(0.2)
         self.ser.close()

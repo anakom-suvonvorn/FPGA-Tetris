@@ -20,9 +20,12 @@ never written VHDL by hand or opened the Vivado GUI. Read in order:
    link and its 1-byte messages, garbage (cancel, send, rise), win / lose /
    draw, the on-screen font and text, music + sound effects (sigma-delta),
    the two-board testbench and the PC fake opponent.
-7. [Visual guide](tetris_visual.html) (open in a browser, or
+7. [The CHAOS layer, line by line](07_chaos_walkthrough.md): slide-switch
+   tasks, attacks over the link, bonuses, mirror / flip / blind / bouncers /
+   the spinning OIIA cat, and how they are tested (on the `chaos` git branch).
+8. [Visual guide](tetris_visual.html) (open in a browser, or
    https://claude.ai/artifact/28Mdg6vDhCJzwXsmgR6Cdb): interactive diagrams
-   for Parts 5 and 6.
+   for Parts 5, 6 and 7.
 
 Quick start for Vivado:
 

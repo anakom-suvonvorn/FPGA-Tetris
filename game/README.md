@@ -1,4 +1,4 @@
-# The game: Tetris Duel (versus core)
+# The game: Tetris Duel, CHAOS edition
 
 Versus Tetris on two EDGE boards linked by a cable. With no second board it
 plays single player.
@@ -41,6 +41,8 @@ The 5 push buttons form a cross:
 | SW4 | music (Tetris theme) |
 | SW5 | sound effects |
 | SW22 | link to the PC over USB instead of the J5 cable |
+| SW21 | **CHAOS** on (tasks + attacks) |
+| SW6..SW13 | the task switches (SW13 = left in the panel picture) |
 
 ## The screen
 
@@ -72,6 +74,28 @@ The 5 push buttons form a cross:
   practically the same instant, before either LOST message arrives: DRAW.
 * SW18 after a round starts the next one on both boards.
 
+## CHAOS (SW21 up)
+
+Every 10–20 s a task pops up in the purple panel on the right; the
+7-segment display counts down its seconds. Do it with **SW6..SW13** while you
+keep playing:
+
+| Task | Do this |
+|---|---|
+| FLIP | flip the shown switch 10 times |
+| MATCH | copy the 8 lights onto the switches |
+| BINARY | set the number in binary (SW13 = 128 ... SW6 = 1) |
+| HANDS | don't touch any button for 4 s |
+| HOLD | keep the bar in the green: the switch pushes it up, it falls by itself |
+| TIMING | flip the switch while the marker is in the green, 3 times in a row |
+
+Done in time → with a rival connected, usually an **attack** on the rival:
+MIRROR (left/right swapped), FLIP (field upside down), BLIND (blocks
+invisible), BOUNCERS, the spinning **OIIA cat**, +3 GARBAGE, CURSED next
+piece (S or Z), SPEED. Otherwise a **bonus**: FREEZE gravity, SINK 2 rows
+(+ cancel waiting garbage), or an I PIECE next. The banner under the field
+says what happened.
+
 ## Wiring two boards
 
 Same as test 04 (test that first):
@@ -97,6 +121,8 @@ SW22 down (off) on both boards. Within half a second both show **LINKED**.
    * `h 15` set the PC's stack height (RIVAL bar turns red);
    * `l` the PC loses → the board shows **WIN!**;
    * `a` auto mode: the PC's stack grows and it sends random garbage;
+   * `x 4` attack the board with the OIIA cat (`x 0`..`x 7`: all 8 attacks;
+     needs SW21 up on the board);
    * clear 2+ lines on the board → the PC prints "board sends n garbage".
 
 ## Sound
@@ -113,6 +139,11 @@ buzzer (jumper J6 on Enable) plays effects only. SW4 / SW5 switch them.
   rows appear, one WIN + one LOSE. PASSED.
 * `tools\sim.bat tb_tetris_frame`: the whole design with a pretend PC;
   saves screenshots `sim\out\frame.png` (game) and `frame2.png` (WIN!).
+* `tools\sim.bat tb_chaos`: a robot solves the tasks; attacks go over the link
+  and switch on the effects of the other board. PASSED.
+* `tools\sim.bat tb_chaos_core`: freeze, speed, cursed / I next, sink. PASSED.
+* `tools\sim.bat tb_chaos_frame`: screenshots with a task panel, the cat,
+  flip + bouncers (`screenshot_chaos_task.png`, `screenshot_chaos_flip.png`).
 
 ## How it's built (top-down)
 
@@ -122,11 +153,14 @@ top_tetris
  ├─ tetris_input    5 buttons → action pulses                    src\game
  ├─ tetris_core     rules + state, garbage, win/lose             src\game
  ├─ versus_link     1-byte messages over uart_tx / uart_rx       src\game
+ ├─ chaos_task      slide-switch tasks                           src\game
+ ├─ chaos_fx        attacks / bonuses on me, banner              src\game
+ ├─ chaos_render    task panel, banner, bouncers, cat (overlay)  src\game
  ├─ tetris_render   (x, y) + state → colour, 9 x text_layer      src\game
  ├─ tetris_sound    music + effects → audio jack / buzzer        src\game
  └─ seg7_scan       lines on the 7-segment display               src\common
 ```
 
 Explained line by line in `docs\learn\05_game_walkthrough.md` (single
-player) and `docs\learn\06_versus_walkthrough.md` (everything added for
-versus).
+player), `docs\learn\06_versus_walkthrough.md` (versus) and
+`docs\learn\07_chaos_walkthrough.md` (chaos).
