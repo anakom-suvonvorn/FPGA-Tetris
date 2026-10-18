@@ -314,7 +314,7 @@ canvas { display: block; max-width: 100%; height: auto; border-radius: 4px; imag
 <!-- ================================================================ 10 -->
 <section id="garb">
   <h2><span class="tag">tetris_core · S_ATTACK, S_GARB</span>Garbage: cancel, send, rise</h2>
-  <p>When a piece locks, <code>S_ATTACK</code> turns the lines it cleared into an attack (2 → 1, 3 → 2, 4 → 4). The attack first cancels garbage <b>waiting for you</b> (the red meter), and only the rest is sent. If the piece cleared nothing, up to 8 waiting lines come in now. <code>S_GARB</code> then pushes the whole field up one row per clock and adds a grey row with one hole.</p>
+  <p>When a piece locks, <code>S_ATTACK</code> turns the lines it cleared into an attack (2 → 1, 3 → 2, 4 → 4). The attack first cancels garbage <b>waiting for you</b> (the red meter), and only the rest is sent. If the piece cleared nothing, up to 3–5 waiting lines (random each time) come in now. <code>S_GARB</code> then pushes the whole field up one row per clock and adds a grey row with one hole.</p>
   <div class="stage">
     <div class="controls">
       <label class="note" for="gPend">waiting for me (pending)</label>
@@ -376,7 +376,7 @@ canvas { display: block; max-width: 100%; height: auto; border-radius: 4px; imag
 <!-- ================================================================ 12 -->
 <section id="tasks">
   <h2><span class="tag">chaos_task · chaos_render</span>Try the chaos tasks</h2>
-  <p>This panel runs the same rules as <code>chaos_task.vhd</code> at 60 frames a second, and draws the same panel as <code>chaos_render.vhd</code>. Click the switches below (SW13 on the left, like the panel) to do the task. "press a button" stands for any Tetris button (it matters for HANDS). On the board you'd be doing this <i>while</i> playing Tetris.</p>
+  <p>This panel runs the same rules as <code>chaos_task.vhd</code> at 60 frames a second, and draws the same panel as <code>chaos_render.vhd</code>. Click the switches below (SW13 on the left, like the panel) to do the task. "press a button" stands for any Tetris button (it matters for HANDS). On the board you'd be doing this <i>while</i> playing Tetris. Every length of time (time allowed, HANDS / HOLD goal, zone width, marker speed) is picked at random from its range each time you press "new task", like <code>rand_range</code> does in hardware. In the game the panel only appears when a task starts; between tasks the screen just says CHAOS MODE ON.</p>
   <div class="stage">
     <div class="controls" role="group" aria-label="Task" id="tkBtns"></div>
     <div class="row2">
@@ -1316,7 +1316,7 @@ canvas { display: block; max-width: 100%; height: auto; border-radius: 4px; imag
     let atk = atk0, pp = p;
     if (atk >= pp) { atk = atk - pp; pp = 0; } else { pp = pp - atk; atk = 0; }
     let incoming = 0;
-    if (gClr === 0 && pp > 0) { incoming = Math.min(8, pp); pp -= incoming; }
+    if (gClr === 0 && pp > 0) { incoming = Math.min(3 + Math.floor(Math.random() * 3), pp); pp -= incoming; }
     const note = `cleared ${gClr} → atk = ${atk0}. ` +
       (atk0 === 0 ? "Nothing to cancel with. " : `Cancel: ${Math.min(atk0, p)} of the ${p} waiting lines are wiped out. `) +
       `<b>Sent to the other board: ${atk}</b>` + (atk > 0 ? " (garb_out pulse → GARBAGE message)" : "") + ". " +
@@ -1488,33 +1488,40 @@ canvas { display: block; max-width: 100%; height: auto; border-radius: 4px; imag
   function drawSdAll() { drawSdTable(); drawBucket(); }
 
   // ------------------------------------------------------------ 12. chaos tasks
+  // lo..hi = the time allowed in frames (chaos_pkg TASK_LO / TASK_HI)
   const TASKS = [
-    { n: "FLIP", l1: "FLIP THE SWITCH", t: 480, how: "Flip the orange switch 10 times. chaos_task counts edges: sw(sel) xor sw_d(sel)." },
-    { n: "MATCH", l1: "COPY THE LIGHTS", t: 720, how: "Make the switches equal the yellow lights. Success when sw = target." },
-    { n: "BINARY", l1: "SET IN BINARY:", t: 900, how: "Set the number in binary: SW13 = 128, SW12 = 64 ... SW6 = 1. Success when sw = target." },
-    { n: "HANDS", l1: "HANDS OFF!", t: 600, how: "Don't press any button for 4 s (240 frames). Each press sets the counter 'good' back to 0." },
-    { n: "HOLD", l1: "KEEP THE BAR IN", t: 900, how: "Switch on = the bar's velocity goes up, off = it falls (velocity −1 per frame, max ±4). Keep it in the green for 180 frames in total." },
-    { n: "TIMING", l1: "FLIP IN GREEN", t: 720, how: "The marker sweeps 3 px per frame. Flip the orange switch while it is in the green: 3 hits in a row. A miss sets the count back to 0." }
+    { n: "FLIP", l1: "FLIP THE SWITCH", lo: 420, hi: 540, how: "Flip the orange switch 10 times. chaos_task counts edges: sw(sel) xor sw_d(sel)." },
+    { n: "MATCH", l1: "COPY THE LIGHTS", lo: 600, hi: 780, how: "Make the switches equal the yellow lights. Success when sw = target." },
+    { n: "BINARY", l1: "SET IN BINARY:", lo: 780, hi: 1020, how: "Set the number in binary: SW13 = 128, SW12 = 64 ... SW6 = 1. Success when sw = target. Tip: watch the progress bar go up or down as you flip." },
+    { n: "HANDS", l1: "HANDS OFF!", lo: 540, hi: 720, how: "Don't press any button for 3–5 s (picked at random, shown on the panel). Each press sets the counter 'good' back to 0." },
+    { n: "HOLD", l1: "KEEP THE BAR IN", lo: 780, hi: 960, how: "Switch on = the bar's velocity goes up, off = it falls (velocity −1 per frame, max ±4). Keep it in the green (40–60 px wide) for 3–4 s in total." },
+    { n: "TIMING", l1: "FLIP IN GREEN", lo: 600, hi: 780, how: "The marker sweeps 2–4 px per frame. Flip the orange switch while it is in the green (28–44 px wide, new place and width after each hit): 3 hits in a row. A miss sets the count back to 0." },
+    { n: "HEX", l1: "SET IN HEX:", lo: 660, hi: 840, how: "Set the 2 hex digits in binary: the left digit on SW13..SW10, the right one on SW9..SW6. A = 1010, 4 = 0100, so A4 = 1010 0100." }
   ];
-  const TK = { task: 2, sw: 0x5A, swd: 0x5A, sel: 3, target: 173, cnt: 0, frames: 900, good: 0, pos: 96, vel: 0, up: true, zlo: 60, zw: 40, done: "", last: 0 };
+  // rand_range from chaos_pkg: lo + r * (hi - lo + 1) / 256, r = a random byte
+  const rr = (lo, hi) => lo + Math.floor(Math.floor(Math.random() * 256) * (hi - lo + 1) / 256);
+  const TK = { task: 2, sw: 0x5A, swd: 0x5A, sel: 3, target: 173, cnt: 0, frames: 900, good: 0, goal: 180, step: 3, pos: 96, vel: 0, up: true, zlo: 60, zw: 40, done: "", last: 0 };
   function tkNew(t) {
     TK.task = t; TK.cnt = 0; TK.good = 0; TK.pos = 96; TK.vel = 0; TK.up = true;
     TK.sel = Math.floor(Math.random() * 8);
     let tg = 1 + Math.floor(Math.random() * 255);
     if (tg === TK.sw) tg = (~TK.sw) & 0xFF;
     TK.target = tg;
-    TK.zw = t === 5 ? 28 : 40;
-    TK.zlo = Math.floor(Math.random() * 150);
-    TK.frames = TASKS[t].t;
+    const g = Math.floor(Math.random() * 4);
+    TK.goal = t === 3 ? [180, 240, 240, 300][g] : [180, 200, 220, 240][g];
+    TK.step = rr(2, 4);
+    if (t === 5) { TK.zw = rr(28, 44); TK.zlo = rr(0, 147); }
+    else { TK.zw = rr(40, 60); TK.zlo = rr(0, 131); }
+    TK.frames = rr(TASKS[t].lo, TASKS[t].hi);
     TK.done = "";
     document.querySelectorAll("#tkBtns button").forEach((b, i) => b.setAttribute("aria-pressed", i === t ? "true" : "false"));
     document.getElementById("tkHow").textContent = TASKS[t].how;
   }
   function tkSuccess() {
     const r = Math.random();
-    const ATT = ["MIRROR", "FLIP", "BLIND", "BOUNCERS", "OIIA CAT", "GARBAGE", "CURSED", "SPEED UP"];
+    const ATT = ["MIRROR", "FLIP", "BLIND", "BOUNCERS", "OIIA CAT", "GARBAGE", "CURSED", "SPEED UP", "LOCK"];
     const BON = ["FREEZE TIME", "SINK 2 ROWS", "I PIECE NEXT"];
-    TK.done = r < 5 / 8 ? "SENT: " + ATT[Math.floor(Math.random() * 8)] + "!" : "BONUS: " + BON[Math.floor(Math.random() * 3)];
+    TK.done = r < 5 / 8 ? "SENT: " + ATT[Math.floor(Math.random() * 9)] + "!" : "BONUS: " + BON[Math.floor(Math.random() * 3)];
   }
   function tkFlip(i) {                          // one switch changed (an edge)
     if (TK.done) return;
@@ -1523,37 +1530,36 @@ canvas { display: block; max-width: 100%; height: auto; border-radius: 4px; imag
     const t = TK.task;
     if (t === 0 && flipped) { TK.cnt++; if (TK.cnt >= 10) tkSuccess(); }
     if (t === 5 && flipped) {
-      if (TK.pos >= TK.zlo && TK.pos < TK.zlo + TK.zw) { TK.cnt++; TK.zlo = Math.floor(Math.random() * 160); if (TK.cnt >= 3) tkSuccess(); }
+      if (TK.pos >= TK.zlo && TK.pos < TK.zlo + TK.zw) { TK.cnt++; TK.zw = rr(28, 44); TK.zlo = rr(0, 147); if (TK.cnt >= 3) tkSuccess(); }
       else TK.cnt = 0;
     }
-    if ((t === 1 || t === 2) && TK.sw === TK.target) tkSuccess();
+    if ((t === 1 || t === 2 || t === 6) && TK.sw === TK.target) tkSuccess();
     drawSwitches();
   }
   function tkFrame() {                          // once per frame, like frame_tick
     if (TK.done) return;
     const t = TK.task;
-    if (t === 3) { TK.good++; if (TK.good >= 240) tkSuccess(); }
+    if (t === 3) { TK.good++; if (TK.good >= TK.goal) tkSuccess(); }
     if (t === 4) {
       const on = (TK.sw >> TK.sel) & 1;
       TK.vel = Math.max(-4, Math.min(4, TK.vel + (on ? 1 : -1)));
       let p = TK.pos + TK.vel;
       if (p < 0) { p = 0; TK.vel = 0; }
       if (p > 191) { p = 191; TK.vel = 0; }
-      if (TK.pos >= TK.zlo && TK.pos < TK.zlo + TK.zw) { TK.good++; if (TK.good >= 180) tkSuccess(); }
+      if (TK.pos >= TK.zlo && TK.pos < TK.zlo + TK.zw) { TK.good++; if (TK.good >= TK.goal) tkSuccess(); }
       TK.pos = p;
     }
     if (t === 5) {
-      if (TK.up) { if (TK.pos >= 188) TK.up = false; else TK.pos += 3; }
-      else { if (TK.pos <= 3) TK.up = true; else TK.pos -= 3; }
+      if (TK.up) { if (TK.pos >= 191 - TK.step) TK.up = false; else TK.pos += TK.step; }
+      else { if (TK.pos <= TK.step) TK.up = true; else TK.pos -= TK.step; }
     }
     if (!TK.done) { TK.frames--; if (TK.frames <= 0) TK.done = "TASK FAILED"; }
   }
   function tkProgress() {
     const t = TK.task;
     if (t === 0) return TK.cnt * 19;
-    if (t === 1 || t === 2) { let x = TK.target ^ TK.sw, n = 0; for (let i = 0; i < 8; i++) n += (x >> i) & 1; return (8 - n) * 23; }
-    if (t === 3) return Math.floor(TK.good * 3 / 4);
-    if (t === 4) return Math.min(179, TK.good);
+    if (t === 1 || t === 2 || t === 6) { let x = TK.target ^ TK.sw, n = 0; for (let i = 0; i < 8; i++) n += (x >> i) & 1; return (8 - n) * 23; }
+    if (t === 3 || t === 4) return Math.min(180, Math.floor(TK.good * Math.round(256 * 180 / TK.goal) / 256));   // good * pscale / 256
     return Math.min(189, TK.cnt * 63);
   }
   function drawSwitches() {
@@ -1580,7 +1586,8 @@ canvas { display: block; max-width: 100%; height: auto; border-radius: 4px; imag
     if (t === 0) l2 = `SW${swn} TEN TIMES`;
     if (t === 1) l2 = "WITH SW13-SW6";
     if (t === 2) l2 = `      ${String(TK.target).padStart(3, "0")}`;
-    if (t === 3) l2 = "NO BUTTONS 4 SEC";
+    if (t === 3) l2 = `NO BUTTONS ${Math.floor(TK.goal / 60)} SEC`;
+    if (t === 6) l2 = `       ${TK.target.toString(16).toUpperCase().padStart(2, "0")}`;
     if (t === 4) l2 = `GREEN WITH SW${swn}`;
     if (t === 5) l2 = `SW${swn}  HITS: ${TK.cnt}/3`;
     g.fillStyle = hx("9BD"); g.fillText(l2, X, Y + 24);
@@ -1600,7 +1607,7 @@ canvas { display: block; max-width: 100%; height: auto; border-radius: 4px; imag
     g.fillStyle = hx("123"); g.fillRect(X, 122, 192, 8);
     g.fillStyle = hx("3CE"); g.fillRect(X, 122, prog, 8);
     g.fillStyle = hx("222"); g.fillRect(X, 138, 192, 6);
-    g.fillStyle = secs < 3 ? hx("F44") : hx("999"); g.fillRect(X, 138, Math.min(192, secs * 12), 6);
+    g.fillStyle = secs < 3 ? hx("F44") : hx("999"); g.fillRect(X, 138, Math.min(192, secs * 11), 6);
     if (TK.done) {
       g.fillStyle = "rgba(0,0,0,0.75)"; g.fillRect(2, 150, 196, 30);
       g.fillStyle = TK.done.startsWith("TASK") ? hx("F55") : (TK.done.startsWith("SENT") ? hx("FD3") : hx("5E7"));
@@ -1608,7 +1615,8 @@ canvas { display: block; max-width: 100%; height: auto; border-radius: 4px; imag
     }
     document.getElementById("tkLog").innerHTML =
       `task ${t} (${TASKS[t].n}) · sel = ${TK.sel} (SW${TK.sel + 6}) · target = ${TK.target} = ${TK.target.toString(2).padStart(8, "0")} · ` +
-      `sw = ${TK.sw.toString(2).padStart(8, "0")} · progress ${prog}/191 · ${secs} s left` + (t === 4 ? ` · bar ${TK.pos}, velocity ${TK.vel}, good ${TK.good}/180` : "") + (t === 3 ? ` · good ${TK.good}/240` : "");
+      `sw = ${TK.sw.toString(2).padStart(8, "0")} · progress ${prog}/191 · ${secs} s left` + (t === 4 ? ` · bar ${TK.pos}, velocity ${TK.vel}, good ${TK.good}/${TK.goal}` : "") + (t === 3 ? ` · good ${TK.good}/${TK.goal}` : "") +
+      (t === 5 ? ` · marker step ${TK.step} px, zone ${TK.zlo}..${TK.zlo + TK.zw}` : "");
   }
   function initTasks() {
     const tb = document.getElementById("tkBtns");

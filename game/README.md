@@ -76,25 +76,29 @@ The 5 push buttons form a cross:
 
 ## CHAOS (SW21 up)
 
-Every 10–20 s a task pops up in the purple panel on the right; the
-7-segment display counts down its seconds. Do it with **SW6..SW13** while you
-keep playing:
+The right side only says **CHAOS MODE ON**. At a random moment (every
+10–17 s) a task pops up in a purple panel there, with a sound; the
+7-segment display counts down its seconds. Do it with **SW6..SW13** (SW13 =
+leftmost) while you keep playing. Every time is random within a range.
 
 | Task | Do this |
 |---|---|
 | FLIP | flip the shown switch 10 times |
 | MATCH | copy the 8 lights onto the switches |
 | BINARY | set the number in binary (SW13 = 128 ... SW6 = 1) |
-| HANDS | don't touch any button for 4 s |
-| HOLD | keep the bar in the green: the switch pushes it up, it falls by itself |
+| HEX | set the 2 hex digits in binary (`A4` = 1010 0100) |
+| HANDS | don't touch any button for 3–5 s (the panel says how long) |
+| HOLD | keep the bar in the green for 3–4 s: the switch pushes it up, it falls by itself |
 | TIMING | flip the switch while the marker is in the green, 3 times in a row |
 
 Done in time → with a rival connected, usually an **attack** on the rival:
-MIRROR (left/right swapped), FLIP (field upside down), BLIND (blocks
-invisible), BOUNCERS, the spinning **OIIA cat**, +3 GARBAGE, CURSED next
-piece (S or Z), SPEED. Otherwise a **bonus**: FREEZE gravity, SINK 2 rows
+MIRROR (left/right swapped), FLIP (field upside down), BLIND (locked blocks
+invisible), 5–10 BOUNCERS, the spinning **OIIA cat**, +3 GARBAGE, CURSED
+next piece (S or Z), SPEED, or **LOCK** (all the rival's buttons locked until
+they finish a task, which starts for them at once; the panel frame turns
+red). Otherwise a **bonus**: FREEZE gravity (3–5 s), SINK 2 rows right away
 (+ cancel waiting garbage), or an I PIECE next. The banner under the field
-says what happened.
+says what happened. At most 3–5 garbage rows come in per piece.
 
 ## Wiring two boards
 
@@ -121,8 +125,8 @@ SW22 down (off) on both boards. Within half a second both show **LINKED**.
    * `h 15` set the PC's stack height (RIVAL bar turns red);
    * `l` the PC loses → the board shows **WIN!**;
    * `a` auto mode: the PC's stack grows and it sends random garbage;
-   * `x 4` attack the board with the OIIA cat (`x 0`..`x 7`: all 8 attacks;
-     needs SW21 up on the board);
+   * `x 4` attack the board with the OIIA cat (`x 0`..`x 8`: all 9 attacks,
+     `x 8` = LOCK; needs SW21 up on the board);
    * clear 2+ lines on the board → the PC prints "board sends n garbage".
 
 ## Sound
