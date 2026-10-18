@@ -1,0 +1,19 @@
+# Design: game (Tetris Duel, versus core)
+# 'top=' is the top entity. The other lines are the VHDL files, in compile order
+# (packages first). Paths are relative to the project folder (the "assignment" folder).
+top=top_tetris
+src/common/common_pkg.vhd
+src/game/tetris_pkg.vhd
+src/game/text_pkg.vhd
+src/common/debounce.vhd
+src/common/seg7_scan.vhd
+src/common/vga_sync.vhd
+src/common/uart_tx.vhd
+src/common/uart_rx.vhd
+src/game/tetris_input.vhd
+src/game/tetris_core.vhd
+src/game/versus_link.vhd
+src/game/text_layer.vhd
+src/game/tetris_render.vhd
+src/game/tetris_sound.vhd
+game/top_tetris.vhd

@@ -1,0 +1,6 @@
+vhdl work "../src/game/tetris_pkg.vhd"
+vhdl work "../src/common/uart_tx.vhd"
+vhdl work "../src/common/uart_rx.vhd"
+vhdl work "../src/game/tetris_core.vhd"
+vhdl work "../src/game/versus_link.vhd"
+vhdl work "tb_versus.vhd"

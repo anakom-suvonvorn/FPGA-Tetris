@@ -1,0 +1,8 @@
+# Design: 02_j5_pin_finder
+# 'top=' is the top entity. The other lines are the VHDL files, in compile order
+# (the package common_pkg.vhd must always come first). Paths are relative to the project folder (the "assignment" folder).
+top=top_j5_finder
+src/common/common_pkg.vhd
+src/common/debounce.vhd
+src/common/seg7_scan.vhd
+tests/02_j5_pin_finder/top_j5_finder.vhd

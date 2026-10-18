@@ -1,0 +1,4 @@
+vhdl work "../src/common/common_pkg.vhd"
+vhdl work "../src/common/uart_tx.vhd"
+vhdl work "../src/common/uart_rx.vhd"
+vhdl work "tb_uart_loop.vhd"

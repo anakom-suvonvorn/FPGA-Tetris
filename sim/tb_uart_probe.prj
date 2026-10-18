@@ -1,0 +1,7 @@
+vhdl work "../src/common/common_pkg.vhd"
+vhdl work "../src/common/uart_tx.vhd"
+vhdl work "../src/common/uart_rx.vhd"
+vhdl work "../src/common/debounce.vhd"
+vhdl work "../src/common/seg7_scan.vhd"
+vhdl work "../tests/05_uart_probe/top_uart_probe.vhd"
+vhdl work "tb_uart_probe.vhd"

@@ -1,0 +1,4 @@
+vhdl work "../src/common/common_pkg.vhd"
+vhdl work "../src/common/vga_sync.vhd"
+vhdl work "../tests/01_vga_bars/top_vga_bars.vhd"
+vhdl work "tb_vga_frame.vhd"

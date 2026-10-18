@@ -1,0 +1,1450 @@
+<title>Tetris Duel Internals</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+/* Layout: one reading column of explanation, each section built around one live diagram
+   that the reader drives with buttons. Diagrams scroll sideways inside their own box on phones. */
+:root {
+  --bg: #f3f5f8;
+  --panel: #ffffff;
+  --fg: #151922;
+  --muted: #586172;
+  --line: #d6dbe3;
+  --accent: #007f8f;
+  --accent-soft: #d5eef1;
+  --warn: #c25e00;
+  --warn-soft: #fbe6d2;
+  --hit: #d6334a;
+  --ok: #24864a;
+  --wall: #c4cad5;
+  --wall-stripe: #aab2c0;
+  --cell: #e9ecf1;
+  --code-bg: #eceff4;
+  --display: "Chakra Petch", "Segoe UI", system-ui, sans-serif;
+  --body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e1116; --panel: #161a21; --fg: #e5e8ee; --muted: #9aa3b2; --line: #2a303b;
+    --accent: #3fc3d3; --accent-soft: #123a40; --warn: #f0954a; --warn-soft: #3d2614;
+    --hit: #ff5c72; --ok: #4cc77a; --wall: #303744; --wall-stripe: #3f4757; --cell: #1d222b;
+    --code-bg: #1d222b; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e1116; --panel: #161a21; --fg: #e5e8ee; --muted: #9aa3b2; --line: #2a303b;
+  --accent: #3fc3d3; --accent-soft: #123a40; --warn: #f0954a; --warn-soft: #3d2614;
+  --hit: #ff5c72; --ok: #4cc77a; --wall: #303744; --wall-stripe: #3f4757; --cell: #1d222b;
+  --code-bg: #1d222b; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--fg); font-family: var(--body); font-size: 16px; line-height: 1.6;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 32px 64px;
+}
+main { max-width: 980px; margin: 0 auto; display: flex; flex-direction: column; gap: 56px; }
+header h1 { font-family: var(--display); font-weight: 700; font-size: clamp(30px, 5vw, 46px); line-height: 1.1; margin: 0 0 12px; text-wrap: balance; letter-spacing: .01em; }
+header p { margin: 0; max-width: 68ch; color: var(--muted); }
+nav.toc { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
+nav.toc a { font-family: var(--mono); font-size: 13px; color: var(--fg); text-decoration: none; border: 1px solid var(--line); background: var(--panel); padding: 4px 10px; border-radius: 4px; }
+nav.toc a:hover, nav.toc a:focus-visible { border-color: var(--accent); color: var(--accent); }
+section { display: flex; flex-direction: column; gap: 16px; }
+section > h2 { font-family: var(--display); font-weight: 600; font-size: clamp(22px, 3.4vw, 30px); margin: 0; line-height: 1.2; text-wrap: balance; }
+section > h2 .tag { font-family: var(--mono); font-size: 13px; font-weight: 500; color: var(--accent); display: block; letter-spacing: .06em; text-transform: uppercase; margin-bottom: 4px; }
+p { margin: 0; max-width: 70ch; }
+code, .mono { font-family: var(--mono); font-size: .9em; }
+code { background: var(--code-bg); padding: 1px 5px; border-radius: 3px; }
+.stage { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 16px; display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.scroll { overflow-x: auto; min-width: 0; }
+.row2 { display: grid; grid-template-columns: minmax(0, auto) minmax(0, 1fr); gap: 20px; align-items: start; }
+@media (max-width: 760px) { .row2 { grid-template-columns: minmax(0, 1fr); } }
+.controls { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.controls .sep { width: 1px; height: 26px; background: var(--line); margin: 0 4px; }
+button {
+  font-family: var(--mono); font-size: 13px; color: var(--fg); background: var(--bg); border: 1px solid var(--line);
+  border-radius: 5px; padding: 6px 10px; cursor: pointer; min-height: 34px;
+}
+button:hover { border-color: var(--accent); }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--panel); }
+button.pc { width: 38px; font-weight: 600; }
+input[type=number] { font-family: var(--mono); font-size: 15px; width: 110px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 5px; background: var(--bg); color: var(--fg); }
+.readout { display: flex; flex-direction: column; gap: 8px; font-size: 14px; }
+.readout .kv { display: grid; grid-template-columns: 120px minmax(0, 1fr); gap: 10px; align-items: baseline; border-bottom: 1px dashed var(--line); padding-bottom: 6px; }
+.readout .k { font-family: var(--mono); font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+.readout .v { font-family: var(--mono); }
+.pill { display: inline-block; font-family: var(--mono); font-size: 13px; font-weight: 600; padding: 2px 8px; border-radius: 99px; }
+.pill.ok { background: color-mix(in srgb, var(--ok) 18%, transparent); color: var(--ok); }
+.pill.bad { background: color-mix(in srgb, var(--hit) 18%, transparent); color: var(--hit); }
+.qa { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+.qa div { border-left: 3px solid var(--accent); padding: 4px 0 4px 12px; font-size: 15px; }
+.qa b { display: block; font-family: var(--display); font-weight: 600; font-size: 16px; margin-bottom: 2px; }
+.note { font-size: 14px; color: var(--muted); }
+.legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 13px; color: var(--muted); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend i { width: 14px; height: 14px; display: inline-block; border-radius: 2px; border: 1px solid var(--line); }
+.log { font-family: var(--mono); font-size: 13px; background: var(--code-bg); border-radius: 6px; padding: 10px 12px; min-height: 3.4em; }
+.log .st { color: var(--accent); font-weight: 600; }
+.clock { font-family: var(--mono); font-size: 13px; color: var(--muted); }
+svg text { font-family: var(--mono); }
+/* svg classes */
+.c-wall { fill: var(--wall); }
+.c-cell { fill: var(--cell); }
+.c-grid { stroke: var(--line); fill: none; }
+.c-fg { fill: var(--fg); }
+.c-muted { fill: var(--muted); }
+.c-accent { fill: var(--accent); }
+.c-accent-soft { fill: var(--accent-soft); }
+.c-warn { fill: var(--warn); }
+.c-warn-soft { fill: var(--warn-soft); }
+.c-hit { fill: var(--hit); }
+.s-accent { stroke: var(--accent); }
+.s-hit { stroke: var(--hit); }
+.s-fg { stroke: var(--fg); }
+.s-muted { stroke: var(--muted); }
+.s-warn { stroke: var(--warn); }
+.c-panel { fill: var(--panel); }
+.node rect { fill: var(--panel); stroke: var(--line); stroke-width: 1.5; }
+.node text { fill: var(--fg); font-size: 12.5px; font-weight: 500; }
+.node.active rect { fill: var(--accent); stroke: var(--accent); }
+.node.active text { fill: var(--panel); }
+.node.visited rect { stroke: var(--accent); }
+.edge { stroke: var(--muted); stroke-width: 1.4; fill: none; }
+.edge.skip { stroke-dasharray: 4 4; }
+.grp { fill: var(--bg); stroke: var(--line); stroke-dasharray: 3 3; }
+table.bits { border-collapse: collapse; font-family: var(--mono); font-size: 13px; }
+table.bits th, table.bits td { border: 1px solid var(--line); padding: 4px 0; text-align: center; min-width: 32px; }
+table.bits th { color: var(--muted); font-weight: 500; }
+table.bits th.rowh { text-align: right; padding: 4px 10px; min-width: 150px; white-space: nowrap; color: var(--fg); }
+table.bits td.inbox { background: var(--accent-soft); }
+table.bits td.one { font-weight: 700; }
+table.bits td.new1 { background: color-mix(in srgb, var(--ok) 25%, transparent); font-weight: 700; }
+table.bits td.dim { color: var(--muted); }
+.digits { display: flex; gap: 10px; flex-wrap: wrap; }
+.digit { border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; text-align: center; min-width: 86px; }
+.digit .d { font-family: var(--display); font-size: 30px; font-weight: 600; line-height: 1.1; }
+.digit .b { font-family: var(--mono); font-size: 13px; color: var(--muted); }
+.digit .lbl { font-family: var(--mono); font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+.digit.cur { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
+.digit.changed .d { color: var(--accent); }
+canvas { display: block; max-width: 100%; height: auto; border-radius: 4px; image-rendering: pixelated; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<main>
+<header>
+  <h1>Tetris Duel Internals</h1>
+  <p>Visual companion to <code>docs/learn/05_game_walkthrough.md</code> (sections 1–8) and <code>06_versus_walkthrough.md</code> (sections 9–11). Every diagram here runs the same rules as the VHDL in <code>src/game/</code>. Press the buttons and watch what the hardware does.</p>
+  <nav class="toc" aria-label="Sections">
+    <a href="#coords">1 · coordinates</a>
+    <a href="#collide">2 · collision check</a>
+    <a href="#fsm">3 · state machine</a>
+    <a href="#lock">4 · S_LOCK / placed_row</a>
+    <a href="#clear">5 · S_CLEAR</a>
+    <a href="#bcd">6 · bcd_inc</a>
+    <a href="#bag">7 · LFSR + 7-bag</a>
+    <a href="#render">8 · renderer</a>
+    <a href="#msg">9 · link message</a>
+    <a href="#garb">10 · garbage</a>
+    <a href="#sd">11 · audio mixer</a>
+  </nav>
+</header>
+
+<!-- ================================================================ 1 -->
+<section id="coords">
+  <h2><span class="tag">tetris_pkg · xpos_t, SPAWN_X</span>Where is the piece? Wide columns</h2>
+  <p>The playfield is 10 columns. The core numbers them on a <b>16-column ruler</b>: 3 imaginary wall columns on each side. <b>Top numbers = wide column</b> (what <code>cur_x</code> uses). <b>Bottom numbers = real board column</b>. Wide = board + 3, always.</p>
+  <p>The piece's position <code>(x, y)</code> is the <b>top-left corner of its dashed 4×4 box</b>, not of the coloured blocks. Move the box around, into the walls too: red blocks are where <code>collides()</code> finds a hit.</p>
+  <div class="stage">
+    <div class="controls" role="group" aria-label="Piece">
+      <span class="note">piece</span>
+      <span id="pcBtns" class="controls"></span>
+      <span class="sep"></span>
+      <button id="bRot" title="Rotate (next rotation)">rotate ↻</button>
+      <button id="bL" aria-label="Move left">←</button>
+      <button id="bR" aria-label="Move right">→</button>
+      <button id="bU" aria-label="Move up">↑</button>
+      <button id="bD" aria-label="Move down">↓</button>
+      <button id="bSpawn">back to spawn</button>
+      <button id="bLand">drop to ghost</button>
+    </div>
+    <div class="row2">
+      <div class="scroll"><svg id="wideSvg" role="img" aria-label="Playfield with wide column numbers"></svg></div>
+      <div class="readout" id="wideRead"></div>
+    </div>
+    <div class="legend">
+      <span><i style="background:var(--wall)"></i>wall / floor ('1' in the collision check)</span>
+      <span><i style="background:var(--accent-soft)"></i>the 4 columns under the box</span>
+      <span><i style="background:var(--hit)"></i>block that collides</span>
+    </div>
+  </div>
+  <div class="qa">
+    <div><b>"Top-left is 6, so why columns 3–6?"</b>6 is on the <i>wide</i> ruler. Wide column 6 is board column 3. The box is 4 wide, so it covers wide 6–9 = board 3–6. The T fills board 3–5, and the box's 4th column (board 6) is empty.</div>
+    <div><b>Why add wall columns at all?</b>The check turns each box row into a 16-bit vector <code>"111" &amp; occ(row) &amp; "111"</code>. Vector bits are numbered from 0, never negative. Boxes hang past the wall: a vertical I against the left wall has its box at board −2. With the extra 3 columns that's wide 1, and the wall is just '1' bits, so no special wall code is needed.</div>
+    <div><b>Why −2..14, not −3..12?</b>That's only the range of the <i>integer type</i>, i.e. how many bits the register gets. It isn't the play area. Real positions are about x = 1..11 (see "legal x" on the right). The core also <i>tests</i> spots that may be illegal: moving tries ±1, a wall kick tries ±2. So test positions reach about −1..13. −2..14 covers that with a little spare. <code>ypos_t</code> (−2..21) is the same idea for rows.</div>
+  </div>
+</section>
+
+<!-- ================================================================ 2 -->
+<section id="collide">
+  <h2><span class="tag">tetris_core · collides()</span>How the collision check sees it</h2>
+  <p>The same box as above, taken apart the way <code>collides()</code> does it. For each box row <code>r</code> it builds the 16-bit <b>wide row</b>. Then for each box column <code>c</code> with a block it looks at <code>wide(x + c)</code>. Any '1' under a block means a hit, and <code>collide</code> is the OR of all of them. Move the piece in section 1 and this updates.</p>
+  <div class="stage">
+    <div id="collideRows" class="scroll"></div>
+    <div id="collideResult" class="log"></div>
+  </div>
+</section>
+
+<!-- ================================================================ 3 -->
+<section id="fsm">
+  <h2><span class="tag">tetris_core · state_t</span>One frame through the state machine</h2>
+  <p>Each box is a <code>when S_… =&gt;</code> in the code. Each step below is <b>one clock</b> (20 ns). Pick a situation and step through it. The highlighted box is the state the machine is in during that clock. Every arrow is a possible change of state (the three states top right are new for versus: garbage). Dashed arrows are the "nothing to do, skip" paths. A curved arrow back into the same box means the state repeats for several clocks. Follow it from the top: a new piece flows down the middle into <code>S_GHOST</code>; the frame loop goes round the left and bottom; locking goes up the right side back to <code>S_PICK</code>.</p>
+  <div class="stage">
+    <div class="controls" role="group" aria-label="Scenario" id="scnBtns"></div>
+    <div class="controls">
+      <button id="fsmPrev">◀ step back</button>
+      <button id="fsmNext">step ▶</button>
+      <button id="fsmPlay">play</button>
+      <button id="fsmReset">restart</button>
+      <span class="clock" id="fsmClock"></span>
+    </div>
+    <div class="scroll"><svg id="fsmSvg" viewBox="0 0 1040 625" style="min-width:800px;width:100%" role="img" aria-label="State machine diagram"></svg></div>
+    <div class="log" id="fsmLog" aria-live="polite"></div>
+  </div>
+</section>
+
+<!-- ================================================================ 4 -->
+<section id="lock">
+  <h2><span class="tag">tetris_core · S_LOCK, placed_row()</span>Writing the piece into the field</h2>
+  <p>When the piece locks, <code>S_LOCK</code> runs for 4 clocks, one per box row (<code>lock_r</code> = 0..3). Each clock it takes one row of the 4×4 box, slides it to the right board columns with <code>placed_row()</code>, and ORs it into that field row. This uses the piece from section 1, dropped to where it would land.</p>
+  <p><code>placed_row</code> asks for every board column <code>c</code>: <i>which box column is above me?</i> The answer is <code>j = c + 3 − x</code>. If j is 0..3 the column is under the box and takes shape bit <code>sh(4·r + j)</code>. Otherwise it gets 0.</p>
+  <div class="stage">
+    <div class="controls" role="group" aria-label="lock_r" id="lockBtns"></div>
+    <div class="scroll" id="lockTable"></div>
+    <p class="note" id="lockNote"></p>
+    <p class="note">Columns are shown left = 0 like on screen. (In VHDL the vector is written <code>9 downto 0</code>, so the same row printed as a string has column 0 on the right.)</p>
+  </div>
+</section>
+
+<!-- ================================================================ 5 -->
+<section id="clear">
+  <h2><span class="tag">tetris_core · S_CLEAR</span>Removing full rows with two pointers</h2>
+  <p><code>rd</code> (read) visits every row from the bottom up, one per clock. <code>wr</code> (write) is where the next row that <i>stays</i> goes. A full row is skipped, not copied. That makes <code>wr</code> fall behind <code>rd</code>, so everything above slides down. When <code>rd</code> runs off the top, the rows from <code>wr</code> up are emptied. The example has full rows at 14, 16 and 19.</p>
+  <div class="stage">
+    <div class="controls">
+      <button id="clrPrev">◀ step back</button>
+      <button id="clrNext">step ▶</button>
+      <button id="clrPlay">play</button>
+      <button id="clrReset">restart</button>
+      <span class="clock" id="clrClock"></span>
+    </div>
+    <div class="row2">
+      <div class="scroll"><svg id="clrSvg" role="img" aria-label="Line clear example"></svg></div>
+      <div class="readout" id="clrRead"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ================================================================ 6 -->
+<section id="bcd">
+  <h2><span class="tag">tetris_core · bcd_inc()</span>Adding 1 in BCD</h2>
+  <p>The line counter is stored as <b>BCD</b>: 16 bits = 4 decimal digits, 4 bits each. The 7-segment display can then show each digit directly, with no binary-to-decimal converter. <code>bcd_inc</code> adds 1 like you would on paper: start at the lowest digit; a 9 becomes 0 and carries to the next digit; anything else gets +1 and the carry stops.</p>
+  <div class="stage">
+    <div class="controls">
+      <label for="bcdIn" class="note">lines before</label>
+      <input type="number" id="bcdIn" min="0" max="9999" value="1299">
+      <button id="bcdPrev">◀ step back</button>
+      <button id="bcdNext">step ▶</button>
+      <button id="bcdReset">restart</button>
+    </div>
+    <div class="digits" id="bcdDigits"></div>
+    <div class="log" id="bcdLog"></div>
+    <p class="note" id="bcdBin"></p>
+  </div>
+</section>
+
+<!-- ================================================================ 7 -->
+<section id="bag">
+  <h2><span class="tag">tetris_core · lfsr, S_PICK</span>Random pieces: LFSR and the 7-bag</h2>
+  <p>The <b>LFSR</b> shifts left every clock. The new bit 0 is <code>bit15 xor bit13 xor bit12 xor bit10</code> (the highlighted taps). It runs through all 65,535 non-zero patterns before repeating. <code>S_PICK</code> reads its lowest 3 bits as a number 0..7. It accepts the number only if it's 0..6 <b>and</b> that piece hasn't been dealt from the current bag. Otherwise it waits one clock (new LFSR value) and tries again.</p>
+  <div class="stage">
+    <div class="controls">
+      <button id="lfsrStep">clock once</button>
+      <button id="lfsrPick">run S_PICK until a piece is dealt</button>
+      <button id="lfsrSeven">deal 7 pieces</button>
+      <button id="lfsrReset">restart (x"ACE1")</button>
+    </div>
+    <div class="scroll"><svg id="lfsrSvg" viewBox="0 0 700 170" style="min-width:560px;width:100%" role="img" aria-label="LFSR register and bag"></svg></div>
+    <div class="log" id="lfsrLog"></div>
+  </div>
+</section>
+
+<!-- ================================================================ 8 -->
+<section id="render">
+  <h2><span class="tag">tetris_render · stage 1 + 2</span>From pixel to colour</h2>
+  <p>The screen is never stored anywhere. For each pixel, the renderer works out which cell it falls in, reads that cell, checks whether the piece or ghost covers it, and picks a colour. This picture is drawn by running that exact logic on all 307,200 pixels, using the piece from section 1. <b>Point at (or tap) any pixel</b> to see the calculation for it.</p>
+  <div class="stage">
+    <div class="row2">
+      <div class="scroll"><canvas id="scr" width="640" height="480" style="width:640px;cursor:crosshair" aria-label="Simulated VGA screen"></canvas></div>
+      <div class="readout" id="pixRead"><p class="note">Point at the screen.</p></div>
+    </div>
+  </div>
+</section>
+<!-- ================================================================ 9 -->
+<section id="msg">
+  <h2><span class="tag">versus_link · msg()</span>One byte between the boards</h2>
+  <p>Every message is one byte: <b>3 bits of type</b>, <b>5 bits of value</b>. <code>uart_tx</code> then sends it as 10 bits on the wire: a 0 start bit, the 8 data bits <b>lowest bit first</b>, and a 1 stop bit. Each bit lasts 434 clocks (8.68 µs). Pick a message and watch the wire.</p>
+  <div class="stage">
+    <div class="controls" id="msgBtns"></div>
+    <div class="controls">
+      <label class="note" for="msgVal">value</label>
+      <input type="number" id="msgVal" min="0" max="31" value="4">
+    </div>
+    <div class="scroll"><svg id="msgSvg" viewBox="0 0 760 250" style="min-width:600px;width:100%" role="img" aria-label="Message bits and UART waveform"></svg></div>
+    <div class="log" id="msgLog"></div>
+  </div>
+</section>
+
+<!-- ================================================================ 10 -->
+<section id="garb">
+  <h2><span class="tag">tetris_core · S_ATTACK, S_GARB</span>Garbage: cancel, send, rise</h2>
+  <p>When a piece locks, <code>S_ATTACK</code> turns the lines it cleared into an attack (2 → 1, 3 → 2, 4 → 4). The attack first cancels garbage <b>waiting for you</b> (the red meter), and only the rest is sent. If the piece cleared nothing, up to 8 waiting lines come in now. <code>S_GARB</code> then pushes the whole field up one row per clock and adds a grey row with one hole.</p>
+  <div class="stage">
+    <div class="controls">
+      <label class="note" for="gPend">waiting for me (pending)</label>
+      <input type="number" id="gPend" min="0" max="31" value="3">
+      <span class="note">lines this piece cleared</span>
+      <span id="gClrBtns" class="controls"></span>
+    </div>
+    <div class="log" id="gCalc"></div>
+    <div class="controls">
+      <button id="gStep">S_GARB: one clock ▶</button>
+      <button id="gReset">restart field</button>
+      <span class="clock" id="gInfo"></span>
+    </div>
+    <div class="scroll"><svg id="gSvg" role="img" aria-label="Garbage rising"></svg></div>
+  </div>
+</section>
+
+<!-- ================================================================ 11 -->
+<section id="sd">
+  <h2><span class="tag">tetris_sound · mixer</span>Two sounds, one pin: the bucket trick</h2>
+  <p><b>The problem.</b> An FPGA pin is a switch: it is either 0 V or 3.3 V, nothing in between. Flipping it 440 times a second gives a 440 Hz beep at full volume. That's fine for one sound, but we want <b>two sounds at once</b> (music + effect), and the music <b>quieter</b>. Both need voltages <i>between</i> 0 and 3.3 V.</p>
+  <p><b>The trick.</b> Flip the pin on and off <i>millions</i> of times a second. A headphone's speaker can't move that fast, so it only follows the <b>average</b>. A pin that is on 3 clocks out of every 16 pushes the speaker like a steady 3/16 × 3.3 V ≈ 0.6 V. It's the same as dimming an LED by blinking it too fast to see.</p>
+  <p>The mixer does this in two steps: <b>(1)</b> decide how loud the pin should be right now, a number called <code>loudness</code> from 0 to 15 (out of 16). <b>(2)</b> a tiny circuit, the <b>bucket</b>, decides on each clock whether the pin is on, so that on average it's on <code>loudness</code> clocks out of 16. That second part is what's called a <b>sigma-delta</b> modulator.</p>
+
+  <div class="stage">
+    <h3 style="margin:0;font-family:var(--display);font-weight:600;font-size:18px">Step 1 · how loud right now?</h3>
+    <p class="note">Each sound is a square wave, so at any instant it is either up (1) or down (0). Music adds 3, the effect adds 7 (louder). Press to change what each square is doing at this instant.</p>
+    <div class="controls">
+      <button id="sdM" aria-pressed="true">music square: 1</button>
+      <button id="sdS" aria-pressed="false">effect square: 0</button>
+    </div>
+    <div class="scroll" id="sdTable"></div>
+  </div>
+
+  <div class="stage">
+    <h3 style="margin:0;font-family:var(--display);font-weight:600;font-size:18px">Step 2 · the bucket, one clock at a time</h3>
+    <p class="note">Every clock, pour <code>loudness</code> into a bucket that holds 16. If it reaches 16 or more, it <b>overflows</b>: the pin is ON for that clock and 16 is poured away. Otherwise the pin is OFF. Step through it: over every 16 clocks the bucket overflows exactly <code>loudness</code> times.</p>
+    <div class="controls">
+      <button id="bkStep">one clock ▶</button>
+      <button id="bkSixteen">16 clocks ▶▶</button>
+      <button id="bkReset">empty bucket</button>
+      <span class="clock" id="bkInfo"></span>
+    </div>
+    <div class="scroll"><svg id="bkSvg" viewBox="0 0 780 250" style="min-width:620px;width:100%" role="img" aria-label="The sigma-delta bucket"></svg></div>
+    <div class="log" id="bkLog"></div>
+    <p class="note"><b>In the VHDL</b> the bucket is a 5-bit register: bits 3..0 hold what's in it (0..15) and bit 4 means "it overflowed". <code>bucket &lt;= ('0' &amp; bucket(3 downto 0)) + loudness;</code> keeps the 4 low bits (dropping bit 4 = pouring the 16 away) and adds the new loudness. <code>audio &lt;= bucket(4);</code> is the pin. The name: <b>Σ</b> (sigma, "sum") because it keeps adding; <b>Δ</b> (delta, "difference") because each overflow takes 16 back out, so it never drifts away from the right average.</p>
+  </div>
+
+  <div class="stage">
+    <h3 style="margin:0;font-family:var(--display);font-weight:600;font-size:18px">Step 3 · zoom out: what the headphones get</h3>
+    <p class="note">6 milliseconds of sound. The two square waves go up and down hundreds of times a second; <code>loudness</code> follows them (0, 3, 7 or 10). At this zoom the pin's on/off flicker is far too fast to draw (one clock is 20 ns, 300,000 clocks fit in this picture), so the bottom graph shows what the speaker actually feels: the average, <code>loudness</code>/16 × 3.3 V. That stepped wave is the music and the effect <b>added together</b>.</p>
+    <div class="controls">
+      <button id="tlS" aria-pressed="true">effect playing</button>
+      <button id="tlM" aria-pressed="true">music playing</button>
+    </div>
+    <div class="scroll"><svg id="tlSvg" viewBox="0 0 780 330" style="min-width:620px;width:100%" role="img" aria-label="Sound over time"></svg></div>
+  </div>
+</section>
+</main>
+
+<script>
+(function () {
+  "use strict";
+  // ------------------------------------------------------------ data from tetris_pkg.vhd
+  const P = (a, b, c, d) => a + b + c + d;
+  const SH = [
+    [P("....","XXXX","....","...."), P("..X.","..X.","..X.","..X."), P("....","....","XXXX","...."), P(".X..",".X..",".X..",".X..")],
+    [P(".XX.",".XX.","....","...."), P(".XX.",".XX.","....","...."), P(".XX.",".XX.","....","...."), P(".XX.",".XX.","....","....")],
+    [P(".X..","XXX.","....","...."), P(".X..",".XX.",".X..","...."), P("....","XXX.",".X..","...."), P(".X..","XX..",".X..","....")],
+    [P(".XX.","XX..","....","...."), P(".X..",".XX.","..X.","...."), P("....",".XX.","XX..","...."), P("X...","XX..",".X..","....")],
+    [P("XX..",".XX.","....","...."), P("..X.",".XX.",".X..","...."), P("....","XX..",".XX.","...."), P(".X..","XX..","X...","....")],
+    [P("X...","XXX.","....","...."), P(".XX.",".X..",".X..","...."), P("....","XXX.","..X.","...."), P(".X..",".X..","XX..","....")],
+    [P("..X.","XXX.","....","...."), P(".X..",".X..",".XX.","...."), P("....","XXX.","X...","...."), P("XX..",".X..",".X..","....")]
+  ];
+  const NAMES = "IOTSZJLG";
+  const RGB12 = ["0EF","EE0","A2F","2E2","F22","25F","F80","888"];
+  const hex8 = h => "#" + h.split("").map(d => d + d).join("");
+  const COL = RGB12.map(hex8);
+  const bit = (p, rot, r, c) => SH[p][rot][4 * r + c] === "X";
+  const ROWS = 20, COLS = 10, SPAWN_X = 6, SPAWN_Y = 0;
+  const NS = "http://www.w3.org/2000/svg";
+
+  // sample field (row 0 = top). Letters = colour, "." = empty
+  const FIELD_TXT = [
+    "..........","..........","..........","..........","..........",
+    "..........","..........","..........","..........","..........",
+    "..........","..........","..........","..........","..........",
+    ".........L","T....OO..L","TT...OO.LL","TJJJ.SS.ZZ","IIII.SSZZG"
+  ];
+  const field = FIELD_TXT.map(s => s.split("").map(ch => ch === "." ? -1 : NAMES.indexOf(ch)));
+  const occ = (r, c) => field[r][c] >= 0;
+
+  const S = { p: 2, rot: 0, x: SPAWN_X, y: SPAWN_Y, next: 3, level: 2 };
+
+  // collides(), exactly like tetris_core.vhd
+  function wideRow(ry) {
+    const w = new Array(16);
+    let kind;
+    if (ry > ROWS - 1) { kind = "floor"; w.fill(1); }
+    else if (ry < 0) { kind = "top"; for (let i = 0; i < 16; i++) w[i] = (i < 3 || i > 12) ? 1 : 0; }
+    else { kind = "field"; for (let i = 0; i < 16; i++) w[i] = (i < 3 || i > 12) ? 1 : (occ(ry, i - 3) ? 1 : 0); }
+    return { w, kind };
+  }
+  function collides(p, rot, x, y) {
+    const rows = [];
+    let hit = false;
+    for (let r = 0; r < 4; r++) {
+      const ry = y + r, wr = wideRow(ry), hits = [];
+      for (let c = 0; c < 4; c++) {
+        if (bit(p, rot, r, c)) {
+          const wx = x + c;
+          if (wx < 0 || wx > 15 || wr.w[wx] === 1) { hits.push(c); hit = true; }
+        }
+      }
+      rows.push({ r, ry, kind: wr.kind, w: wr.w, hits });
+    }
+    return { hit, rows };
+  }
+  function ghostY() {
+    if (collides(S.p, S.rot, S.x, S.y).hit) return null;
+    let y = S.y;
+    while (!collides(S.p, S.rot, S.x, y + 1).hit) y++;
+    return y;
+  }
+  function legalRange(p, rot) {
+    let lo = null, hi = null;
+    for (let x = -2; x <= 14; x++) {
+      let ok = true;
+      for (let r = 0; r < 4; r++) for (let c = 0; c < 4; c++)
+        if (bit(p, rot, r, c) && (x + c < 3 || x + c > 12)) ok = false;
+      if (ok) { if (lo === null) lo = x; hi = x; }
+    }
+    return [lo, hi];
+  }
+
+  function el(tag, attrs, parent, text) {
+    const e = document.createElementNS(NS, tag);
+    for (const k in attrs) {
+      const v = attrs[k];
+      if ((k === "fill" || k === "stroke") && typeof v === "string" && v.startsWith("var(")) e.style[k] = v;
+      else e.setAttribute(k, v);
+    }
+    if (text !== undefined) e.textContent = text;
+    if (parent) parent.appendChild(e);
+    return e;
+  }
+  function hatchDefs(svg, id) {
+    const defs = el("defs", {}, svg);
+    const pat = el("pattern", { id, width: 6, height: 6, patternUnits: "userSpaceOnUse", patternTransform: "rotate(45)" }, defs);
+    el("rect", { width: 6, height: 6, class: "c-wall" }, pat);
+    el("line", { x1: 0, y1: 0, x2: 0, y2: 6, style: "stroke:var(--wall-stripe);stroke-width:2.5" }, pat);
+  }
+
+  // ------------------------------------------------------------ 1. wide columns
+  const pcBtns = document.getElementById("pcBtns");
+  "IOTSZJL".split("").forEach((n, i) => {
+    const b = document.createElement("button");
+    b.className = "pc"; b.textContent = n; b.id = "pc" + n;
+    b.style.borderBottom = "3px solid " + COL[i];
+    b.addEventListener("click", () => { S.p = i; S.rot = 0; update(); });
+    pcBtns.appendChild(b);
+  });
+  const clampPos = () => { S.x = Math.max(0, Math.min(12, S.x)); S.y = Math.max(0, Math.min(18, S.y)); };
+  document.getElementById("bRot").onclick = () => { S.rot = (S.rot + 1) % 4; update(); };
+  document.getElementById("bL").onclick = () => { S.x--; clampPos(); update(); };
+  document.getElementById("bR").onclick = () => { S.x++; clampPos(); update(); };
+  document.getElementById("bU").onclick = () => { S.y--; clampPos(); update(); };
+  document.getElementById("bD").onclick = () => { S.y++; clampPos(); update(); };
+  document.getElementById("bSpawn").onclick = () => { S.x = SPAWN_X; S.y = SPAWN_Y; S.rot = 0; update(); };
+  document.getElementById("bLand").onclick = () => { const g = ghostY(); if (g !== null) { S.y = g; update(); } };
+
+  function drawWide() {
+    const svg = document.getElementById("wideSvg");
+    svg.innerHTML = "";
+    const CS = 22, L = 46, T = 50, NR = 22;
+    const W = L + 16 * CS + 10, H = T + NR * CS + 54;
+    svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+    svg.setAttribute("width", W); svg.style.maxWidth = "100%"; svg.style.height = "auto";
+    hatchDefs(svg, "hatchW");
+    const res = collides(S.p, S.rot, S.x, S.y);
+    // highlight box columns in both rulers
+    for (let c = 0; c < 4; c++) {
+      const wx = S.x + c;
+      if (wx >= 0 && wx <= 15) {
+        el("rect", { x: L + wx * CS, y: T - 22, width: CS, height: 20, class: "c-accent-soft" }, svg);
+        el("rect", { x: L + wx * CS, y: T + NR * CS + 4, width: CS, height: 20, class: "c-accent-soft" }, svg);
+      }
+    }
+    // ruler labels
+    el("text", { x: L + 1.5 * CS, y: 14, "text-anchor": "middle", class: "c-muted", "font-size": 10 }, svg, "wall");
+    el("text", { x: L + 14.5 * CS, y: 14, "text-anchor": "middle", class: "c-muted", "font-size": 10 }, svg, "wall");
+    el("text", { x: L + 8 * CS, y: 14, "text-anchor": "middle", class: "c-muted", "font-size": 10 }, svg, "the real field, 10 columns");
+    el("text", { x: 4, y: T - 8, class: "c-accent", "font-size": 10, "font-weight": 600 }, svg, "wide");
+    el("text", { x: 4, y: T + NR * CS + 18, class: "c-muted", "font-size": 10, "font-weight": 600 }, svg, "board");
+    for (let w = 0; w < 16; w++) {
+      el("text", { x: L + w * CS + CS / 2, y: T - 8, "text-anchor": "middle", class: "c-accent", "font-size": 11, "font-weight": 600 }, svg, String(w));
+      el("text", { x: L + w * CS + CS / 2, y: T + NR * CS + 18, "text-anchor": "middle", class: "c-muted", "font-size": 11 }, svg, (w >= 3 && w <= 12) ? String(w - 3) : "·");
+    }
+    el("text", { x: L + 8 * CS, y: T + NR * CS + 42, "text-anchor": "middle", class: "c-muted", "font-size": 11 }, svg, "board column = wide column − 3");
+    // rows
+    for (let r = 0; r < NR; r++) {
+      el("text", { x: L - 6, y: T + r * CS + CS / 2 + 4, "text-anchor": "end", class: "c-muted", "font-size": 10 }, svg, r < 20 ? String(r) : "floor");
+      for (let w = 0; w < 16; w++) {
+        const x0 = L + w * CS, y0 = T + r * CS;
+        const isWall = w < 3 || w > 12 || r > 19;
+        if (isWall) el("rect", { x: x0, y: y0, width: CS, height: CS, fill: "url(#hatchW)" }, svg);
+        else if (occ(r, w - 3)) el("rect", { x: x0 + 1, y: y0 + 1, width: CS - 2, height: CS - 2, fill: COL[field[r][w - 3]], rx: 2 }, svg);
+        else el("rect", { x: x0, y: y0, width: CS, height: CS, class: "c-cell" }, svg);
+        el("rect", { x: x0, y: y0, width: CS, height: CS, class: "c-grid", "stroke-width": 0.6 }, svg);
+      }
+    }
+    // field outline
+    el("rect", { x: L + 3 * CS, y: T, width: 10 * CS, height: 20 * CS, fill: "none", class: "s-fg", "stroke-width": 1.5 }, svg);
+    // ghost outline
+    const g = ghostY();
+    if (g !== null && g !== S.y) {
+      for (let r = 0; r < 4; r++) for (let c = 0; c < 4; c++) if (bit(S.p, S.rot, r, c))
+        el("rect", { x: L + (S.x + c) * CS + 3, y: T + (g + r) * CS + 3, width: CS - 6, height: CS - 6, fill: "none", stroke: COL[S.p], "stroke-width": 1.5, "stroke-dasharray": "3 2" }, svg);
+    }
+    // piece blocks
+    for (let r = 0; r < 4; r++) {
+      const hits = res.rows[r].hits;
+      for (let c = 0; c < 4; c++) if (bit(S.p, S.rot, r, c)) {
+        const x0 = L + (S.x + c) * CS, y0 = T + (S.y + r) * CS;
+        const isHit = hits.includes(c);
+        el("rect", { x: x0 + 2, y: y0 + 2, width: CS - 4, height: CS - 4, fill: isHit ? "var(--hit)" : COL[S.p], rx: 2, opacity: isHit ? 0.95 : 0.92 }, svg);
+        if (isHit) {
+          el("line", { x1: x0 + 6, y1: y0 + 6, x2: x0 + CS - 6, y2: y0 + CS - 6, stroke: "#fff", "stroke-width": 2 }, svg);
+          el("line", { x1: x0 + CS - 6, y1: y0 + 6, x2: x0 + 6, y2: y0 + CS - 6, stroke: "#fff", "stroke-width": 2 }, svg);
+        }
+      }
+    }
+    // the 4x4 box
+    el("rect", { x: L + S.x * CS, y: T + S.y * CS, width: 4 * CS, height: 4 * CS, fill: "none", class: "s-accent", "stroke-width": 2, "stroke-dasharray": "6 4" }, svg);
+    el("circle", { cx: L + S.x * CS, cy: T + S.y * CS, r: 4.5, class: "c-accent" }, svg);
+    const lx = L + S.x * CS + 6, ly = T + S.y * CS - 5;
+    el("text", { x: lx, y: Math.max(T - 26, ly), class: "c-accent", "font-size": 11, "font-weight": 600 }, svg, `(x=${S.x}, y=${S.y})`);
+  }
+
+  function readWide() {
+    const res = collides(S.p, S.rot, S.x, S.y);
+    const [lo, hi] = legalRange(S.p, S.rot);
+    const cols = new Set();
+    for (let r = 0; r < 4; r++) for (let c = 0; c < 4; c++) if (bit(S.p, S.rot, r, c)) cols.add(S.x + c - 3);
+    const colList = [...cols].sort((a, b) => a - b);
+    const g = ghostY();
+    const box = document.getElementById("wideRead");
+    const kv = (k, v) => `<div class="kv"><span class="k">${k}</span><span class="v">${v}</span></div>`;
+    box.innerHTML =
+      kv("piece", `${NAMES[S.p]}, rotation ${S.rot}`) +
+      kv("box x (wide)", `${S.x} → box covers wide ${S.x}–${S.x + 3}`) +
+      kv("same in board", `columns ${S.x - 3}–${S.x}`) +
+      kv("blocks in", `board columns ${colList.join(", ")}`) +
+      kv("box y", `${S.y} → rows ${S.y}–${S.y + 3}`) +
+      kv("collide", res.hit ? `<span class="pill bad">1: hits something</span>` : `<span class="pill ok">0: fits</span>`) +
+      kv("ghost_y", g === null ? "— (piece doesn't fit here)" : String(g)) +
+      kv("legal x", `${lo}..${hi} for this rotation (walls only)`) +
+      `<p class="note">Spawn is x = ${SPAWN_X}, y = ${SPAWN_Y}: wide 6 = board 3, so 3-wide pieces sit in board columns 3–5, the middle of the field.</p>`;
+    document.querySelectorAll("#pcBtns button").forEach((b, i) => b.setAttribute("aria-pressed", i === S.p ? "true" : "false"));
+  }
+
+  // ------------------------------------------------------------ 2. collision rows
+  function drawCollide() {
+    const res = collides(S.p, S.rot, S.x, S.y);
+    const host = document.getElementById("collideRows");
+    host.innerHTML = "";
+    const CS = 26, L = 8, W = L + 16 * CS + 8;
+    res.rows.forEach(row => {
+      const div = document.createElement("div");
+      div.style.marginBottom = "14px";
+      const cap = document.createElement("div");
+      cap.className = "mono";
+      cap.style.fontSize = "13px";
+      let how;
+      if (row.kind === "floor") how = `row ${row.ry} is below the floor → wide := all '1'`;
+      else if (row.kind === "top") how = `row ${row.ry} is above the top → wide := "1110000000000111"`;
+      else how = `wide := "111" &amp; occ(${row.ry}) &amp; "111"`;
+      const shapeRow = SH[S.p][S.rot].substr(4 * row.r, 4);
+      cap.innerHTML = `<b>r = ${row.r}</b> · box row ${row.r} = <code>${shapeRow}</code> · board row y + r = ${row.ry} · ${how}`;
+      div.appendChild(cap);
+      const svg = document.createElementNS(NS, "svg");
+      const H = 2 * CS + 26;
+      svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+      svg.setAttribute("width", W); svg.style.maxWidth = "none"; svg.style.display = "block";
+      hatchDefs(svg, "hatchC" + row.r);
+      // shape bits above
+      for (let c = 0; c < 4; c++) {
+        const wx = S.x + c;
+        if (wx < 0 || wx > 15) continue;
+        const on = bit(S.p, S.rot, row.r, c);
+        const hit = row.hits.includes(c);
+        el("rect", { x: L + wx * CS + 1, y: 1, width: CS - 2, height: CS - 2, rx: 3, fill: on ? (hit ? "var(--hit)" : COL[S.p]) : "none", class: on ? "" : "s-muted", "stroke-dasharray": on ? "" : "2 2" }, svg);
+        el("text", { x: L + wx * CS + CS / 2, y: CS / 2 + 5, "text-anchor": "middle", "font-size": 12, fill: on ? "#111" : "var(--muted)" }, svg, on ? "1" : "0");
+      }
+      // wide row
+      for (let w = 0; w < 16; w++) {
+        const x0 = L + w * CS, y0 = CS + 4;
+        const isWall = (w < 3 || w > 12 || row.kind === "floor");
+        const inBox = w >= S.x && w < S.x + 4;
+        if (isWall) el("rect", { x: x0, y: y0, width: CS, height: CS, fill: "url(#hatchC" + row.r + ")" }, svg);
+        else el("rect", { x: x0, y: y0, width: CS, height: CS, class: inBox ? "c-accent-soft" : "c-cell" }, svg);
+        if (row.kind === "field" && !isWall && row.w[w]) el("rect", { x: x0 + 3, y: y0 + 3, width: CS - 6, height: CS - 6, fill: COL[field[row.ry][w - 3]], rx: 2 }, svg);
+        el("rect", { x: x0, y: y0, width: CS, height: CS, class: "c-grid", "stroke-width": 0.8 }, svg);
+        el("text", { x: x0 + CS / 2, y: y0 + CS / 2 + 5, "text-anchor": "middle", "font-size": 12, "font-weight": row.w[w] ? 700 : 400, class: row.w[w] ? "c-fg" : "c-muted" }, svg, String(row.w[w]));
+        el("text", { x: x0 + CS / 2, y: y0 + CS + 15, "text-anchor": "middle", "font-size": 9.5, class: "c-muted" }, svg, String(w));
+      }
+      // box outline around the 4 columns
+      el("rect", { x: L + S.x * CS, y: 0, width: 4 * CS, height: 2 * CS + 6, fill: "none", class: "s-accent", "stroke-width": 1.6, "stroke-dasharray": "5 3" }, svg);
+      const sc = document.createElement("div"); sc.className = "scroll"; sc.appendChild(svg);
+      div.appendChild(sc);
+      const res2 = document.createElement("div");
+      res2.className = "note mono";
+      res2.style.fontSize = "13px";
+      res2.innerHTML = row.hits.length
+        ? `<span style="color:var(--hit);font-weight:600">hit</span> at box column ${row.hits.join(", ")} → wide(${row.hits.map(c => S.x + c).join(", ")}) = '1'`
+        : (shapeRow === "...." ? "no blocks in this box row: nothing to check" : "every block is over a '0': no hit in this row");
+      div.appendChild(res2);
+      host.appendChild(div);
+    });
+    const anyHit = res.hit;
+    document.getElementById("collideResult").innerHTML =
+      `collide = ${res.rows.map(r => r.hits.length ? "1" : "0").join(" OR ")} = <b style="color:${anyHit ? "var(--hit)" : "var(--ok)"}">${anyHit ? "1" : "0"}</b>` +
+      ` · in hardware the two loops are copied 4 × 4 times: <code>occ(ry)</code> is a 20-to-1 mux of rows, <code>wide(x + c)</code> a 16-to-1 mux of bits.`;
+  }
+
+  // ------------------------------------------------------------ 3. state machine
+  // Layout: a central spine S_SPAWN → S_SPAWN_CHK → S_GHOST → S_GHOST_CHK → S_LOCKCHK.
+  // New game / new piece runs along the top into the spine; the frame loop wraps
+  // around the left and bottom back into S_GHOST; lock → clear → score climbs the
+  // right side and returns to S_PICK over the top. Every transition is a drawn arrow.
+  const NODES = {
+    S_IDLE: [100, 60], S_INIT: [260, 60], S_PICK: [420, 60], S_SPAWN: [580, 60],
+    S_SPAWN_CHK: [580, 155], S_GHOST: [580, 250], S_GHOST_CHK: [580, 345], S_LOCKCHK: [580, 440],
+    S_PLAY: [580, 540], S_ROT: [420, 540], S_ROT_CHK: [260, 540], S_MOVE: [100, 540],
+    S_MOVE_CHK: [100, 440], S_DOWN: [100, 345], S_DOWN_CHK: [100, 250],
+    S_LOCK: [760, 440], S_CLEAR: [760, 345], S_SCORE: [760, 250],
+    S_ATTACK: [760, 155], S_HOLE: [920, 155], S_GARB: [920, 60]
+  };
+  const NW = 124, NH = 38;
+  const T = n => [NODES[n][0], NODES[n][1] - NH / 2], B = n => [NODES[n][0], NODES[n][1] + NH / 2];
+  const Lf = n => [NODES[n][0] - NW / 2, NODES[n][1]], R = n => [NODES[n][0] + NW / 2, NODES[n][1]];
+  // [points, label, label x, label y, dashed]
+  const EDGES = [
+    [[R("S_IDLE"), Lf("S_INIT")]],
+    [[R("S_INIT"), Lf("S_PICK")]],
+    [[R("S_PICK"), Lf("S_SPAWN")]],
+    [[B("S_SPAWN"), T("S_SPAWN_CHK")]],
+    [[B("S_SPAWN_CHK"), T("S_GHOST")], "fits", 590, 207],
+    [[Lf("S_SPAWN_CHK"), [130, 155], [130, 79]], "no room: lose", 330, 147],
+    [[B("S_GHOST"), T("S_GHOST_CHK")], "hit", 590, 302],
+    [[B("S_GHOST_CHK"), T("S_LOCKCHK")]],
+    [[B("S_LOCKCHK"), T("S_PLAY")], "no lock", 590, 497],
+    [[R("S_LOCKCHK"), Lf("S_LOCK")], "lock", 670, 432],
+    [[T("S_LOCK"), B("S_CLEAR")], "4 rows done", 770, 397],
+    [[T("S_CLEAR"), B("S_SCORE")], "done", 770, 302],
+    [[T("S_SCORE"), B("S_ATTACK")], "lines counted", 770, 207],
+    [[T("S_ATTACK"), [760, 24], [420, 24], T("S_PICK")], "next piece", 470, 19],
+    [[R("S_ATTACK"), Lf("S_HOLE")], "rise", 826, 147],
+    [[T("S_HOLE"), B("S_GARB")], "hole picked", 928, 112],
+    [[[890, NODES.S_GARB[1] - NH / 2], [890, 24], [420, 24], T("S_PICK")], "rows done", 800, 36],
+    [[[950, NODES.S_GARB[1] - NH / 2], [950, 6], [100, 6], T("S_IDLE")], "pushed out: lose", 790, 17],
+    [[Lf("S_PLAY"), R("S_ROT")]],
+    [[Lf("S_ROT"), R("S_ROT_CHK")]],
+    [[Lf("S_ROT_CHK"), R("S_MOVE")]],
+    [[T("S_MOVE"), B("S_MOVE_CHK")], "left/right", 108, 497],
+    [[T("S_MOVE_CHK"), B("S_DOWN")]],
+    [[T("S_DOWN"), B("S_DOWN_CHK")], "fall", 108, 302],
+    [[R("S_DOWN_CHK"), Lf("S_GHOST")]],
+    // skip paths (nothing to do in that step)
+    [[B("S_ROT"), [420, 596], [100, 596], B("S_MOVE")], "skip: no rotate", 260, 612, true],
+    [[Lf("S_MOVE"), [18, 540], [18, 345], Lf("S_DOWN")], "", 0, 0, true],
+    [[R("S_DOWN"), [470, 345], [470, 262], [NODES.S_GHOST[0] - NW / 2, 262]], "skip: not falling", 300, 337, true]
+  ];
+  // [side, label, optional label x, label y, anchor]
+  const LOOPS = {
+    S_IDLE: ["bottomleft", "wait for start", 30, 116, "start"], S_PICK: ["bottom", "retry"], S_PLAY: ["right", "wait for frame_tick"],
+    S_ROT_CHK: ["top", "next kick"], S_GHOST_CHK: ["left", "1 row lower"], S_LOCK: ["right", "next box row"],
+    S_CLEAR: ["right", "1 row / clock"], S_SCORE: ["right", "1 line / clock"],
+    S_HOLE: ["right", "retry", 998, 194, "middle"], S_GARB: ["right", "1 row / clock", 1000, 34, "middle"]
+  };
+  let nodeEls = {};
+  function drawFsm() {
+    const svg = document.getElementById("fsmSvg");
+    svg.setAttribute("viewBox", "0 0 1040 625");
+    svg.innerHTML = "";
+    const defs = el("defs", {}, svg);
+    const mk = el("marker", { id: "arr", viewBox: "0 0 10 10", refX: 9, refY: 5, markerWidth: 7, markerHeight: 7, orient: "auto-start-reverse" }, defs);
+    el("path", { d: "M0,0 L10,5 L0,10 z", class: "c-muted" }, mk);
+    // region captions
+    el("text", { x: 300, y: 450, class: "c-muted", "font-size": 12 }, svg, "once per frame");
+    el("text", { x: 300, y: 466, class: "c-muted", "font-size": 11 }, svg, "(60 times a second)");
+    el("text", { x: 830, y: 520, "text-anchor": "middle", class: "c-muted", "font-size": 12 }, svg, "lock · clear · score");
+    el("text", { x: 862, y: 212, class: "c-muted", "font-size": 12 }, svg, "versus: garbage");
+    el("text", { x: 180, y: 120, class: "c-muted", "font-size": 12 }, svg, "new game / new piece");
+    el("text", { x: 180, y: 136, class: "c-accent", "font-size": 11, "font-weight": 600 }, svg, "rival LOST, in any state → S_IDLE (WIN!)");
+    // edges
+    EDGES.forEach(([pts, label, lx, ly, dashed]) => {
+      el("polyline", { points: pts.map(q => q.join(",")).join(" "), class: "edge" + (dashed ? " skip" : ""), "marker-end": "url(#arr)" }, svg);
+      if (label) el("text", { x: lx, y: ly, class: dashed ? "c-muted" : "c-accent", "font-size": 10.5, "font-weight": dashed ? 400 : 600, "text-anchor": "start" }, svg, label);
+    });
+    // self loops
+    Object.keys(LOOPS).forEach(n => {
+      const [cx, cy] = NODES[n], [side, label, lx, ly, la] = LOOPS[n];
+      let d, tx, ty, anchor = "start";
+      if (side === "top") { d = `M ${cx - 16} ${cy - NH / 2} C ${cx - 26} ${cy - 48}, ${cx + 26} ${cy - 48}, ${cx + 16} ${cy - NH / 2}`; tx = cx + 26; ty = cy - 36; }
+      else if (side === "bottom") { d = `M ${cx - 16} ${cy + NH / 2} C ${cx - 26} ${cy + 48}, ${cx + 26} ${cy + 48}, ${cx + 16} ${cy + NH / 2}`; tx = cx + 26; ty = cy + 42; }
+      else if (side === "bottomleft") { d = `M ${cx - 44} ${cy + NH / 2} C ${cx - 54} ${cy + 46}, ${cx - 14} ${cy + 46}, ${cx - 24} ${cy + NH / 2}`; tx = cx - 60; ty = cy + 50; }
+      else if (side === "right") { d = `M ${cx + NW / 2} ${cy - 8} C ${cx + NW / 2 + 32} ${cy - 22}, ${cx + NW / 2 + 32} ${cy + 22}, ${cx + NW / 2} ${cy + 8}`; tx = cx + NW / 2 + 30; ty = cy + 4; }
+      else { d = `M ${cx - NW / 2} ${cy - 8} C ${cx - NW / 2 - 32} ${cy - 22}, ${cx - NW / 2 - 32} ${cy + 22}, ${cx - NW / 2} ${cy + 8}`; tx = cx - NW / 2 - 30; ty = cy + 26; anchor = "end"; }
+      if (lx !== undefined) { tx = lx; ty = ly; anchor = la || anchor; }
+      el("path", { d, class: "edge", "marker-end": "url(#arr)" }, svg);
+      el("text", { x: tx, y: ty, class: "c-muted", "font-size": 10, "text-anchor": anchor }, svg, label);
+    });
+    // nodes on top
+    nodeEls = {};
+    Object.keys(NODES).forEach(n => {
+      const [cx, cy] = NODES[n];
+      const g = el("g", { class: "node" }, svg);
+      el("rect", { x: cx - NW / 2, y: cy - NH / 2, width: NW, height: NH, rx: 6 }, g);
+      el("text", { x: cx, y: cy + 4.5, "text-anchor": "middle" }, g, n);
+      nodeEls[n] = g;
+    });
+  }
+
+  // each step = one clock. n = how many clocks the step stands for.
+  const tail = (k) => [
+    ["S_GHOST", "cand = the piece one row lower (cand_y = cur_y + 1). → S_GHOST_CHK"],
+    ["S_GHOST_CHK", "collide = 0: that row is free → cand_y + 1, check again next clock"],
+    ["S_GHOST_CHK", `… the same for ${k} more rows (one clock each)`, k],
+    ["S_GHOST_CHK", "collide = 1: hit the stack → ghost_y = cand_y − 1 (the last free row). → S_LOCKCHK"],
+    ["S_LOCKCHK", "ghost_y ≠ cur_y: the piece is still in the air → lock_cnt = 0. → S_PLAY"],
+    ["S_PLAY", "Frame done. The rest of the 833,333 clocks: just waiting for the next frame_tick."]
+  ];
+  const tick = ["S_PLAY", "frame_tick! Copy req_* → w_*, clear req_*. Gravity counter +1 (not due yet, w_grav = 0). → S_ROT"];
+  const SCEN = {
+    "quiet frame": [tick,
+      ["S_ROT", "w_rot = 0: no turn requested → S_MOVE"],
+      ["S_MOVE", "w_left = w_right = 0 → skip to S_DOWN"],
+      ["S_DOWN", "no soft drop, gravity not due → skip to S_GHOST"],
+      ...tail(14)],
+    "press left": [tick,
+      ["S_ROT", "w_rot = 0 → S_MOVE"],
+      ["S_MOVE", "w_left = 1 → cand = same shape, cand_x = cur_x − 1, same row. → S_MOVE_CHK"],
+      ["S_MOVE_CHK", "collide = 0 → cur_x = cand_x: the piece moved. Lock timer restarted. → S_DOWN"],
+      ["S_DOWN", "nothing → S_GHOST"],
+      ...tail(14)],
+    "rotate at a wall": [tick,
+      ["S_ROT", "w_rot = 1 → cand = next rotation's shape, same x and y, kick = 0. → S_ROT_CHK"],
+      ["S_ROT_CHK", "collide = 1: the turned piece sticks into the wall → kick 1: cand_x = cur_x + 1"],
+      ["S_ROT_CHK", "collide = 1 again → kick 2: cand_x = cur_x − 1"],
+      ["S_ROT_CHK", "collide = 1 again → kick 3: cand_x = cur_x + 2"],
+      ["S_ROT_CHK", "collide = 0: fits → cur_rot, cur_sh, cur_x = the candidate. → S_MOVE"],
+      ["S_MOVE", "nothing → S_DOWN"],
+      ["S_DOWN", "nothing → S_GHOST"],
+      ...tail(12)],
+    "gravity": [["S_PLAY", "frame_tick! grav_cnt reached gravity_frames(level) − 1 → w_grav = 1. → S_ROT"],
+      ["S_ROT", "nothing → S_MOVE"],
+      ["S_MOVE", "nothing → S_DOWN"],
+      ["S_DOWN", "w_grav = 1 → cand_y = cur_y + 1. → S_DOWN_CHK"],
+      ["S_DOWN_CHK", "collide = 0 → cur_y = cand_y: the piece fell one row. → S_GHOST"],
+      ...tail(13)],
+    "hard drop + 2 lines": [tick,
+      ["S_ROT", "nothing → S_MOVE"],
+      ["S_MOVE", "nothing → S_DOWN"],
+      ["S_DOWN", "w_hard = 1 → don't fall row by row; the ghost search finds the spot. → S_GHOST"],
+      ["S_GHOST", "cand = one row lower → S_GHOST_CHK"],
+      ["S_GHOST_CHK", "free → one row lower …", 16],
+      ["S_GHOST_CHK", "collide = 1 → ghost_y found. → S_LOCKCHK"],
+      ["S_LOCKCHK", "w_hard = 1 → cur_y = ghost_y (jump down), lock_r = 0. → S_LOCK"],
+      ["S_LOCK", "lock_r = 0: OR box row 0 into field row cur_y + 0"],
+      ["S_LOCK", "lock_r = 1: box row 1 → field row cur_y + 1"],
+      ["S_LOCK", "lock_r = 2"],
+      ["S_LOCK", "lock_r = 3 (last) → rd = wr = 19, cleared = 0. → S_CLEAR"],
+      ["S_CLEAR", "rd walks from row 19 up to row 0, one row per clock: 2 full rows skipped, the others copied down", 20],
+      ["S_CLEAR", "rd = −1: empty the 2 top rows (wr = 1, then 0)", 2],
+      ["S_CLEAR", "wr = −1: done. clear_evt pulse with clear_n = 2. → S_SCORE"],
+      ["S_SCORE", "score_left = 2 → lines = bcd_inc(lines)"],
+      ["S_SCORE", "score_left = 1 → lines = bcd_inc(lines)"],
+      ["S_SCORE", "score_left = 0 → S_ATTACK"],
+      ["S_ATTACK", "cleared 2 → atk = 1. Nothing waiting for me (pending = 0), so all of it is sent: garb_out pulse, value 1 → the link sends GARBAGE 1. → S_PICK"],
+      ["S_PICK", "rnd = 7 → not a piece, retry next clock"],
+      ["S_PICK", "rnd = 5 (J) but J is already in the bag → retry"],
+      ["S_PICK", "rnd = 3 (S), not dealt yet → accept: cur_p = next_p, next_p = S. → S_SPAWN"],
+      ["S_SPAWN", "rotation 0, x = 6, y = 0, and the same into cand_*. → S_SPAWN_CHK"],
+      ["S_SPAWN_CHK", "collide = 0: room at the top → S_GHOST"],
+      ...tail(15)],
+    "start a game": [["S_IDLE", "req_hard = 1 (centre button pressed) → S_INIT"],
+      ["S_INIT", "all 800 field flip-flops cleared in this one clock; lines, level, bag reset; playing = 1. → S_PICK"],
+      ["S_PICK", "have_next = 0: this first pick only fills next_p. Stay in S_PICK."],
+      ["S_PICK", "second pick: cur_p = next_p, next_p = new → S_SPAWN"],
+      ["S_SPAWN", "piece at (6, 0) → S_SPAWN_CHK"],
+      ["S_SPAWN_CHK", "fits → S_GHOST"],
+      ...tail(16)],
+    "garbage comes in": [["S_PLAY", "frame_tick! (3 garbage lines are waiting: pending = 3, the red meter)"],
+      ["S_ROT", "nothing → S_MOVE"],
+      ["S_MOVE", "nothing → S_DOWN"],
+      ["S_DOWN", "nothing → S_GHOST"],
+      ["S_GHOST", "cand one row lower → S_GHOST_CHK"],
+      ["S_GHOST_CHK", "collide = 1 at once: the piece is resting. ghost_y = cur_y. → S_LOCKCHK"],
+      ["S_LOCKCHK", "resting and lock_cnt = 30 (half a second) → lock. → S_LOCK"],
+      ["S_LOCK", "4 box rows written into the field (one per clock)", 4],
+      ["S_CLEAR", "rd walks rows 19 → 0: no row is full, nothing removed", 20],
+      ["S_CLEAR", "done: clear_evt, clear_n = 0 → S_SCORE"],
+      ["S_SCORE", "score_left = 0 → S_ATTACK"],
+      ["S_ATTACK", "cleared 0 → atk = 0, nothing to send or cancel. Garbage waits (p = 3) → garb_left = 3, p = 0. → S_HOLE"],
+      ["S_HOLE", "rnd = lfsr(3..0) = 12 → not a column (≥ 10), retry next clock"],
+      ["S_HOLE", "rnd = 6 → hole = 6 → S_GARB"],
+      ["S_GARB", "top row empty → every row moves up one, row 19 = grey with a hole in column 6. garb_left = 2"],
+      ["S_GARB", "again → garb_left = 1"],
+      ["S_GARB", "again → garb_left = 0"],
+      ["S_GARB", "garb_left = 0 → S_PICK (if the top row had been full: pushed out → LOSE → S_IDLE)"],
+      ["S_PICK", "rnd accepted → S_SPAWN"],
+      ["S_SPAWN", "new piece at (6, 0) → S_SPAWN_CHK"],
+      ["S_SPAWN_CHK", "fits → S_GHOST"],
+      ...tail(12)],
+    "win: rival lost": [tick,
+      ["S_ROT", "nothing → S_MOVE"],
+      ["S_MOVE", "nothing → S_DOWN"],
+      ["S_DOWN", "nothing → S_GHOST"],
+      ["S_GHOST", "cand one row lower → S_GHOST_CHK"],
+      ["S_GHOST_CHK", "In this clock the link gives an opp_lost pulse (a LOST message arrived). The block after the case runs last and wins: result = WIN, playing = 0, state = S_IDLE."],
+      ["S_IDLE", "Gold frame, WIN! banner, win jingle. The rival's board shows LOSE. Waits for SW18 to start the next round on both boards."]],
+    "game over": [["S_SPAWN", "new piece at (6, 0) → S_SPAWN_CHK"],
+      ["S_SPAWN_CHK", "collide = 1: the stack reaches the top, no room → over_r = 1, playing = 0, lost_out pulse (→ LOST message), result = LOSE (or GAME OVER with no link). → S_IDLE"],
+      ["S_IDLE", "Red frame, grey blocks. Waits here until the centre button starts a new game."]]
+  };
+  let scen = "quiet frame", fsmI = 0, fsmTimer = null;
+  const scnBtns = document.getElementById("scnBtns");
+  Object.keys(SCEN).forEach(k => {
+    const b = document.createElement("button");
+    b.textContent = k;
+    b.addEventListener("click", () => { scen = k; fsmI = 0; stopPlay(); showFsm(); });
+    scnBtns.appendChild(b);
+  });
+  function showFsm() {
+    const steps = SCEN[scen];
+    Object.values(nodeEls).forEach(g => g.setAttribute("class", "node"));
+    for (let i = 0; i < fsmI; i++) nodeEls[steps[i][0]].setAttribute("class", "node visited");
+    const st = steps[fsmI];
+    nodeEls[st[0]].setAttribute("class", "node active");
+    let clocks = 0;
+    for (let i = 0; i <= fsmI; i++) clocks += steps[i][2] || 1;
+    document.getElementById("fsmClock").textContent = `step ${fsmI + 1} / ${steps.length} · clock ${clocks} · ${clocks * 20} ns`;
+    document.getElementById("fsmLog").innerHTML = `<span class="st">${st[0]}</span>${st[2] ? ` (×${st[2]} clocks)` : ""}: ${st[1]}`;
+    scnBtns.querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", b.textContent === scen ? "true" : "false"));
+  }
+  function stopPlay() { if (fsmTimer) { clearInterval(fsmTimer); fsmTimer = null; document.getElementById("fsmPlay").textContent = "play"; } }
+  document.getElementById("fsmNext").onclick = () => { stopPlay(); if (fsmI < SCEN[scen].length - 1) fsmI++; showFsm(); };
+  document.getElementById("fsmPrev").onclick = () => { stopPlay(); if (fsmI > 0) fsmI--; showFsm(); };
+  document.getElementById("fsmReset").onclick = () => { stopPlay(); fsmI = 0; showFsm(); };
+  document.getElementById("fsmPlay").onclick = () => {
+    if (fsmTimer) { stopPlay(); return; }
+    if (fsmI >= SCEN[scen].length - 1) fsmI = 0;
+    document.getElementById("fsmPlay").textContent = "pause";
+    fsmTimer = setInterval(() => {
+      if (fsmI < SCEN[scen].length - 1) { fsmI++; showFsm(); } else stopPlay();
+    }, 1100);
+    showFsm();
+  };
+
+  // ------------------------------------------------------------ 4. lock
+  let lockR = 0;
+  const lockBtns = document.getElementById("lockBtns");
+  [0, 1, 2, 3].forEach(r => {
+    const b = document.createElement("button");
+    b.textContent = "lock_r = " + r;
+    b.addEventListener("click", () => { lockR = r; drawLock(); });
+    lockBtns.appendChild(b);
+  });
+  function drawLock() {
+    lockBtns.querySelectorAll("button").forEach((b, i) => b.setAttribute("aria-pressed", i === lockR ? "true" : "false"));
+    const host = document.getElementById("lockTable"), note = document.getElementById("lockNote");
+    const g = ghostY();
+    if (g === null) {
+      host.innerHTML = "";
+      note.innerHTML = `<span class="pill bad">collide = 1</span> The piece in section 1 overlaps something, so it can't land from there. Move it to a free spot first.`;
+      return;
+    }
+    const y = g, x = S.x, row = y + lockR;
+    const shapeRow = SH[S.p][S.rot].substr(4 * lockR, 4);
+    const cells = [];
+    for (let c = 0; c < 10; c++) {
+      const j = c + 3 - x;
+      const inb = j >= 0 && j <= 3;
+      const sb = inb ? (shapeRow[j] === "X" ? 1 : 0) : null;
+      const old = (row >= 0 && row < 20 && occ(row, c)) ? 1 : 0;
+      cells.push({ c, j, inb, sb, prow: sb ? 1 : 0, old, nw: (sb ? 1 : 0) | old });
+    }
+    const td = (v, cls) => `<td class="${cls || ""}">${v}</td>`;
+    let h = `<table class="bits"><tr><th class="rowh">board column c</th>${cells.map(k => `<th>${k.c}</th>`).join("")}</tr>`;
+    h += `<tr><th class="rowh">j = c + 3 − x  (x = ${x})</th>${cells.map(k => td(k.j, k.inb ? "inbox" : "dim")).join("")}</tr>`;
+    h += `<tr><th class="rowh">sh(4·${lockR} + j)</th>${cells.map(k => td(k.inb ? k.sb : "–", (k.inb ? "inbox " : "dim ") + (k.sb ? "one" : ""))).join("")}</tr>`;
+    h += `<tr><th class="rowh">placed_row → prow</th>${cells.map(k => `<td class="${k.prow ? "one" : "dim"}" style="${k.prow ? `background:${COL[S.p]};color:#111` : ""}">${k.prow}</td>`).join("")}</tr>`;
+    h += `<tr><th class="rowh">occ(${row}) before</th>${cells.map(k => td(k.old, k.old ? "one" : "dim")).join("")}</tr>`;
+    h += `<tr><th class="rowh">occ(${row}) or prow</th>${cells.map(k => td(k.nw, k.prow ? "new1" : (k.nw ? "one" : "dim"))).join("")}</tr>`;
+    h += `</table>`;
+    host.innerHTML = h;
+    const any = cells.some(k => k.prow);
+    note.innerHTML = `Piece ${NAMES[S.p]} rotation ${S.rot}, box at x = ${x}, landing y = ${y}. Box row ${lockR} is <code>${shapeRow}</code> → field row y + lock_r = ${y} + ${lockR} = <b>${row}</b>. ` +
+      (any ? `Its colour bits <code>colf(${row})(3c+2 downto 3c)</code> are set to the piece number (${S.p}) in the green columns.` : `This box row is empty, so prow = 0 and row ${row} doesn't change (the clock still passes).`) +
+      ` Doing one row per clock means each field row only needs "am I row y + lock_r?" instead of checking all 16 box cells.`;
+  }
+
+  // ------------------------------------------------------------ 5. clear
+  const CLR_START = [
+    "..........","..........","..........","..........","..........","..........","..........","..........",
+    "..........","..........","..........","..........",
+    "....T.....","...TTT....","IIIIJJJLLL","O.SS..ZZ..","OSSJJJLZZL","TT.J.LLL.I","TJJJ.ZZOOI","SSZZOOLLLI"
+  ].map(s => s.split(""));
+  let clrSteps = [];
+  function buildClear() {
+    const f = CLR_START.map(r => r.slice());
+    let rd = 19, wr = 19, cleared = 0;
+    const isFull = r => f[r].every(ch => ch !== ".");
+    clrSteps = [{ f: f.map(r => r.slice()), rd, wr, cleared, msg: "S_LOCK just finished: rd = wr = 19, cleared = 0.", ch: [] }];
+    for (;;) {
+      let msg, ch = [];
+      if (rd >= 0) {
+        if (isFull(rd)) { cleared++; msg = `rd = ${rd}: row is full → skip it (don't copy). cleared = ${cleared}. wr stays at ${wr}.`; rd--; }
+        else {
+          if (wr !== rd) { f[wr] = f[rd].slice(); ch = [wr]; msg = `rd = ${rd}: keep → copy row ${rd} into row ${wr}, then wr = ${wr - 1}.`; }
+          else msg = `rd = ${rd}: keep. wr = rd, so the row is already in place (no copy). wr = ${wr - 1}.`;
+          wr--; rd--;
+        }
+      } else if (wr >= 0) {
+        f[wr] = "..........".split(""); ch = [wr]; msg = `rd = −1 (past the top): empty row ${wr}, wr = ${wr - 1}.`; wr--;
+      } else {
+        clrSteps.push({ f: f.map(r => r.slice()), rd, wr, cleared, msg: `wr = −1: done. clear_evt pulse, clear_n = ${cleared}. → S_SCORE`, ch: [], done: true });
+        break;
+      }
+      clrSteps.push({ f: f.map(r => r.slice()), rd, wr, cleared, msg, ch });
+    }
+  }
+  let clrI = 0, clrTimer = null;
+  function drawClear() {
+    const s = clrSteps[clrI];
+    const svg = document.getElementById("clrSvg");
+    svg.innerHTML = "";
+    const CS = 22, L = 34, T = 14, R0 = 8, NR = 12, W = L + 10 * CS + 120, H = T + NR * CS + 30;
+    svg.setAttribute("viewBox", `0 0 ${W} ${H}`); svg.setAttribute("width", W); svg.style.maxWidth = "100%"; svg.style.height = "auto";
+    el("text", { x: L, y: 10, class: "c-muted", "font-size": 10 }, svg, "rows 0–7 are empty (not drawn)");
+    for (let i = 0; i < NR; i++) {
+      const r = R0 + i, y0 = T + i * CS;
+      el("text", { x: L - 6, y: y0 + CS / 2 + 4, "text-anchor": "end", class: "c-muted", "font-size": 10 }, svg, String(r));
+      const full = s.f[r].every(ch => ch !== ".");
+      for (let c = 0; c < 10; c++) {
+        const ch = s.f[r][c], x0 = L + c * CS;
+        el("rect", { x: x0, y: y0, width: CS, height: CS, class: "c-cell" }, svg);
+        if (ch !== ".") el("rect", { x: x0 + 1, y: y0 + 1, width: CS - 2, height: CS - 2, rx: 2, fill: COL[NAMES.indexOf(ch)], opacity: full ? 0.45 : 1 }, svg);
+        el("rect", { x: x0, y: y0, width: CS, height: CS, class: "c-grid", "stroke-width": 0.6 }, svg);
+      }
+      if (full && !s.done) el("text", { x: L + 5 * CS, y: y0 + CS / 2 + 4, "text-anchor": "middle", class: "c-fg", "font-size": 11, "font-weight": 700 }, svg, "FULL");
+      if (s.ch.includes(r)) el("rect", { x: L - 1, y: y0 - 1, width: 10 * CS + 2, height: CS + 2, fill: "none", class: "s-warn", "stroke-width": 2.5 }, svg);
+    }
+    const ptr = (r, label, cls, dx) => {
+      if (r < R0 || r > 19) return;
+      const y0 = T + (r - R0) * CS + CS / 2;
+      const x0 = L + 10 * CS + 8 + dx;
+      el("path", { d: `M ${x0} ${y0} l 10 -6 l 0 12 z`, class: cls }, svg);
+      el("text", { x: x0 + 14, y: y0 + 4, class: cls, "font-size": 12, "font-weight": 700 }, svg, label);
+    };
+    ptr(s.rd, "rd", "c-accent", 0);
+    ptr(s.wr, "wr", "c-warn", 52);
+    const kv = (k, v) => `<div class="kv"><span class="k">${k}</span><span class="v">${v}</span></div>`;
+    document.getElementById("clrRead").innerHTML =
+      kv("rd", `<span style="color:var(--accent);font-weight:600">${s.rd}</span>`) +
+      kv("wr", `<span style="color:var(--warn);font-weight:600">${s.wr}</span>`) +
+      kv("cleared", s.cleared) +
+      `<div class="log">${s.msg}</div>` +
+      `<p class="note">Orange outline = the row written in this clock. Faded rows are full and will be skipped.</p>`;
+    document.getElementById("clrClock").textContent = `clock ${clrI} / ${clrSteps.length - 1}`;
+  }
+  function stopClr() { if (clrTimer) { clearInterval(clrTimer); clrTimer = null; document.getElementById("clrPlay").textContent = "play"; } }
+  document.getElementById("clrNext").onclick = () => { stopClr(); if (clrI < clrSteps.length - 1) clrI++; drawClear(); };
+  document.getElementById("clrPrev").onclick = () => { stopClr(); if (clrI > 0) clrI--; drawClear(); };
+  document.getElementById("clrReset").onclick = () => { stopClr(); clrI = 0; drawClear(); };
+  document.getElementById("clrPlay").onclick = () => {
+    if (clrTimer) { stopClr(); return; }
+    if (clrI >= clrSteps.length - 1) clrI = 0;
+    document.getElementById("clrPlay").textContent = "pause";
+    clrTimer = setInterval(() => { if (clrI < clrSteps.length - 1) { clrI++; drawClear(); } else stopClr(); }, 700);
+  };
+
+  // ------------------------------------------------------------ 6. bcd
+  let bcdSteps = [], bcdI = 0;
+  function buildBcd() {
+    let n = parseInt(document.getElementById("bcdIn").value, 10);
+    if (!(n >= 0)) n = 0; if (n > 9999) n = 9999;
+    const dig = String(n).padStart(4, "0").split("").reverse().map(Number); // dig[0] = ones
+    bcdSteps = [{ d: dig.slice(), cur: -1, msg: `v = ${n} → 4 digits of 4 bits. carry := true (we are adding 1).`, changed: [] }];
+    if (n === 9999) { bcdSteps.push({ d: dig.slice(), cur: -1, msg: "v = 9999: the function returns it unchanged (the counter stops at 9999).", changed: [] }); return; }
+    let carry = true;
+    const d = dig.slice();
+    const names = ["ones", "tens", "hundreds", "thousands"];
+    for (let k = 0; k < 4; k++) {
+      if (!carry) { bcdSteps.push({ d: d.slice(), cur: k, msg: `d = ${k} (${names[k]}): carry is false → leave it.`, changed: [] }); continue; }
+      if (d[k] === 9) { d[k] = 0; bcdSteps.push({ d: d.slice(), cur: k, msg: `d = ${k} (${names[k]}): digit is "1001" (9) → becomes "0000", carry stays true.`, changed: [k] }); }
+      else { d[k]++; carry = false; bcdSteps.push({ d: d.slice(), cur: k, msg: `d = ${k} (${names[k]}): digit + 1 = ${d[k]} → carry := false (done adding).`, changed: [k] }); }
+    }
+    bcdSteps.push({ d: d.slice(), cur: -1, msg: `return r = ${d.slice().reverse().join("")}`, changed: [] });
+  }
+  function drawBcd() {
+    const s = bcdSteps[bcdI];
+    const host = document.getElementById("bcdDigits");
+    const names = ["ones", "tens", "hundreds", "thousands"];
+    host.innerHTML = [3, 2, 1, 0].map(k => {
+      const v = s.d[k];
+      return `<div class="digit ${s.cur === k ? "cur" : ""} ${s.changed.includes(k) ? "changed" : ""}">
+        <div class="lbl">${names[k]} · bits ${4 * k + 3}..${4 * k}</div>
+        <div class="d">${v}</div><div class="b">${v.toString(2).padStart(4, "0")}</div></div>`;
+    }).join("");
+    document.getElementById("bcdLog").innerHTML = `step ${bcdI} / ${bcdSteps.length - 1} · ${s.msg}`;
+    const n = parseInt(s.d.slice().reverse().join(""), 10);
+    const bcdBits = s.d.slice().reverse().map(x => x.toString(2).padStart(4, "0")).join(" ");
+    document.getElementById("bcdBin").innerHTML =
+      `In BCD, ${n} is <code>${bcdBits}</code>: each group feeds one 7-segment digit through <code>hex7</code>. ` +
+      `As a plain binary number it would be <code>${n.toString(2).padStart(16, "0")}</code>, and the 4 hex digits on the display would read <b>${n.toString(16).toUpperCase().padStart(4, "0")}</b> instead of ${String(n).padStart(4, "0")}.`;
+  }
+  document.getElementById("bcdIn").addEventListener("input", () => { buildBcd(); bcdI = 0; drawBcd(); });
+  document.getElementById("bcdNext").onclick = () => { if (bcdI < bcdSteps.length - 1) bcdI++; drawBcd(); };
+  document.getElementById("bcdPrev").onclick = () => { if (bcdI > 0) bcdI--; drawBcd(); };
+  document.getElementById("bcdReset").onclick = () => { bcdI = 0; drawBcd(); };
+
+  // ------------------------------------------------------------ 7. lfsr + bag
+  let lfsr = 0xACE1, bag = 0, lfsrMsg = "", clocks = 0, dealt = [];
+  function lfsrClock() {
+    const b = i => (lfsr >> i) & 1;
+    const fb = b(15) ^ b(13) ^ b(12) ^ b(10);
+    lfsr = ((lfsr << 1) & 0xFFFF) | fb;
+    clocks++;
+    return fb;
+  }
+  function tryPick() {
+    const rnd = lfsr & 7;
+    if (rnd === 7) return { ok: false, rnd, why: "7 is not a piece" };
+    if ((bag >> rnd) & 1) return { ok: false, rnd, why: `${NAMES[rnd]} already dealt from this bag` };
+    let nb = bag | (1 << rnd);
+    const full = nb === 0x7F;
+    if (full) nb = 0;
+    bag = nb;
+    return { ok: true, rnd, full };
+  }
+  function drawLfsr() {
+    const svg = document.getElementById("lfsrSvg");
+    svg.innerHTML = "";
+    const CS = 36, L = 20, T = 30;
+    el("text", { x: L, y: 16, class: "c-muted", "font-size": 11 }, svg, "lfsr (bit 15 on the left)");
+    for (let i = 15; i >= 0; i--) {
+      const x0 = L + (15 - i) * CS, v = (lfsr >> i) & 1;
+      const tap = [15, 13, 12, 10].includes(i), low = i <= 2;
+      el("rect", { x: x0, y: T, width: CS - 3, height: CS - 3, rx: 4, class: low ? "c-warn-soft" : (tap ? "c-accent-soft" : "c-cell") }, svg);
+      el("rect", { x: x0, y: T, width: CS - 3, height: CS - 3, rx: 4, fill: "none", class: tap ? "s-accent" : (low ? "s-warn" : "s-muted"), "stroke-width": tap || low ? 1.8 : 0.6 }, svg);
+      el("text", { x: x0 + (CS - 3) / 2, y: T + 23, "text-anchor": "middle", "font-size": 16, "font-weight": 600, class: "c-fg" }, svg, String(v));
+      el("text", { x: x0 + (CS - 3) / 2, y: T + CS + 12, "text-anchor": "middle", "font-size": 9.5, class: "c-muted" }, svg, String(i));
+    }
+    el("text", { x: L + 0 * CS, y: T + CS + 28, class: "c-accent", "font-size": 11 }, svg, "taps 15, 13, 12, 10 → XOR → new bit 0");
+    el("text", { x: L + 13 * CS - 20, y: T + CS + 28, class: "c-warn", "font-size": 11 }, svg, `rnd = bits 2..0 = ${lfsr & 7}`);
+    // bag
+    const by = 120;
+    el("text", { x: L, y: by - 6, class: "c-muted", "font-size": 11 }, svg, "bag (6 downto 0): filled = already dealt");
+    for (let k = 0; k < 7; k++) {
+      const x0 = L + k * 46, on = (bag >> k) & 1;
+      el("rect", { x: x0, y: by, width: 40, height: 34, rx: 4, fill: on ? COL[k] : "none", class: on ? "" : "s-muted", "stroke-dasharray": on ? "" : "3 3", "stroke-width": 1.2 }, svg);
+      el("text", { x: x0 + 20, y: by + 22, "text-anchor": "middle", "font-size": 14, "font-weight": 700, fill: on ? "#111" : "var(--muted)" }, svg, NAMES[k]);
+    }
+    el("text", { x: L + 7 * 46 + 16, y: by + 14, class: "c-muted", "font-size": 11 }, svg, "dealt so far:");
+    el("text", { x: L + 7 * 46 + 16, y: by + 32, class: "c-fg", "font-size": 14, "font-weight": 600 }, svg, dealt.slice(-12).join(" ") || "—");
+    document.getElementById("lfsrLog").innerHTML = `clock ${clocks} · lfsr = x"${lfsr.toString(16).toUpperCase().padStart(4, "0")}" · ${lfsrMsg || "press a button"}`;
+  }
+  function pickUntilDealt() {
+    const log = [];
+    for (let guard = 0; guard < 500; guard++) {
+      const r = tryPick();
+      if (r.ok) {
+        dealt.push(NAMES[r.rnd]);
+        log.push(`rnd = ${r.rnd} → deal <b>${NAMES[r.rnd]}</b>${r.full ? " (that was the 7th: bag emptied, a new bag starts)" : ""}`);
+        lfsrClock();
+        break;
+      }
+      log.push(`rnd = ${r.rnd}: retry (${r.why})`);
+      lfsrClock();
+    }
+    return log;
+  }
+  document.getElementById("lfsrStep").onclick = () => { const fb = lfsrClock(); lfsrMsg = `shifted left, new bit 0 = ${fb}`; drawLfsr(); };
+  document.getElementById("lfsrPick").onclick = () => { lfsrMsg = pickUntilDealt().join(" · "); drawLfsr(); };
+  document.getElementById("lfsrSeven").onclick = () => {
+    let n = 0;
+    for (let i = 0; i < 7; i++) n += pickUntilDealt().length;
+    lfsrMsg = `7 pieces dealt in ${n} clocks. Every group of 7 has each piece once.`;
+    drawLfsr();
+  };
+  document.getElementById("lfsrReset").onclick = () => { lfsr = 0xACE1; bag = 0; clocks = 0; dealt = []; lfsrMsg = ""; drawLfsr(); };
+
+  // ------------------------------------------------------------ 8. renderer
+  const FX0 = 240, FY0 = 80, FW = 160, FH = 320, NX0 = 432, NY0 = 80, LX0 = 432, LY0 = 176;
+  const rgbArr = h => [0, 1, 2].map(i => parseInt(h[i], 16));
+  const lighten = c => c.map(v => v + ((15 - v) >> 1));
+  const darken = c => c.map(v => v >> 1);
+  const bevel = (c, px, py) => (px === 0 || py === 0) ? lighten(c) : ((px === 15 || py === 15) ? darken(c) : c);
+  function pixel(xi, yi, g) {
+    const I = { xi, yi };
+    const inF = xi >= FX0 && xi < FX0 + FW && yi >= FY0 && yi < FY0 + FH;
+    let col = 0, row = 0;
+    if (inF) { col = (xi - FX0) >> 4; row = (yi - FY0) >> 4; }
+    const px = xi & 15, py = yi & 15;
+    const cc = col + 3 - S.x;
+    let rr = row - S.y;
+    const piece = inF && rr >= 0 && rr <= 3 && cc >= 0 && cc <= 3 && bit(S.p, S.rot, rr, cc);
+    let ghost = false, rg = null;
+    if (g !== null) { rg = row - g; ghost = inF && rg >= 0 && rg <= 3 && cc >= 0 && cc <= 3 && bit(S.p, S.rot, rg, cc); }
+    let c = rgbArr("113"), layer = "background";
+    if (inF) {
+      c = (px === 0 || py === 0) ? rgbArr("111") : rgbArr("000");
+      layer = (px === 0 || py === 0) ? "empty cell (grid line)" : "empty cell";
+      if (piece) { c = bevel(rgbArr(RGB12[S.p]), px, py); layer = "falling piece"; }
+      else if (occ(row, col)) { c = bevel(rgbArr(RGB12[field[row][col]]), px, py); layer = "locked block"; }
+      else if (ghost) { if (px === 0 || py === 0 || px === 15 || py === 15) { c = darken(rgbArr(RGB12[S.p])); layer = "ghost outline"; } else layer = "inside ghost (only the outline is drawn)"; }
+    } else if (xi >= FX0 - 4 && xi < FX0 + FW + 4 && yi >= FY0 - 4 && yi < FY0 + FH + 4) { c = rgbArr("AAA"); layer = "field frame"; }
+    else if (xi >= NX0 && xi < NX0 + 64 && yi >= NY0 && yi < NY0 + 64) {
+      const nc = (xi - NX0) >> 4, nr = (yi - NY0) >> 4;
+      if (bit(S.next, 0, nr, nc)) { c = bevel(rgbArr(RGB12[S.next]), px, py); layer = "next piece"; } else { c = rgbArr("000"); layer = "next box (empty)"; }
+      I.nc = nc; I.nr = nr;
+    } else if (xi >= NX0 - 4 && xi < NX0 + 68 && yi >= NY0 - 4 && yi < NY0 + 68) { c = rgbArr("AAA"); layer = "next frame"; }
+    else if (xi >= LX0 && xi < LX0 + 128 && yi >= LY0 && yi < LY0 + 32) {
+      const li = (xi - LX0) >> 4, lj = (yi - LY0) >> 4;
+      if (px < 12 && py < 12 && lj * 8 + li <= S.level) { c = rgbArr("FC2"); layer = `level square ${lj * 8 + li}`; }
+    }
+    Object.assign(I, { inF, col, row, px, py, rr, cc, rg, piece, ghost, c, layer, g });
+    return I;
+  }
+  let baseImg = null;
+  function drawScreen() {
+    const cv = document.getElementById("scr"), ctx = cv.getContext("2d");
+    const img = ctx.createImageData(640, 480);
+    const g = ghostY();
+    for (let y = 0; y < 480; y++) for (let x = 0; x < 640; x++) {
+      const c = pixel(x, y, g).c, o = (y * 640 + x) * 4;
+      img.data[o] = c[0] * 17; img.data[o + 1] = c[1] * 17; img.data[o + 2] = c[2] * 17; img.data[o + 3] = 255;
+    }
+    baseImg = img;
+    ctx.putImageData(img, 0, 0);
+  }
+  function inspect(x, y) {
+    const cv = document.getElementById("scr"), ctx = cv.getContext("2d");
+    ctx.putImageData(baseImg, 0, 0);
+    const I = pixel(x, y, ghostY());
+    ctx.strokeStyle = "#ff3df0"; ctx.lineWidth = 2;
+    if (I.inF) ctx.strokeRect(FX0 + I.col * 16 - 1, FY0 + I.row * 16 - 1, 18, 18);
+    ctx.beginPath(); ctx.moveTo(x - 9, y); ctx.lineTo(x + 9, y); ctx.moveTo(x, y - 9); ctx.lineTo(x, y + 9); ctx.stroke();
+    const kv = (k, v) => `<div class="kv"><span class="k">${k}</span><span class="v">${v}</span></div>`;
+    const sw = `<i style="display:inline-block;width:14px;height:14px;vertical-align:-2px;border:1px solid var(--line);background:rgb(${I.c.map(v => v * 17).join(",")})"></i>`;
+    let h = kv("pixel", `x = ${x}, y = ${y}`);
+    if (I.inF) {
+      h += kv("cell", `col = (${x} − 240) / 16 = ${I.col}<br>row = (${y} − 80) / 16 = ${I.row}`);
+      h += kv("in the cell", `px = x(3..0) = ${I.px}, py = ${I.py}`);
+      h += kv("field", `occ(${I.row})(${I.col}) = ${occ(I.row, I.col) ? "1, colour " + NAMES[field[I.row][I.col]] : "0"}`);
+      const inBox = I.rr >= 0 && I.rr <= 3 && I.cc >= 0 && I.cc <= 3;
+      h += kv("piece?", `rr = row − cur_y = ${I.row} − ${S.y} = ${I.rr}<br>cc = col + 3 − cur_x = ${I.col} + 3 − ${S.x} = ${I.cc}<br>${inBox ? `inside the box → shape bit ${4 * I.rr + I.cc} = ${I.piece ? 1 : 0}` : "outside the 4×4 box → 0"}`);
+      if (I.g !== null) h += kv("ghost?", `rr = row − ghost_y = ${I.rg}${(I.rg >= 0 && I.rg <= 3 && I.cc >= 0 && I.cc <= 3) ? ` → shape bit ${4 * I.rg + I.cc} = ${I.ghost ? 1 : 0}` : " → outside"}`);
+    } else {
+      h += kv("cell", "outside the field");
+      if (I.nc !== undefined) h += kv("next box", `nc = ${I.nc}, nr = ${I.nr} → next_shape bit ${4 * I.nr + I.nc}`);
+    }
+    h += kv("stage 2 picks", `${sw} ${I.layer}`);
+    h += `<p class="note">Stage 1 works out everything above and stores it in s1_* registers. Stage 2, one clock later, chooses the colour: piece over block over ghost over empty.</p>`;
+    document.getElementById("pixRead").innerHTML = h;
+  }
+  (function () {
+    const cv = document.getElementById("scr");
+    const at = e => { const r = cv.getBoundingClientRect(); return [Math.floor((e.clientX - r.left) * 640 / r.width), Math.floor((e.clientY - r.top) * 480 / r.height)]; };
+    cv.addEventListener("pointermove", e => { const [x, y] = at(e); if (x >= 0 && x < 640 && y >= 0 && y < 480) inspect(x, y); });
+    cv.addEventListener("pointerdown", e => { const [x, y] = at(e); if (x >= 0 && x < 640 && y >= 0 && y < 480) inspect(x, y); });
+  })();
+
+  // ------------------------------------------------------------ 9. message
+  const MSGT = [["HEARTBEAT", 0], ["GARBAGE", 1], ["LOST", 2], ["START", 3]];
+  let msgT = 1;
+  const msgBtns = document.getElementById("msgBtns");
+  MSGT.forEach((m, i) => {
+    const b = document.createElement("button"); b.textContent = m[0];
+    b.addEventListener("click", () => { msgT = i; drawMsg(); });
+    msgBtns.appendChild(b);
+  });
+  document.getElementById("msgVal").addEventListener("input", drawMsg);
+  function drawMsg() {
+    msgBtns.querySelectorAll("button").forEach((b, i) => b.setAttribute("aria-pressed", i === msgT ? "true" : "false"));
+    let v = parseInt(document.getElementById("msgVal").value, 10);
+    if (!(v >= 0)) v = 0;
+    if (v > 31) v = 31;
+    const t = MSGT[msgT][1], byte = (t << 5) | v;
+    const svg = document.getElementById("msgSvg");
+    svg.innerHTML = "";
+    const CS = 44, L = 30;
+    el("text", { x: L, y: 16, class: "c-muted", "font-size": 11 }, svg, "the byte (bit 7 on the left)");
+    for (let i = 7; i >= 0; i--) {
+      const x0 = L + (7 - i) * CS, on = (byte >> i) & 1, isT = i >= 5;
+      el("rect", { x: x0, y: 24, width: CS - 4, height: 36, rx: 4, class: isT ? "c-accent-soft" : "c-warn-soft" }, svg);
+      el("text", { x: x0 + (CS - 4) / 2, y: 49, "text-anchor": "middle", "font-size": 17, "font-weight": 700, class: "c-fg" }, svg, String(on));
+      el("text", { x: x0 + (CS - 4) / 2, y: 74, "text-anchor": "middle", "font-size": 10, class: "c-muted" }, svg, String(i));
+    }
+    el("text", { x: L + 1.5 * CS - 2, y: 90, "text-anchor": "middle", class: "c-accent", "font-size": 11, "font-weight": 600 }, svg, "type = " + t.toString(2).padStart(3, "0"));
+    el("text", { x: L + 5.5 * CS - 2, y: 90, "text-anchor": "middle", class: "c-warn", "font-size": 11, "font-weight": 600 }, svg, "value = " + v.toString(2).padStart(5, "0") + " (" + v + ")");
+    el("text", { x: L + 8 * CS + 14, y: 49, class: "c-fg", "font-size": 15, "font-weight": 600 }, svg, "= 0x" + byte.toString(16).toUpperCase().padStart(2, "0"));
+    // waveform: idle, start, d0..d7, stop, idle
+    const bits = [1, 0];
+    for (let i = 0; i < 8; i++) bits.push((byte >> i) & 1);
+    bits.push(1, 1);
+    const labels = ["idle", "start"];
+    for (let i = 0; i < 8; i++) labels.push("d" + i);
+    labels.push("stop", "idle");
+    const BW = 56, X0 = 30, YH = 150, YL = 200;
+    let d = "";
+    bits.forEach((bv, i) => {
+      const x = X0 + i * BW, y = bv ? YH : YL;
+      d += (i === 0 ? `M ${x} ${y}` : ` L ${x} ${y}`) + ` L ${x + BW} ${y}`;
+      const cls = (i >= 2 && i <= 9) ? ((i - 2) >= 5 ? "c-accent" : "c-warn") : "c-muted";
+      el("text", { x: x + BW / 2, y: 238, "text-anchor": "middle", "font-size": 10, class: cls }, svg, labels[i]);
+      el("line", { x1: x, y1: 128, x2: x, y2: 222, class: "s-muted", "stroke-width": 0.4, "stroke-dasharray": "2 3" }, svg);
+    });
+    el("path", { d, fill: "none", class: "s-fg", "stroke-width": 2.2 }, svg);
+    el("text", { x: 4, y: YH + 4, class: "c-muted", "font-size": 10 }, svg, "1");
+    el("text", { x: 4, y: YL + 4, class: "c-muted", "font-size": 10 }, svg, "0");
+    el("text", { x: X0, y: 120, class: "c-muted", "font-size": 11 }, svg, "on the wire: each bit 434 clocks, lowest bit first");
+    let meaning;
+    if (t === 0) meaning = `the other board draws my RIVAL bar ${v} rows high` + (v > 20 ? " (over 20: ignored)" : "") + ". Sent 10 times a second; silence for 0.5 s = NO LINK.";
+    else if (t === 1) meaning = `the other board adds ${v} to its red garbage meter.`;
+    else if (t === 2) meaning = "the other board shows WIN! and stops at once. (If that board had already topped out a moment before, it shows DRAW instead, and so does this one.)";
+    else meaning = "the other board leaves S_IDLE and starts a round.";
+    document.getElementById("msgLog").innerHTML = `<span class="st">${MSGT[msgT][0]}</span>: ${meaning}`;
+  }
+
+  // ------------------------------------------------------------ 10. garbage
+  let gClr = 4;
+  const gClrBtns = document.getElementById("gClrBtns");
+  [0, 1, 2, 3, 4].forEach(n => {
+    const b = document.createElement("button"); b.textContent = String(n);
+    b.addEventListener("click", () => { gClr = n; calcGarb(); });
+    gClrBtns.appendChild(b);
+  });
+  document.getElementById("gPend").addEventListener("input", calcGarb);
+  let gField, gLeft = 0, gHole = 6, gLost = false, gStepN = 0;
+  const G_START = ["..........", "..........", "..........", "..........", "..........", "..........", "..........", "..........",
+    "..........", "..........", "..........", "..........", "..........", "....T.....", "...TTT....", "O.SS..ZZ..", "OSS.JJLZZL", "TT.J.LLL.I", "TJJJ.ZZOOI", "SSZZOOL.LI"];
+  function calcGarb() {
+    gClrBtns.querySelectorAll("button").forEach((b, i) => b.setAttribute("aria-pressed", i === gClr ? "true" : "false"));
+    let p = parseInt(document.getElementById("gPend").value, 10);
+    if (!(p >= 0)) p = 0;
+    if (p > 31) p = 31;
+    const atk0 = [0, 0, 1, 2, 4][gClr];
+    let atk = atk0, pp = p;
+    if (atk >= pp) { atk = atk - pp; pp = 0; } else { pp = pp - atk; atk = 0; }
+    let incoming = 0;
+    if (gClr === 0 && pp > 0) { incoming = Math.min(8, pp); pp -= incoming; }
+    const note = `cleared ${gClr} → atk = ${atk0}. ` +
+      (atk0 === 0 ? "Nothing to cancel with. " : `Cancel: ${Math.min(atk0, p)} of the ${p} waiting lines are wiped out. `) +
+      `<b>Sent to the other board: ${atk}</b>` + (atk > 0 ? " (garb_out pulse → GARBAGE message)" : "") + ". " +
+      (incoming > 0 ? `<b>${incoming} grey rows rise now</b> (S_HOLE → S_GARB). ` :
+        (gClr === 0 ? "Nothing waits, so no rows rise. " : "Lines were cleared, so no garbage rises this time. ")) +
+      `Still waiting afterwards: <b>${pp}</b>.`;
+    document.getElementById("gCalc").innerHTML = note;
+    gField = G_START.map(r => r.split(""));
+    gLeft = incoming; gLost = false; gStepN = 0;
+    drawGarb();
+  }
+  document.getElementById("gReset").onclick = () => calcGarb();
+  document.getElementById("gStep").onclick = () => {
+    if (gLost || gLeft === 0) return;
+    if (gField[0].some(ch => ch !== ".")) { gLost = true; drawGarb(); return; }
+    for (let r = 0; r < 19; r++) gField[r] = gField[r + 1];
+    const row = "GGGGGGGGGG".split(""); row[gHole] = "."; gField[19] = row;
+    gLeft--; gStepN++;
+    drawGarb();
+  };
+  function drawGarb() {
+    const svg = document.getElementById("gSvg");
+    svg.innerHTML = "";
+    const CS = 18, L = 30, T = 6, R0 = 6, NR = 14, W = L + 10 * CS + 240, H = T + NR * CS + 10;
+    svg.setAttribute("viewBox", `0 0 ${W} ${H}`); svg.setAttribute("width", W); svg.style.maxWidth = "100%"; svg.style.height = "auto";
+    el("text", { x: L, y: T - 0, class: "c-muted", "font-size": 9 }, svg, "");
+    for (let i = 0; i < NR; i++) {
+      const r = R0 + i, y0 = T + i * CS;
+      el("text", { x: L - 6, y: y0 + CS / 2 + 4, "text-anchor": "end", class: "c-muted", "font-size": 9.5 }, svg, String(r));
+      for (let c = 0; c < 10; c++) {
+        const ch = gField[r][c], x0 = L + c * CS;
+        el("rect", { x: x0, y: y0, width: CS, height: CS, class: "c-cell" }, svg);
+        if (ch !== ".") el("rect", { x: x0 + 1, y: y0 + 1, width: CS - 2, height: CS - 2, rx: 2, fill: COL[NAMES.indexOf(ch)] }, svg);
+        el("rect", { x: x0, y: y0, width: CS, height: CS, class: "c-grid", "stroke-width": 0.5 }, svg);
+      }
+    }
+    for (let i = 1; i < NR; i += 3) {
+      const y0 = T + i * CS + CS / 2;
+      el("path", { d: `M ${L + 10 * CS + 14} ${y0 + 7} l 0 -14 m -4 4 l 4 -4 l 4 4`, fill: "none", class: "s-accent", "stroke-width": 1.4 }, svg);
+    }
+    el("text", { x: L + 10 * CS + 30, y: T + 30, class: "c-fg", "font-size": 12 }, svg, "occ_r(r) <= occ_r(r + 1)");
+    el("text", { x: L + 10 * CS + 30, y: T + 48, class: "c-muted", "font-size": 11 }, svg, "all 20 rows move up at once:");
+    el("text", { x: L + 10 * CS + 30, y: T + 63, class: "c-muted", "font-size": 11 }, svg, "fixed wires, no muxes");
+    el("text", { x: L + 10 * CS + 30, y: T + NR * CS - 8, class: "c-fg", "font-size": 12 }, svg, `row 19 <= grey, hole at column ${gHole}`);
+    document.getElementById("gInfo").textContent = gLost ? "occ_r(0) is not empty: shifting would push blocks out → LOSE" :
+      (gLeft > 0 ? `garb_left = ${gLeft} · clock ${gStepN}` :
+        (gStepN ? `done after ${gStepN} clocks → S_PICK` : "no rows to add (pick 0 lines cleared with garbage waiting)"));
+  }
+
+  // ------------------------------------------------------------ 11. sigma-delta
+  let sdM = true, sdS = false, bk = 0, bkHist = [], bkLast = null, tlS = true, tlM = true;
+  const loud = () => (sdM ? 3 : 0) + (sdS ? 7 : 0);
+  document.getElementById("sdM").onclick = () => { sdM = !sdM; drawSdAll(); };
+  document.getElementById("sdS").onclick = () => { sdS = !sdS; drawSdAll(); };
+  document.getElementById("bkStep").onclick = () => { bkClock(); drawBucket(); };
+  document.getElementById("bkSixteen").onclick = () => { for (let i = 0; i < 16; i++) bkClock(); drawBucket(); };
+  document.getElementById("bkReset").onclick = () => { bk = 0; bkHist = []; bkLast = null; drawBucket(); };
+  document.getElementById("tlS").onclick = () => { tlS = !tlS; drawTimeline(); };
+  document.getElementById("tlM").onclick = () => { tlM = !tlM; drawTimeline(); };
+  function bkClock() {
+    const L = loud(), before = bk, sum = bk + L, on = sum >= 16 ? 1 : 0;
+    bk = sum - 16 * on;
+    bkHist.push(on);
+    if (bkHist.length > 32) bkHist.shift();
+    bkLast = { before, L, sum, on, after: bk };
+  }
+  function drawSdTable() {
+    document.getElementById("sdM").textContent = "music square: " + (sdM ? 1 : 0);
+    document.getElementById("sdS").textContent = "effect square: " + (sdS ? 1 : 0);
+    document.getElementById("sdM").setAttribute("aria-pressed", sdM ? "true" : "false");
+    document.getElementById("sdS").setAttribute("aria-pressed", sdS ? "true" : "false");
+    const rows = [[0, 0], [1, 0], [0, 1], [1, 1]];
+    let h = `<table class="bits"><tr><th class="rowh">music square</th><th class="rowh">effect square</th><th class="rowh">loudness</th><th class="rowh">pin on, on average</th><th class="rowh">average voltage</th></tr>`;
+    rows.forEach(([m, e]) => {
+      const l = 3 * m + 7 * e, cur = (m === (sdM ? 1 : 0) && e === (sdS ? 1 : 0));
+      const td = v => `<td class="${cur ? "inbox one" : ""}" style="padding:4px 10px">${v}</td>`;
+      h += `<tr>${td(m)}${td(e)}${td(`${m ? 3 : 0} + ${e ? 7 : 0} = <b>${l}</b>`)}${td(`${l} / 16 of the clocks`)}${td((l / 16 * 3.3).toFixed(2) + " V")}</tr>`;
+    });
+    h += `</table>`;
+    document.getElementById("sdTable").innerHTML = h;
+  }
+  function drawBucket() {
+    const svg = document.getElementById("bkSvg");
+    svg.innerHTML = "";
+    const L = loud();
+    // the bucket: 16 units tall
+    const BX = 40, BY = 30, BW = 90, U = 11, BH = 16 * U;
+    el("text", { x: BX + BW / 2, y: 18, "text-anchor": "middle", class: "c-muted", "font-size": 11 }, svg, "bucket (holds 16)");
+    const shownLevel = bkLast ? Math.min(bkLast.sum, 16) : bk;
+    const keep = bkLast ? bkLast.before : bk;
+    for (let k = 0; k < 16; k++) {
+      const y0 = BY + BH - (k + 1) * U;
+      let cls = "c-cell";
+      if (bkLast) {
+        if (k < keep) cls = "c-accent-soft";
+        else if (k < shownLevel) cls = "c-accent";
+      } else if (k < bk) cls = "c-accent-soft";
+      el("rect", { x: BX + 1, y: y0 + 1, width: BW - 2, height: U - 2, class: cls }, svg);
+    }
+    el("path", { d: `M ${BX} ${BY - 4} L ${BX} ${BY + BH} L ${BX + BW} ${BY + BH} L ${BX + BW} ${BY - 4}`, fill: "none", class: "s-fg", "stroke-width": 2 }, svg);
+    el("text", { x: BX - 6, y: BY + BH + 4, "text-anchor": "end", class: "c-muted", "font-size": 10 }, svg, "0");
+    el("text", { x: BX - 6, y: BY + 8, "text-anchor": "end", class: "c-muted", "font-size": 10 }, svg, "16");
+    // overflow spout
+    const over = bkLast && bkLast.on;
+    el("path", { d: `M ${BX + BW} ${BY + 2} q 26 0 30 24`, fill: "none", class: over ? "s-warn" : "s-muted", "stroke-width": over ? 4 : 1.5 }, svg);
+    el("text", { x: BX + BW + 40, y: BY + 44, class: over ? "c-warn" : "c-muted", "font-size": 12, "font-weight": 700 }, svg, over ? "overflow!  −16" : "no overflow");
+    // pin lamp
+    el("circle", { cx: BX + BW + 70, cy: BY + 90, r: 22, class: over ? "c-accent" : "c-cell" }, svg);
+    el("circle", { cx: BX + BW + 70, cy: BY + 90, r: 22, fill: "none", class: "s-fg", "stroke-width": 1.5 }, svg);
+    el("text", { x: BX + BW + 70, y: BY + 95, "text-anchor": "middle", class: over ? "c-panel" : "c-muted", "font-size": 12, "font-weight": 700 }, svg, over ? "ON" : "OFF");
+    el("text", { x: BX + BW + 70, y: BY + 130, "text-anchor": "middle", class: "c-muted", "font-size": 11 }, svg, "audio pin");
+    el("text", { x: BX + BW + 70, y: BY + 145, "text-anchor": "middle", class: "c-muted", "font-size": 11 }, svg, "this clock");
+    // history strip
+    const HX = 290, HY = 60, CW = 15;
+    el("text", { x: HX, y: HY - 14, class: "c-muted", "font-size": 11 }, svg, "the pin, last 32 clocks (newest on the right)");
+    for (let i = 0; i < 32; i++) {
+      const v = bkHist[bkHist.length - 32 + i];
+      const has = v !== undefined;
+      el("rect", { x: HX + i * CW, y: HY, width: CW - 2, height: 26, rx: 2, class: has ? (v ? "c-accent" : "c-cell") : "c-cell", opacity: has ? 1 : 0.35 }, svg);
+      if (i % 16 === 15) el("line", { x1: HX + (i + 1) * CW - 1, y1: HY - 6, x2: HX + (i + 1) * CW - 1, y2: HY + 32, class: "s-warn", "stroke-width": 1.5, "stroke-dasharray": "3 3" }, svg);
+    }
+    const last16 = bkHist.slice(-16), ons = last16.reduce((a, b) => a + b, 0);
+    el("text", { x: HX, y: HY + 50, class: "c-fg", "font-size": 12 }, svg, bkHist.length >= 16 ? `last 16 clocks: ON ${ons} times  (loudness = ${L})` : `step ${16 - bkHist.length} more clocks to see a full group of 16`);
+    // the arithmetic
+    if (bkLast) {
+      const b5 = n => n.toString(2).padStart(5, "0");
+      el("text", { x: HX, y: HY + 90, class: "c-muted", "font-size": 11 }, svg, "this clock in the VHDL register:");
+      el("text", { x: HX, y: HY + 110, class: "c-fg", "font-size": 13 }, svg, `  bucket(3..0) = ${bkLast.before.toString(2).padStart(4, "0")}  (${bkLast.before})`);
+      el("text", { x: HX, y: HY + 128, class: "c-fg", "font-size": 13 }, svg, `+ loudness    = ${bkLast.L.toString(2).padStart(4, "0")}  (${bkLast.L})`);
+      el("text", { x: HX, y: HY + 148, class: "c-fg", "font-size": 13, "font-weight": 700 }, svg, `= bucket      = ${b5(bkLast.sum)} (${bkLast.sum})`);
+      el("text", { x: HX, y: HY + 170, class: bkLast.on ? "c-warn" : "c-muted", "font-size": 12 }, svg, `bit 4 = ${bkLast.on} → pin ${bkLast.on ? "ON" : "OFF"};  bits 3..0 = ${bkLast.after} stay in the bucket`);
+    }
+    document.getElementById("bkInfo").textContent = `loudness = ${L} (set in step 1) · bucket now holds ${bk}`;
+    document.getElementById("bkLog").innerHTML = bkLast
+      ? `bucket ${bkLast.before} + loudness ${bkLast.L} = <b>${bkLast.sum}</b> ` + (bkLast.on ? `≥ 16 → overflow: <b>pin ON</b>, ${bkLast.sum} − 16 = ${bkLast.after} stays.` : `&lt; 16 → <b>pin OFF</b>, the bucket keeps ${bkLast.after}.`)
+      : (L === 0 ? "loudness is 0: nothing is ever poured in, so the pin stays off (silence). Turn a square on in step 1." : "Press \"one clock\".");
+  }
+  function drawTimeline() {
+    document.getElementById("tlS").setAttribute("aria-pressed", tlS ? "true" : "false");
+    document.getElementById("tlM").setAttribute("aria-pressed", tlM ? "true" : "false");
+    const svg = document.getElementById("tlSvg");
+    svg.innerHTML = "";
+    const X0 = 120, W = 640, TMAX = 6;            // ms
+    const fm = 440, fe = 1046.5;
+    const sq = (f, t) => (Math.floor(t * f * 2 / 1000) % 2 === 0) ? 1 : 0;   // t in ms
+    const xs = t => X0 + t / TMAX * W;
+    const rows = [
+      { name: "music (440 Hz)", y: 20, h: 36, fn: t => tlM ? sq(fm, t) : 0, max: 1 },
+      { name: "effect (1047 Hz)", y: 80, h: 36, fn: t => tlS ? sq(fe, t) : 0, max: 1 },
+      { name: "loudness (0..15)", y: 140, h: 70, fn: t => (tlM ? 3 * sq(fm, t) : 0) + (tlS ? 7 * sq(fe, t) : 0), max: 15 },
+      { name: "speaker feels", y: 236, h: 70, fn: t => ((tlM ? 3 * sq(fm, t) : 0) + (tlS ? 7 * sq(fe, t) : 0)) / 16 * 3.3, max: 3.3 }
+    ];
+    rows.forEach((r, k) => {
+      el("text", { x: 4, y: r.y + r.h / 2 + 4, class: "c-muted", "font-size": 11 }, svg, r.name);
+      el("line", { x1: X0, y1: r.y + r.h, x2: X0 + W, y2: r.y + r.h, class: "s-muted", "stroke-width": 0.6 }, svg);
+      let d = "", prevY = null;
+      for (let i = 0; i <= 1200; i++) {
+        const t = i / 1200 * TMAX, v = r.fn(t), y = r.y + r.h - v / r.max * r.h, x = xs(t);
+        if (i === 0) d = `M ${x} ${y}`;
+        else { if (y !== prevY) d += ` L ${x} ${prevY}`; d += ` L ${x} ${y}`; }
+        prevY = y;
+      }
+      el("path", { d, fill: "none", class: k === 3 ? "s-accent" : (k === 2 ? "s-warn" : "s-fg"), "stroke-width": k >= 2 ? 2 : 1.4 }, svg);
+      if (k === 2) [3, 7, 10].forEach(v => el("text", { x: X0 - 6, y: r.y + r.h - v / 15 * r.h + 4, "text-anchor": "end", class: "c-muted", "font-size": 9 }, svg, String(v)));
+      if (k === 3) [["0 V", 0], ["0.62", 3 / 16 * 3.3], ["1.44", 7 / 16 * 3.3], ["2.06", 10 / 16 * 3.3]].forEach(([lb, v]) => el("text", { x: X0 - 6, y: r.y + r.h - v / 3.3 * r.h + 4, "text-anchor": "end", class: "c-muted", "font-size": 9 }, svg, lb));
+    });
+    for (let t = 0; t <= TMAX; t++) el("text", { x: xs(t), y: 324, "text-anchor": "middle", class: "c-muted", "font-size": 10 }, svg, t + " ms");
+  }
+  function drawSdAll() { drawSdTable(); drawBucket(); }
+
+  // ------------------------------------------------------------ wire-up
+  function update() { drawWide(); readWide(); drawCollide(); drawLock(); drawScreen(); }
+  drawFsm(); showFsm();
+  buildClear(); drawClear();
+  buildBcd(); drawBcd();
+  drawLfsr();
+  drawMsg(); calcGarb(); drawSdAll(); drawTimeline();
+  update();
+  inspect(FX0 + 4 * 16 + 7, FY0 + 1 * 16 + 7);
+})();
+</script>

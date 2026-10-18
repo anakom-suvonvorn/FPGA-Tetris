@@ -1,0 +1,16 @@
+# Vivado / simulator scratch files
+.Xil/
+*.jou
+*.log
+*.pb
+*.wdb
+xsim.dir/
+sim/out/*
+!sim/out/preview_all_patterns.png
+
+# build output, except the finished bitstreams
+tests/*/build/*
+!tests/*/build/*.bit
+
+# Vivado GUI projects made by tools/vivado_gui.bat (throw-away)
+vivado/

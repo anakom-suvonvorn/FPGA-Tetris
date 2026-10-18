@@ -1,0 +1,7 @@
+# Design: 01_vga_bars
+# 'top=' is the top entity. The other lines are the VHDL files, in compile order
+# (the package common_pkg.vhd must always come first). Paths are relative to the project folder (the "assignment" folder).
+top=top_vga_bars
+src/common/common_pkg.vhd
+src/common/vga_sync.vhd
+tests/01_vga_bars/top_vga_bars.vhd

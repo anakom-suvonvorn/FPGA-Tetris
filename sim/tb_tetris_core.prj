@@ -1,0 +1,3 @@
+vhdl work "../src/game/tetris_pkg.vhd"
+vhdl work "../src/game/tetris_core.vhd"
+vhdl work "tb_tetris_core.vhd"

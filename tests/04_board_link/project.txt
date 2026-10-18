@@ -1,0 +1,9 @@
+# Design: 04_board_link
+# 'top=' is the top entity. The other lines are the VHDL files, in compile order
+# (the package common_pkg.vhd must always come first). Paths are relative to the project folder (the "assignment" folder).
+top=top_board_link
+src/common/common_pkg.vhd
+src/common/uart_rx.vhd
+src/common/uart_tx.vhd
+src/common/seg7_scan.vhd
+tests/04_board_link/top_board_link.vhd
