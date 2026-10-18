@@ -67,6 +67,13 @@ entity tetris_core is
     pending    : out integer range 0 to 31;     -- garbage waiting to come in
     result     : out integer range 0 to 4;      -- 0 none, 1 WIN, 2 LOSE, 3 DRAW, 4 GAME OVER (solo)
 
+    -- chaos effects (from chaos_fx)
+    fx_freeze  : in  std_logic;                 -- no gravity while '1'
+    fx_speed   : in  std_logic;                 -- gravity as if 6 levels higher while '1'
+    fx_next_bad : in std_logic;                 -- pulse: the next piece becomes an S or a Z
+    fx_next_i  : in  std_logic;                 -- pulse: the next piece becomes an I
+    fx_sink    : in  std_logic;                 -- pulse: remove 2 bottom rows, cancel waiting garbage
+
     -- what the renderer needs
     occ        : out occ_field_t;
     colf       : out col_field_t;
@@ -93,7 +100,7 @@ architecture rtl of tetris_core is
   type state_t is (S_IDLE, S_INIT, S_PICK, S_SPAWN, S_SPAWN_CHK,
                    S_PLAY, S_ROT, S_ROT_CHK, S_MOVE, S_MOVE_CHK,
                    S_DOWN, S_DOWN_CHK, S_GHOST, S_GHOST_CHK, S_LOCKCHK,
-                   S_LOCK, S_CLEAR, S_SCORE, S_ATTACK, S_HOLE, S_GARB);
+                   S_LOCK, S_CLEAR, S_SCORE, S_ATTACK, S_HOLE, S_GARB, S_SINK);
   signal state : state_t := S_IDLE;
 
   -- the playfield
@@ -160,6 +167,7 @@ architecture rtl of tetris_core is
   signal start_o, lost_o, garb_o : std_logic := '0';
   signal garb_o_n  : integer range 0 to 31 := 0;
   signal height_r  : integer range 0 to 20 := 0;
+  signal sink_left : integer range 0 to 7 := 0;      -- chaos bonus: rows to remove
 
   constant R_NONE : integer := 0;
   constant R_WIN  : integer := 1;
@@ -214,6 +222,12 @@ architecture rtl of tetris_core is
       end if;
     end loop;
     return row;
+  end function;
+
+  -- chaos SPEED: fall as if 6 levels higher (at most level 15)
+  function speed_level(lv : integer range 0 to 15) return integer is
+  begin
+    if lv >= 9 then return 15; else return lv + 6; end if;
   end function;
 
   -- add 1 to a 4-digit BCD number (9999 stays 9999)
@@ -292,6 +306,7 @@ begin
           level_r    <= 0;
           lvl_cnt    <= 0;
           bag        <= (others => '0');
+          sink_left  <= 0;
           have_next  <= '0';
           grav_cnt   <= 0;
           w_hard     <= '0';
@@ -365,7 +380,13 @@ begin
             req_left <= '0'; req_right <= '0'; req_rot <= '0';
             req_soft <= '0'; req_hard  <= '0';
             -- gravity: one row down every gravity_frames(level) frames
-            if grav_cnt >= gravity_frames(level_r) - 1 then
+            -- (chaos: FREEZE stops it, SPEED uses a level 6 higher)
+            if fx_freeze = '1' then
+              w_grav <= '0';
+            elsif fx_speed = '1' and grav_cnt >= gravity_frames(speed_level(level_r)) - 1 then
+              grav_cnt <= 0;
+              w_grav   <= '1';
+            elsif grav_cnt >= gravity_frames(level_r) - 1 then
               grav_cnt <= 0;
               w_grav   <= '1';
             else
@@ -574,7 +595,9 @@ begin
             garb_o   <= '1';
             garb_o_n <= atk;
           end if;
-          if cleared = 0 and p > 0 then
+          if sink_left > 0 then
+            state <= S_SINK;                        -- chaos bonus first
+          elsif cleared = 0 and p > 0 then
             if p > MAX_GARB_PER_LOCK then n := MAX_GARB_PER_LOCK; else n := p; end if;
             garb_left <= n;
             p         := p - n;
@@ -616,7 +639,42 @@ begin
             garb_left <= garb_left - 1;
           end if;
 
+        -- chaos bonus SINK: the opposite of S_GARB. Every row takes the one
+        -- ABOVE it, so the bottom row falls out and an empty row enters at
+        -- the top. One row per clock.
+        when S_SINK =>
+          if sink_left = 0 then
+            state <= S_PICK;
+          else
+            for r in ROWS - 1 downto 1 loop
+              occ_r(r) <= occ_r(r - 1);
+              col_r(r) <= col_r(r - 1);
+            end loop;
+            occ_r(0)  <= EMPTY_OCC;
+            col_r(0)  <= EMPTY_COL;
+            sink_left <= sink_left - 1;
+          end if;
+
       end case;
+
+      -- ---------------------------------------------- chaos effects
+      if fx_next_bad = '1' then                     -- cursed: next is an S or a Z
+        if lfsr(0) = '1' then
+          next_p  <= 3;
+          next_sh <= shape_of(3, 0);
+        else
+          next_p  <= 4;
+          next_sh <= shape_of(4, 0);
+        end if;
+      end if;
+      if fx_next_i = '1' then                       -- bonus: next is an I
+        next_p  <= 0;
+        next_sh <= shape_of(0, 0);
+      end if;
+      if fx_sink = '1' then                         -- bonus: 2 rows out, waiting garbage gone
+        if sink_left < 6 then sink_left <= sink_left + 2; end if;
+        p := 0;
+      end if;
 
       -- ---------------------------------------------- the other board lost
       if opp_lost = '1' then

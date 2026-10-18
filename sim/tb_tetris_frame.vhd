@@ -53,6 +53,7 @@ begin
     port map (clk => clk, btn_left => b_left, btn_rot => b_rot, btn_hard => b_hard,
               btn_soft => b_soft, btn_right => b_right,
               sw_pause => '0', sw_music => '1', sw_sfx => '1', sw_usb => '1',
+              sw_chaos => '0', sw_task => x"00",
               link_tx => open, link_rx => '1', usb_tx => open, usb_rx => pc_line,
               audio_l => open, audio_r => open, buzzer => open,
               vga_r => r, vga_g => g, vga_b => b, vga_hs => hs, vga_vs => vs,

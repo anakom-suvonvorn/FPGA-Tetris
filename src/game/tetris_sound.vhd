@@ -15,7 +15,9 @@
 --   separately. Plays only while a game is running and SW4 is on.
 --
 -- EFFECTS: up to 4 (note, frames) steps each, started by game events:
---   lock, line clear, Tetris, garbage arriving, start, win, lose.
+--   lock, line clear, Tetris, garbage arriving, start, win, lose,
+--   and the chaos events (task start / done / failed, attack sent / hit,
+--   the OIIA cat). If several start in the same clock, the later 'if' wins.
 --   A new effect replaces the one playing. Need SW5 on.
 --
 -- MIXING TO ONE PIN (see docs\learn\06 section 6.5 for the long version):
@@ -46,6 +48,13 @@ entity tetris_sound is
     clear_n    : in  integer range 0 to 4;        -- ...clearing this many lines
     garb_evt   : in  std_logic;                   -- garbage arrived
     result     : in  integer range 0 to 4;        -- 1 win, 2 lose, 3 draw, 4 game over
+    -- chaos events (one-clock pulses)
+    task_start_evt : in std_logic;
+    task_ok_evt    : in std_logic;
+    task_fail_evt  : in std_logic;
+    sent_evt       : in std_logic;                -- I sent an attack
+    hit_evt        : in std_logic;                -- an attack hit me
+    oiia_evt       : in std_logic;                -- the cat arrived
     audio      : out std_logic;                   -- to both audio jack pins
     buzz       : out std_logic                    -- effects only, for the buzzer
   );
@@ -118,7 +127,14 @@ architecture rtl of tetris_sound is
   constant FX_WIN    : integer := 4;
   constant FX_LOSE   : integer := 5;
   constant FX_START  : integer := 6;
-  type fx_t is array (0 to 6, 0 to 3) of integer range 0 to 31;
+  constant FX_TASK   : integer := 7;     -- chaos: a task pops up
+  constant FX_OK     : integer := 8;     -- task done
+  constant FX_FAIL   : integer := 9;     -- task failed
+  constant FX_SENT   : integer := 10;    -- attack sent (a falling "zap")
+  constant FX_HIT    : integer := 11;    -- attack arrived (alarm)
+  constant FX_OIIA   : integer := 12;    -- "o - i - i - a" (the spinning cat)
+  constant N_FX      : integer := 13;
+  type fx_t is array (0 to N_FX - 1, 0 to 3) of integer range 0 to 63;
   constant FX_NOTE : fx_t := (
     (C6, R,  R,  R),
     (E6, G6, C7, R),
@@ -126,7 +142,13 @@ architecture rtl of tetris_sound is
     (A2, F2, R,  R),
     (C6, E6, G6, C7),
     (G4, E4, C4, C3),
-    (C6, G6, R,  R));
+    (C6, G6, R,  R),
+    (C6, R,  C6, R),
+    (E6, G6, C7, R),
+    (C4, F2, R,  R),
+    (C7, G6, E6, C6),
+    (A5, E5, A5, E5),
+    (G4, E6, E6, C5));
   constant FX_FRAMES : fx_t := (
     (2,  0,  0,  0),
     (3,  3,  5,  0),
@@ -134,7 +156,13 @@ architecture rtl of tetris_sound is
     (5,  8,  0,  0),
     (6,  6,  6,  24),
     (10, 10, 10, 30),
-    (4,  8,  0,  0));
+    (4,  8,  0,  0),
+    (3,  3,  3,  0),
+    (3,  3,  10, 0),
+    (8,  16, 0,  0),
+    (2,  2,  2,  5),
+    (6,  6,  6,  6),
+    (10, 7,  7,  16));
 
   -- music player
   signal mus_i     : integer range 0 to MUS_LEN_N - 1 := 0;
@@ -142,7 +170,7 @@ architecture rtl of tetris_sound is
   signal mus_now  : integer range 0 to 31 := 0;          -- sounding now (0 = silent)
 
   -- effect player
-  signal fx_id     : integer range 0 to 6 := 0;
+  signal fx_id     : integer range 0 to N_FX - 1 := 0;
   signal fx_step   : integer range 0 to 4 := 4;           -- 4 = not playing
   signal fx_left   : integer range 0 to 63 := 0;
   signal fx_now   : integer range 0 to 31 := 0;
@@ -167,7 +195,7 @@ begin
 
   -- ---------------------------------------------------------------- sequencers
   process(clk)
-    variable start_fx : integer range -1 to 6;
+    variable start_fx : integer range -1 to N_FX - 1;
     variable len      : integer range 0 to 63;
   begin
     if rising_edge(clk) then
@@ -184,6 +212,12 @@ begin
       end if;
       if garb_evt = '1' then start_fx := FX_GARB; end if;
       if playing = '1' and playing_d = '0' then start_fx := FX_START; end if;
+      if task_start_evt = '1' then start_fx := FX_TASK; end if;
+      if task_fail_evt  = '1' then start_fx := FX_FAIL; end if;
+      if task_ok_evt    = '1' then start_fx := FX_OK;   end if;
+      if sent_evt       = '1' then start_fx := FX_SENT; end if;
+      if hit_evt        = '1' then start_fx := FX_HIT;  end if;
+      if oiia_evt       = '1' then start_fx := FX_OIIA; end if;
       if result /= result_d then
         if result = 1 then start_fx := FX_WIN;
         elsif result >= 2 then start_fx := FX_LOSE;

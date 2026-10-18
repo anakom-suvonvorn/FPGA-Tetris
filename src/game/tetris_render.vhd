@@ -60,6 +60,11 @@ entity tetris_render is
     pending    : in  integer range 0 to 31;
     opp_height : in  integer range 0 to 20;
     link_ok    : in  std_logic;
+    -- chaos
+    fx_flip    : in  std_logic;                  -- draw the field upside down
+    fx_blind   : in  std_logic;                  -- hide the locked blocks
+    ov_on      : in  std_logic;                  -- chaos_render overlay: draw ov_rgb on top
+    ov_rgb     : in  rgb_t;
     -- VGA pins
     vga_r      : out std_logic_vector(3 downto 0);
     vga_g      : out std_logic_vector(3 downto 0);
@@ -176,6 +181,9 @@ begin
       if in_f then
         col := (xi - FX0) / 16;
         row := (yi - FY0) / 16;
+        if fx_flip = '1' then
+          row := ROWS - 1 - row;                  -- chaos FLIP: rows read bottom-up
+        end if;
       else
         col := 0;
         row := 0;
@@ -273,7 +281,11 @@ begin
       end if;
 
       s1_px  <= x(3 downto 0);
-      s1_py  <= y(3 downto 0);
+      if in_f and fx_flip = '1' then
+        s1_py <= not y(3 downto 0);               -- 15 - y: the cell itself flips too
+      else
+        s1_py <= y(3 downto 0);
+      end if;
       s1_vid <= video_on;
       s1_hs  <= hsync;
       s1_vs  <= vsync;
@@ -297,12 +309,17 @@ begin
         if s1_piece = '1' then
           c := bevel(piece_rgb(cur_color), s1_px, s1_py);
         elsif s1_occ_bit = '1' then
-          if game_over = '1' then
+          if fx_blind = '1' then
+            cell := x"112";                       -- chaos BLIND: almost invisible
+          elsif game_over = '1' then
             cell := x"555";                       -- I lost: everything grey
           else
             cell := piece_rgb(s1_cell_col);
           end if;
           c := bevel(cell, s1_px, s1_py);
+          if fx_blind = '1' then
+            c := x"111";                          -- no bevel either: nothing gives it away
+          end if;
         elsif s1_ghost = '1' then
           -- outline only, in a dark version of the piece colour
           if s1_px = 0 or s1_py = 0 or s1_px = 15 or s1_py = 15 then
@@ -378,6 +395,11 @@ begin
         c := LABEL_C;
       elsif t_num = '1' then
         c := x"FFF";
+      end if;
+
+      -- the chaos overlay (task panel, banner, bouncers, cat) goes on top
+      if ov_on = '1' then
+        c := ov_rgb;
       end if;
 
       if s1_vid = '1' then

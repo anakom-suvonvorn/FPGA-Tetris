@@ -135,6 +135,7 @@ begin
       versus => '0', start_in => '0', garb_in => '0', garb_in_n => 0, opp_lost => '0',
       start_out => open, lost_out => open, garb_out => open, garb_out_n => open,
       height => open, pending => open, result => open,
+      fx_freeze => '0', fx_speed => '0', fx_next_bad => '0', fx_next_i => '0', fx_sink => '0',
       occ => occ, colf => colf, cur_shape => cur_shape, cur_color => cur_color,
       cur_x => cur_x, cur_y => cur_y, ghost_y => ghost_y,
       next_shape => next_shape, next_color => next_color,

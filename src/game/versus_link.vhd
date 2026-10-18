@@ -13,10 +13,11 @@
 --   type 1  GARBAGE    value = number of garbage lines to add (1..31)
 --   type 2  LOST       I topped out (value unused)
 --   type 3  START      I started a new round, start yours too
---   type 4..7          free for the chaos attacks later
+--   type 4  ATTACK     value = chaos attack number (chaos_pkg), 0..7
+--   type 5..7          free
 --
 -- SENDING: requests (send_* pulses) are remembered until the transmitter is
--- free, then sent in priority order START > LOST > GARBAGE > HEARTBEAT.
+-- free, then sent in priority order START > LOST > ATTACK > GARBAGE > HEARTBEAT.
 -- Garbage that is waiting adds up (2 + 4 = one message "6").
 --
 -- RECEIVING: each good byte is decoded into a one-clock got_* pulse.
@@ -44,12 +45,16 @@ entity versus_link is
     send_garbage : in  std_logic;
     garbage_n    : in  integer range 0 to 31;
     my_height    : in  integer range 0 to 20;
+    send_attack  : in  std_logic;
+    attack_id    : in  integer range 0 to 31;
     -- what arrived
     got_start    : out std_logic;
     got_lost     : out std_logic;
     got_garbage  : out std_logic;
     got_n        : out integer range 0 to 31;
     opp_height   : out integer range 0 to 20;
+    got_attack   : out std_logic;
+    got_attack_id : out integer range 0 to 31;
     link_ok      : out std_logic
   );
 end entity;
@@ -59,6 +64,7 @@ architecture rtl of versus_link is
   constant T_GARBAGE   : std_logic_vector(2 downto 0) := "001";
   constant T_LOST      : std_logic_vector(2 downto 0) := "010";
   constant T_START     : std_logic_vector(2 downto 0) := "011";
+  constant T_ATTACK    : std_logic_vector(2 downto 0) := "100";
 
   signal tx_data  : std_logic_vector(7 downto 0) := (others => '0');
   signal tx_start : std_logic := '0';
@@ -70,12 +76,16 @@ architecture rtl of versus_link is
   signal start_p, lost_p, hb_p : std_logic := '0';
   signal garb_p   : integer range 0 to 31 := 0;
   signal hb_cnt   : integer range 0 to HB_FRAMES - 1 := 0;
+  signal att_p    : std_logic := '0';
+  signal att_id   : integer range 0 to 31 := 0;
 
   -- receive side
   signal silence  : integer range 0 to TIMEOUT_FRAMES := TIMEOUT_FRAMES;
   signal g_start, g_lost, g_garb : std_logic := '0';
   signal g_n      : integer range 0 to 31 := 0;
   signal opp_h    : integer range 0 to 20 := 0;
+  signal g_att    : std_logic := '0';
+  signal g_att_id : integer range 0 to 31 := 0;
 
   function msg(t : std_logic_vector(2 downto 0); v : integer) return std_logic_vector is
   begin
@@ -99,10 +109,15 @@ begin
       g_start  <= '0';
       g_lost   <= '0';
       g_garb   <= '0';
+      g_att    <= '0';
 
       -- ---------------------------------------------- remember requests
       if send_start = '1' then start_p <= '1'; end if;
       if send_lost  = '1' then lost_p  <= '1'; end if;
+      if send_attack = '1' then
+        att_p  <= '1';
+        att_id <= attack_id;
+      end if;
       if frame_tick = '1' then
         if hb_cnt = HB_FRAMES - 1 then
           hb_cnt <= 0;
@@ -123,6 +138,10 @@ begin
           tx_data  <= msg(T_LOST, 0);
           tx_start <= '1';
           lost_p   <= '0';
+        elsif att_p = '1' then
+          tx_data  <= msg(T_ATTACK, att_id);
+          tx_start <= '1';
+          att_p    <= '0';
         elsif garb_p > 0 then
           tx_data  <= msg(T_GARBAGE, garb_p);
           tx_start <= '1';
@@ -154,6 +173,9 @@ begin
             g_lost <= '1';
           when T_START =>
             g_start <= '1';
+          when T_ATTACK =>
+            g_att    <= '1';
+            g_att_id <= to_integer(unsigned(rx_data(4 downto 0)));
           when others =>
             null;                                   -- reserved for later
         end case;
@@ -168,6 +190,8 @@ begin
   got_garbage <= g_garb;
   got_n       <= g_n;
   opp_height  <= opp_h;
+  got_attack  <= g_att;
+  got_attack_id <= g_att_id;
   link_ok     <= '1' when silence < TIMEOUT_FRAMES else '0';
 
 end architecture;

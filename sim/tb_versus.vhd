@@ -180,6 +180,7 @@ begin
       versus => link_a, start_in => st_in_a, garb_in => ga_in_a, garb_in_n => gn_in_a, opp_lost => lo_in_a,
       start_out => st_out_a, lost_out => lo_out_a, garb_out => ga_out_a, garb_out_n => gn_out_a,
       height => h_a, pending => pend_a, result => res_a,
+      fx_freeze => '0', fx_speed => '0', fx_next_bad => '0', fx_next_i => '0', fx_sink => '0',
       occ => occ_a, colf => colf_a, cur_shape => open, cur_color => col_a, cur_x => x_a, cur_y => open,
       ghost_y => open, next_shape => open, next_color => open, playing => play_a, game_over => open,
       lines_bcd => open, level => open, clear_evt => evt_a, clear_n => cn_a);
@@ -188,8 +189,8 @@ begin
     port map (
       clk => clk, frame_tick => frame_tick, rx => line_ba, tx => line_ab,
       send_start => st_out_a, send_lost => lo_out_a, send_garbage => ga_out_a, garbage_n => gn_out_a,
-      my_height => h_a, got_start => st_in_a, got_lost => lo_in_a, got_garbage => ga_in_a,
-      got_n => gn_in_a, opp_height => oh_a, link_ok => link_a);
+      my_height => h_a, send_attack => '0', attack_id => 0, got_start => st_in_a, got_lost => lo_in_a, got_garbage => ga_in_a,
+      got_n => gn_in_a, opp_height => oh_a, got_attack => open, got_attack_id => open, link_ok => link_a);
 
   -- ------------------------------------------------------------ board B
   core_b : entity work.tetris_core
@@ -199,6 +200,7 @@ begin
       versus => link_b, start_in => st_in_b, garb_in => ga_in_b, garb_in_n => gn_in_b, opp_lost => lo_in_b,
       start_out => st_out_b, lost_out => lo_out_b, garb_out => ga_out_b, garb_out_n => gn_out_b,
       height => h_b, pending => pend_b, result => res_b,
+      fx_freeze => '0', fx_speed => '0', fx_next_bad => '0', fx_next_i => '0', fx_sink => '0',
       occ => occ_b, colf => colf_b, cur_shape => open, cur_color => col_b, cur_x => x_b, cur_y => open,
       ghost_y => open, next_shape => open, next_color => open, playing => play_b, game_over => open,
       lines_bcd => open, level => open, clear_evt => evt_b, clear_n => cn_b);
@@ -207,8 +209,8 @@ begin
     port map (
       clk => clk, frame_tick => frame_tick, rx => line_ab, tx => line_ba,
       send_start => st_out_b, send_lost => lo_out_b, send_garbage => ga_out_b, garbage_n => gn_out_b,
-      my_height => h_b, got_start => st_in_b, got_lost => lo_in_b, got_garbage => ga_in_b,
-      got_n => gn_in_b, opp_height => oh_b, link_ok => link_b);
+      my_height => h_b, send_attack => '0', attack_id => 0, got_start => st_in_b, got_lost => lo_in_b, got_garbage => ga_in_b,
+      got_n => gn_in_b, opp_height => oh_b, got_attack => open, got_attack_id => open, link_ok => link_b);
 
   -- ------------------------------------------------------------ watchers
   process(clk)

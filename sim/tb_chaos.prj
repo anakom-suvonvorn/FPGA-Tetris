@@ -1,0 +1,8 @@
+vhdl work "../src/game/text_pkg.vhd"
+vhdl work "../src/game/chaos_pkg.vhd"
+vhdl work "../src/common/uart_tx.vhd"
+vhdl work "../src/common/uart_rx.vhd"
+vhdl work "../src/game/versus_link.vhd"
+vhdl work "../src/game/chaos_task.vhd"
+vhdl work "../src/game/chaos_fx.vhd"
+vhdl work "tb_chaos.vhd"

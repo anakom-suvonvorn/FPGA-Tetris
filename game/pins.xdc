@@ -11,6 +11,15 @@ set_property -dict { PACKAGE_PIN K11  IOSTANDARD LVCMOS33 } [get_ports {sw_pause
 set_property -dict { PACKAGE_PIN M11  IOSTANDARD LVCMOS33 } [get_ports {sw_music}]   ;# slide switch SW4: music on
 set_property -dict { PACKAGE_PIN N14  IOSTANDARD LVCMOS33 } [get_ports {sw_sfx}]   ;# slide switch SW5: sound effects on
 set_property -dict { PACKAGE_PIN J1   IOSTANDARD LVCMOS33 } [get_ports {sw_usb}]   ;# slide switch SW22: link via USB (PC)
+set_property -dict { PACKAGE_PIN K3   IOSTANDARD LVCMOS33 } [get_ports {sw_chaos}]   ;# slide switch SW21: CHAOS on
+set_property -dict { PACKAGE_PIN P12  IOSTANDARD LVCMOS33 } [get_ports {sw_task[0]}]   ;# slide switch SW6: task switch
+set_property -dict { PACKAGE_PIN N10  IOSTANDARD LVCMOS33 } [get_ports {sw_task[1]}]   ;# slide switch SW7: task switch
+set_property -dict { PACKAGE_PIN P10  IOSTANDARD LVCMOS33 } [get_ports {sw_task[2]}]   ;# slide switch SW8: task switch
+set_property -dict { PACKAGE_PIN M10  IOSTANDARD LVCMOS33 } [get_ports {sw_task[3]}]   ;# slide switch SW9: task switch
+set_property -dict { PACKAGE_PIN N4   IOSTANDARD LVCMOS33 } [get_ports {sw_task[4]}]   ;# slide switch SW10: task switch
+set_property -dict { PACKAGE_PIN L2   IOSTANDARD LVCMOS33 } [get_ports {sw_task[5]}]   ;# slide switch SW11: task switch
+set_property -dict { PACKAGE_PIN P3   IOSTANDARD LVCMOS33 } [get_ports {sw_task[6]}]   ;# slide switch SW12: task switch
+set_property -dict { PACKAGE_PIN N1   IOSTANDARD LVCMOS33 } [get_ports {sw_task[7]}]   ;# slide switch SW13: task switch
 set_property -dict { PACKAGE_PIN L14  IOSTANDARD LVCMOS33 } [get_ports {link_tx}]   ;# J5 pin 5: to the other board
 set_property -dict { PACKAGE_PIN M13  IOSTANDARD LVCMOS33 PULLUP true } [get_ports {link_rx}]   ;# J5 pin 6: from the other board (pull-up: unplugged = idle)
 set_property -dict { PACKAGE_PIN F2   IOSTANDARD LVCMOS33 } [get_ports {usb_tx}]   ;# USB serial, to the PC
