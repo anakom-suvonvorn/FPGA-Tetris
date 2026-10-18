@@ -15,7 +15,7 @@ every message the board sends, and lets you type commands:
     h 12     pretend my stack is 12 rows high (the RIVAL bar)
     x 4      send chaos ATTACK number 4 (needs SW21 chaos on, on the board):
              0 mirror  1 flip  2 blind  3 bouncers  4 OIIA cat
-             5 garbage 6 cursed next  7 speed
+             5 garbage 6 cursed next  7 speed  8 lock (buttons locked until a task is done)
     a        auto mode on/off: stack grows, random garbage every few seconds
     q        quit
 
@@ -37,7 +37,7 @@ except ImportError:
 
 T_HEARTBEAT, T_GARBAGE, T_LOST, T_START, T_ATTACK = 0, 1, 2, 3, 4
 NAMES = {0: "HEARTBEAT", 1: "GARBAGE", 2: "LOST", 3: "START", 4: "ATTACK"}
-ATTACKS = ["MIRROR", "FLIP", "BLIND", "BOUNCERS", "OIIA CAT", "GARBAGE", "CURSED NEXT", "SPEED"]
+ATTACKS = ["MIRROR", "FLIP", "BLIND", "BOUNCERS", "OIIA CAT", "GARBAGE", "CURSED NEXT", "SPEED", "LOCK"]
 
 
 def msg(t, v=0):
@@ -133,7 +133,7 @@ class Opponent:
                 self.height = max(0, min(20, arg or 0))
                 print(f"  my height is now {self.height}")
             elif cmd == "x":
-                n = max(0, min(7, arg or 0))
+                n = max(0, min(len(ATTACKS) - 1, arg or 0))
                 self.send(T_ATTACK, n)
                 print(f"  -> ATTACK {n} ({ATTACKS[n]})")
             elif cmd == "a":
