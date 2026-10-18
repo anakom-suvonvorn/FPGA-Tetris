@@ -1,0 +1,13 @@
+# Design: 06_flash_read
+# 'top=' is the top entity. The other lines are the VHDL files, in compile order
+# (the package common_pkg.vhd must always come first). Paths are relative to the project folder (the "assignment" folder).
+top=top_flash_read
+src/common/common_pkg.vhd
+src/common/vga_sync.vhd
+src/common/debounce.vhd
+src/common/seg7_scan.vhd
+src/game/text_pkg.vhd
+src/game/text_layer.vhd
+src/media/spi_flash.vhd
+src/media/media_player.vhd
+tests/06_flash_read/top_flash_read.vhd
