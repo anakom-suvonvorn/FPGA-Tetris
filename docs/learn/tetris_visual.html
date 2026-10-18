@@ -314,7 +314,7 @@ canvas { display: block; max-width: 100%; height: auto; border-radius: 4px; imag
 <!-- ================================================================ 10 -->
 <section id="garb">
   <h2><span class="tag">tetris_core · S_ATTACK, S_GARB</span>Garbage: cancel, send, rise</h2>
-  <p>When a piece locks, <code>S_ATTACK</code> turns the lines it cleared into an attack (2 → 1, 3 → 2, 4 → 4). The attack first cancels garbage <b>waiting for you</b> (the red meter), and only the rest is sent. If the piece cleared nothing, up to 8 waiting lines come in now. <code>S_GARB</code> then pushes the whole field up one row per clock and adds a grey row with one hole.</p>
+  <p>When a piece locks, <code>S_ATTACK</code> turns the lines it cleared into an attack (2 → 1, 3 → 2, 4 → 4). The attack first cancels garbage <b>waiting for you</b> (the red meter), and only the rest is sent. If the piece cleared nothing, up to 3–5 waiting lines (random each time) come in now. <code>S_GARB</code> then pushes the whole field up one row per clock and adds a grey row with one hole.</p>
   <div class="stage">
     <div class="controls">
       <label class="note" for="gPend">waiting for me (pending)</label>
@@ -1316,7 +1316,7 @@ canvas { display: block; max-width: 100%; height: auto; border-radius: 4px; imag
     let atk = atk0, pp = p;
     if (atk >= pp) { atk = atk - pp; pp = 0; } else { pp = pp - atk; atk = 0; }
     let incoming = 0;
-    if (gClr === 0 && pp > 0) { incoming = Math.min(8, pp); pp -= incoming; }
+    if (gClr === 0 && pp > 0) { incoming = Math.min(3 + Math.floor(Math.random() * 3), pp); pp -= incoming; }
     const note = `cleared ${gClr} → atk = ${atk0}. ` +
       (atk0 === 0 ? "Nothing to cancel with. " : `Cancel: ${Math.min(atk0, p)} of the ${p} waiting lines are wiped out. `) +
       `<b>Sent to the other board: ${atk}</b>` + (atk > 0 ? " (garb_out pulse → GARBAGE message)" : "") + ". " +
