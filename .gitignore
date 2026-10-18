@@ -14,3 +14,7 @@ tests/*/build/*
 
 # Vivado GUI projects made by tools/vivado_gui.bat (throw-away)
 vivado/
+
+# game build output, except the finished bitstream
+game/build/*
+!game/build/*.bit
