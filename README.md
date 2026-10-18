@@ -31,6 +31,7 @@ assignment\
     03_uart_echo\         <-   talk to the PC over the USB serial port
     04_board_link\        <-   two boards talking over jumper wires
     05_uart_probe\        <-   finds which USB-serial pin is TX and which is RX
+    06_flash_read\        <-   pictures, animation and sound from the SPI flash
        (each has: top_*.vhd, project.txt, pins.xdc, README.md, build\*.bit)
   sim\                    <- testbenches (run on the PC, no board needed)
     tb_uart_loop.vhd      <-   checks uart_tx -> uart_rx
@@ -70,6 +71,7 @@ should see in its own README.
 | 03 | `03_uart_echo` | 1 board + PuTTY | what you type comes back in CAPITALS; PB3 prints a message |
 | 05 | `05_uart_probe` | 1 board + PuTTY | display shows which pin the PC talks on, then it echoes like 03 |
 | 04 | `04_board_link` | 2 boards + 3 jumper wires + 2×330 Ω | each board shows the other board's switches |
+| 06 | `06_flash_read` | 1 board + VGA + headphones; first `tools\flash_media.bat media\media.bin` | ID `016017`, MEDIA FILE OK, colour card, VERIFY 0000 BAD, sound in sync |
 
 ### Option A: use the TA's FPGA Builder (what you already know)
 

@@ -1,3 +1,4 @@
+<meta charset="utf-8">
 <title>Tetris Duel Internals</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -72,6 +73,8 @@ button:hover { border-color: var(--accent); }
 button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--panel); }
 button.pc { width: 38px; font-weight: 600; }
+input[type=text], select { font-family: var(--mono); font-size: 13px; padding: 4px 6px; border: 1px solid var(--line); border-radius: 5px; background: var(--bg); color: var(--fg); }
+#plTable input[type=number] { font-size: 13px; padding: 4px 6px; }
 input[type=number] { font-family: var(--mono); font-size: 15px; width: 110px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 5px; background: var(--bg); color: var(--fg); }
 .readout { display: flex; flex-direction: column; gap: 8px; font-size: 14px; }
 .readout .kv { display: grid; grid-template-columns: 120px minmax(0, 1fr); gap: 10px; align-items: baseline; border-bottom: 1px dashed var(--line); padding-bottom: 6px; }
@@ -138,7 +141,7 @@ canvas { display: block; max-width: 100%; height: auto; border-radius: 4px; imag
 <main>
 <header>
   <h1>Tetris Duel Internals</h1>
-  <p>Visual companion to <code>docs/learn/05_game_walkthrough.md</code> (sections 1–8), <code>06_versus_walkthrough.md</code> (sections 9–11) and <code>07_chaos_walkthrough.md</code> (sections 12–13). Every diagram here runs the same rules as the VHDL in <code>src/game/</code>. Press the buttons and watch what the hardware does.</p>
+  <p>Visual companion to <code>docs/learn/05_game_walkthrough.md</code> (sections 1–8), <code>06_versus_walkthrough.md</code> (sections 9–11) and <code>07_chaos_walkthrough.md</code> (sections 12–13) and <code>08_flash_walkthrough.md</code> (sections 14–15). Every diagram here runs the same rules as the VHDL in <code>src/game/</code>. Press the buttons and watch what the hardware does.</p>
   <nav class="toc" aria-label="Sections">
     <a href="#coords">1 · coordinates</a>
     <a href="#collide">2 · collision check</a>
@@ -153,6 +156,8 @@ canvas { display: block; max-width: 100%; height: auto; border-radius: 4px; imag
     <a href="#sd">11 · audio mixer</a>
     <a href="#tasks">12 · chaos tasks</a>
     <a href="#cat">13 · the spinning cat</a>
+    <a href="#spi">14 · SPI flash</a>
+    <a href="#media">15 · media player</a>
   </nav>
 </header>
 
@@ -404,6 +409,64 @@ canvas { display: block; max-width: 100%; height: auto; border-radius: 4px; imag
       <button id="catPlay" aria-pressed="true">spinning</button>
       <span class="clock" id="catInfo"></span>
     </div>
+  </div>
+</section>
+<!-- ================================================================ 14 -->
+<section id="spi">
+  <h2><span class="tag">spi_flash</span>Reading the flash chip, one bit at a time</h2>
+  <p>Four wires: <b>CS_N</b> low selects the chip, we make <b>SCLK</b>, our bits go out on <b>MOSI</b>, the chip's bits come back on <b>MISO</b>. The chip reads MOSI when SCLK rises and changes MISO a little after SCLK falls. We read MISO at the <b>end of the high half</b> (the ▼ marks), just before SCLK falls, when the bit has been stable the longest. Step through a transaction bit by bit and watch the shift registers <code>sh_out</code> and <code>sh_in</code>.</p>
+  <div class="stage">
+    <div class="controls" role="group" aria-label="Command">
+      <button id="spiCmdId" aria-pressed="true">READ ID (9F)</button>
+      <button id="spiCmdRd" aria-pressed="false">READ (03) at 0x100000</button>
+      <span class="sep"></span>
+      <span class="clock">SCLK:</span>
+      <span id="spiSpeeds" class="controls" role="group" aria-label="SPI clock"></span>
+    </div>
+    <div class="scroll"><svg id="spiSvg" viewBox="0 0 900 230" style="min-width:720px;width:100%" role="img" aria-label="SPI timing diagram"></svg></div>
+    <div class="controls">
+      <button id="spiPrev">◀ bit</button>
+      <button id="spiNext">bit ▶</button>
+      <button id="spiPlay" aria-pressed="false">play</button>
+      <button id="spiEnd">to the end</button>
+    </div>
+    <div class="log" id="spiLog"></div>
+  </div>
+</section>
+
+<!-- ================================================================ 15 -->
+<section id="media">
+  <h2><span class="tag">media_player · make_media.py</span>Frame buffer, sound ring, and how much fits</h2>
+  <p><b>Beam race.</b> The screen is drawn top to bottom in 15.25 ms, then 1.43 ms of blank time, 60 times a second. <code>frame_tick</code> comes when the visible part ends; that is when the player starts loading the next picture into the frame buffer. If the loader stays ahead of the beam drawing the <i>next</i> frame, every frame is all-new. If the beam catches up, the bottom of the screen still shows the old picture: <b>tearing</b>. Change the SPI speed and the colours (bits per pixel).</p>
+  <div class="stage">
+    <div class="controls" role="group" aria-label="Beam race settings">
+      <span class="clock">SCLK:</span><span id="brSpeeds" class="controls"></span>
+      <span class="sep"></span>
+      <span class="clock">bpp:</span><span id="brBpp" class="controls"></span>
+      <span class="sep"></span>
+      <button id="brSnd" aria-pressed="true">with sound (533 B)</button>
+    </div>
+    <div class="scroll"><svg id="brSvg" viewBox="0 0 760 300" style="min-width:600px;width:100%" role="img" aria-label="Screen beam versus loader"></svg></div>
+    <div class="log" id="brLog"></div>
+  </div>
+
+  <p><b>Sound ring.</b> Sound must come out at exactly <i>rate</i> samples a second, so with picture + sound the <b>sound sets the pace</b>: at each <code>frame_tick</code>, if fewer bytes than the <i>low water</i> mark are waiting in the ring, the next record (its sound + its picture) is loaded. Its picture shows at once; its sound plays after the few bytes still waiting, at most ~25 ms later. So picture and sound can never drift apart.</p>
+  <div class="stage">
+    <div class="controls" role="group" aria-label="Frames per second">
+      <span class="clock">video fps:</span><span id="rgFps" class="controls"></span>
+      <span class="sep"></span>
+      <span class="clock">rate:</span><span id="rgRate" class="controls"></span>
+    </div>
+    <div class="scroll"><svg id="rgSvg" viewBox="0 0 760 240" style="min-width:600px;width:100%" role="img" aria-label="Sound ring fill over time"></svg></div>
+    <div class="log" id="rgLog"></div>
+  </div>
+
+  <p><b>What fits in 7 MB?</b> Plan the game's media here. Each row is one item as <code>make_media.py</code> would store it (160 × 120 pictures, palette, records of sound + picture). Edit the numbers; the bar shows how full the flash would be.</p>
+  <div class="stage">
+    <div class="scroll"><table class="bits" id="plTable" style="min-width:640px"></table></div>
+    <div class="controls"><button id="plAdd">add a row</button><button id="plReset">example plan</button></div>
+    <svg id="plBar" viewBox="0 0 760 64" style="width:100%" role="img" aria-label="Flash usage"></svg>
+    <div class="log" id="plLog"></div>
   </div>
 </section>
 </main>
@@ -1705,13 +1768,338 @@ canvas { display: block; max-width: 100%; height: auto; border-radius: 4px; imag
     requestAnimationFrame(loop);
   }
 
+  // ------------------------------------------------------------ 14. SPI
+  const SPI = { cmd: "id", hp: 1, k: 0, timer: null };
+  const SPEEDS = [[1, "25"], [2, "12.5"], [4, "6.25"], [8, "3.125"]];
+  function spiBits() {
+    // returns arrays of per-bit values: mosi ('0'/'1'/'x'), miso ('0'/'1'/'z'), phase names
+    const byteBits = v => v.toString(2).padStart(8, "0").split("");
+    let mosi = [], miso = [], phase = [];
+    if (SPI.cmd === "id") {
+      mosi = byteBits(0x9F).concat(Array(24).fill("x"));
+      miso = Array(8).fill("z").concat(byteBits(0x01), byteBits(0x60), byteBits(0x17));
+      phase = Array(8).fill("command 9F").concat(Array(8).fill("ID byte 1"), Array(8).fill("ID byte 2"), Array(8).fill("ID byte 3"));
+    } else {
+      mosi = byteBits(0x03).concat(byteBits(0x10), byteBits(0x00), byteBits(0x00), Array(16).fill("x"));
+      miso = Array(32).fill("z").concat(byteBits(0x54), byteBits(0x44));
+      phase = Array(8).fill("command 03").concat(Array(24).fill("address 0x100000"), Array(8).fill("data byte 0"), Array(8).fill("data byte 1"));
+    }
+    return { mosi, miso, phase, n: mosi.length };
+  }
+  function drawSpi() {
+    const svg = document.getElementById("spiSvg");
+    svg.innerHTML = "";
+    const B = spiBits(), n = B.n;
+    const X0 = 80, X1 = 890, w = (X1 - X0) / (n + 1), xb = i => X0 + w * (i + 0.5);
+    const rows = [["CS_N", 30], ["SCLK", 78], ["MOSI", 126], ["MISO", 174]];
+    const hi = y => y - 14, lo = y => y + 14;
+    rows.forEach(([lb, y]) => el("text", { x: 8, y: y + 4, class: "c-fg", "font-size": 13 }, svg, lb));
+    // done area + current bit
+    if (SPI.k > 0) el("rect", { x: xb(0), y: 8, width: w * Math.min(SPI.k, n), height: 196, class: "c-accent-soft" }, svg);
+    if (SPI.k < n) el("rect", { x: xb(SPI.k), y: 8, width: w, height: 196, fill: "none", class: "s-accent", "stroke-width": 2 }, svg);
+    // CS_N
+    let d = `M ${X0} ${hi(30)} L ${xb(0) - 2} ${hi(30)} L ${xb(0) - 2} ${lo(30)} L ${xb(n) + 2} ${lo(30)} L ${xb(n) + 2} ${hi(30)} L ${X1} ${hi(30)}`;
+    el("path", { d, fill: "none", class: "s-fg", "stroke-width": 1.6 }, svg);
+    // SCLK
+    d = `M ${X0} ${lo(78)}`;
+    for (let i = 0; i < n; i++) {
+      const a = xb(i), m = a + w / 2, b = a + w;
+      d += ` L ${m} ${lo(78)} L ${m} ${hi(78)} L ${b} ${hi(78)} L ${b} ${lo(78)}`;
+    }
+    d += ` L ${X1} ${lo(78)}`;
+    el("path", { d, fill: "none", class: "s-accent", "stroke-width": 1.6 }, svg);
+    // MOSI / MISO as bus-like bit cells
+    const drawBits = (vals, y, delay) => {
+      for (let i = 0; i < n; i++) {
+        const a = xb(i) + delay, b = Math.min(xb(i + 1) + delay, X1), v = vals[i];
+        if (v === "z" || v === "x") {
+          el("line", { x1: a, y1: y, x2: b, y2: y, class: "s-muted", "stroke-dasharray": "3 3", "stroke-width": 1.2 }, svg);
+        } else {
+          const yy = v === "1" ? hi(y) : lo(y);
+          el("line", { x1: a, y1: yy, x2: b, y2: yy, class: "s-fg", "stroke-width": 1.6 }, svg);
+          const prev = i > 0 ? vals[i - 1] : "z";
+          if (prev !== v) el("line", { x1: a, y1: hi(y), x2: a, y2: lo(y), class: "s-fg", "stroke-width": 1 }, svg);
+          if (w >= 14) el("text", { x: (a + b) / 2, y: y + 4, "text-anchor": "middle", class: "c-muted", "font-size": 10 }, svg, v);
+        }
+      }
+    };
+    drawBits(B.mosi, 126, 0);
+    // MISO changes a little AFTER the falling edge of SCLK (the start of the next bit cell)
+    drawBits(B.miso, 174, w * 0.18);
+    // sample marks at the end of each high half, for received bits
+    for (let i = 0; i < n; i++) if (B.miso[i] !== "z") {
+      const x = xb(i + 1) - 1;
+      el("path", { d: `M ${x - 4} 152 L ${x + 4} 152 L ${x} 159 Z`, class: "c-warn" }, svg);
+    }
+    // byte boundaries + labels
+    for (let i = 0; i <= n; i += 8) el("line", { x1: xb(i), y1: 200, x2: xb(i), y2: 210, class: "s-muted" }, svg);
+    for (let i = 0; i < n; i += 8) el("text", { x: xb(i) + 4 * w, y: 222, "text-anchor": "middle", class: "c-muted", "font-size": 11 }, svg, B.phase[i]);
+
+    // log
+    const k = Math.min(SPI.k, n);
+    const ns = 2 * SPI.hp * 20;                  // one SCLK period in ns
+    const sent = B.mosi.slice(0, k).filter(v => v !== "x").join("");
+    const rx = B.miso.slice(0, k).filter(v => v !== "z");
+    const nbytes = Math.floor(rx.length / 8);
+    const bytes = [];
+    for (let j = 0; j < nbytes; j++) bytes.push(parseInt(rx.slice(8 * j, 8 * j + 8).join(""), 2).toString(16).toUpperCase().padStart(2, "0"));
+    const shin = rx.slice(8 * nbytes).join("").padStart(8, "·");
+    const mhz = 50 / (2 * SPI.hp);
+    let s = `<span class="st">bit ${k} / ${n}</span> · ${k < n ? B.phase[k] : "done: CS_N goes high"} · time ${(k * ns / 1000).toFixed(2)} µs at ${mhz} MHz (one bit = ${ns} ns)<br>`;
+    s += `sent on MOSI so far: <b>${sent || "–"}</b><br>`;
+    s += `sh_in (byte being received): <b>${shin}</b> · bytes received: <b>${bytes.join(" ") || "–"}</b>`;
+    if (SPI.cmd === "id" && nbytes === 3) s += " → 01 = Spansion, 60 17 = 64 Mbit (8 MB)";
+    if (SPI.cmd === "rd" && nbytes >= 1) s += ` → "${bytes.map(h => String.fromCharCode(parseInt(h, 16))).join("")}" (the start of "TDMF")`;
+    s += `<br>at this speed: ${(mhz / 8).toFixed(2)} MB per second; a 19,200-byte picture takes ${(19200 * 8 / mhz / 1000).toFixed(1)} ms`;
+    document.getElementById("spiLog").innerHTML = s;
+  }
+  function initSpi() {
+    const host = document.getElementById("spiSpeeds");
+    SPEEDS.forEach(([hp, lb]) => {
+      const b = document.createElement("button"); b.textContent = lb + " MHz"; b.dataset.hp = hp;
+      b.setAttribute("aria-pressed", hp === SPI.hp ? "true" : "false");
+      b.onclick = () => { SPI.hp = hp; host.querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", +x.dataset.hp === hp ? "true" : "false")); drawSpi(); };
+      host.appendChild(b);
+    });
+    const setCmd = c => {
+      SPI.cmd = c; SPI.k = 0;
+      document.getElementById("spiCmdId").setAttribute("aria-pressed", c === "id" ? "true" : "false");
+      document.getElementById("spiCmdRd").setAttribute("aria-pressed", c === "rd" ? "true" : "false");
+      drawSpi();
+    };
+    document.getElementById("spiCmdId").onclick = () => setCmd("id");
+    document.getElementById("spiCmdRd").onclick = () => setCmd("rd");
+    document.getElementById("spiPrev").onclick = () => { SPI.k = Math.max(0, SPI.k - 1); drawSpi(); };
+    document.getElementById("spiNext").onclick = () => { SPI.k = Math.min(spiBits().n, SPI.k + 1); drawSpi(); };
+    document.getElementById("spiEnd").onclick = () => { SPI.k = spiBits().n; drawSpi(); };
+    const pb = document.getElementById("spiPlay");
+    pb.onclick = () => {
+      if (SPI.timer) { clearInterval(SPI.timer); SPI.timer = null; pb.setAttribute("aria-pressed", "false"); pb.textContent = "play"; return; }
+      if (SPI.k >= spiBits().n) SPI.k = 0;
+      pb.setAttribute("aria-pressed", "true"); pb.textContent = "pause";
+      SPI.timer = setInterval(() => {
+        SPI.k++;
+        if (SPI.k >= spiBits().n) { clearInterval(SPI.timer); SPI.timer = null; pb.setAttribute("aria-pressed", "false"); pb.textContent = "play"; }
+        drawSpi();
+      }, 180);
+    };
+    drawSpi();
+  }
+
+  // ------------------------------------------------------------ 15. media: beam race
+  const BR = { hp: 1, bpp: 4, snd: true };
+  function drawBeam() {
+    const svg = document.getElementById("brSvg");
+    svg.innerHTML = "";
+    const L = 60, R = 740, T = 14, Bt = 262, TMAX = 34;
+    const xs = t => L + t / TMAX * (R - L), ys = l => Bt - l / 480 * (Bt - T);
+    const LINE = 0.031777, VIS = 480 * LINE, FRAME = 525 * LINE;   // ms
+    // blank intervals
+    [[VIS, FRAME], [FRAME + VIS, 2 * FRAME]].forEach(([a, b]) => el("rect", { x: xs(a), y: T, width: xs(Math.min(b, TMAX)) - xs(a), height: Bt - T, class: "c-accent-soft" }, svg));
+    el("line", { x1: L, y1: Bt, x2: R, y2: Bt, class: "s-muted" }, svg);
+    el("line", { x1: L, y1: T, x2: L, y2: Bt, class: "s-muted" }, svg);
+    for (let t = 0; t <= 32; t += 4) el("text", { x: xs(t), y: Bt + 16, "text-anchor": "middle", class: "c-muted", "font-size": 10 }, svg, t + " ms");
+    [0, 120, 240, 360, 480].forEach(l => el("text", { x: L - 6, y: ys(l) + 4, "text-anchor": "end", class: "c-muted", "font-size": 10 }, svg, "line " + l));
+    // beams
+    el("line", { x1: xs(0), y1: ys(0), x2: xs(VIS), y2: ys(480), class: "s-muted", "stroke-width": 2 }, svg);
+    el("line", { x1: xs(FRAME), y1: ys(0), x2: xs(FRAME + VIS), y2: ys(480), class: "s-fg", "stroke-width": 2.5 }, svg);
+    el("text", { x: xs(4), y: ys(300), class: "c-muted", "font-size": 11 }, svg, "beam, frame 1");
+    el("text", { x: xs(FRAME + VIS) - 4, y: ys(470), "text-anchor": "end", class: "c-fg", "font-size": 11 }, svg, "beam, frame 2");
+    // frame_tick
+    el("line", { x1: xs(VIS), y1: T, x2: xs(VIS), y2: Bt, class: "s-warn", "stroke-dasharray": "4 3" }, svg);
+    el("text", { x: xs(VIS) + 4, y: T + 12, class: "c-warn", "font-size": 11 }, svg, "frame_tick");
+    // loader
+    const mhz = 50 / (2 * BR.hp), Bps = mhz * 1e6 / 8 / 1000;        // bytes per ms
+    const aud = BR.snd ? 533 : 0, pix = 2400 * BR.bpp;
+    const t0 = VIS + aud / Bps, t1 = t0 + pix / Bps;
+    const tl = l => t0 + l / 480 * (t1 - t0), tb = l => FRAME + l * LINE;
+    const endL = t1 <= TMAX ? 480 : 480 * (TMAX - t0) / (t1 - t0);
+    if (aud) el("line", { x1: xs(VIS), y1: ys(0), x2: xs(Math.min(t0, TMAX)), y2: ys(0), class: "s-accent", "stroke-width": 5, opacity: 0.6 }, svg);
+    el("line", { x1: xs(t0), y1: ys(0), x2: xs(tl(endL)), y2: ys(endL), class: "s-accent", "stroke-width": 3 }, svg);
+    el("text", { x: xs(tl(endL / 2)) + 8, y: ys(endL / 2), class: "c-accent", "font-size": 11 }, svg, "loader");
+    // first line where the beam is ahead of the loader
+    let tear = -1;
+    for (let l = 0; l <= 480; l++) if (tl(l) > tb(l)) { tear = l; break; }
+    if (tear >= 0) {
+      el("rect", { x: L, y: T, width: R - L, height: ys(tear) - T, fill: "var(--hit)", opacity: 0.08 }, svg);
+      el("circle", { cx: xs(tb(tear)), cy: ys(tear), r: 6, fill: "var(--hit)" }, svg);
+    }
+    let s = `SCLK ${mhz} MHz = ${(mhz / 8).toFixed(2)} MB/s · record = ${aud ? aud + " sound + " : ""}${pix.toLocaleString()} picture bytes (${BR.bpp} bpp) · loading takes <b>${(t1 - VIS).toFixed(1)} ms</b>, the beam draws the frame in 15.25 ms<br>`;
+    if (tear < 0) s += `<span class="pill ok">no tearing</span> the loader is ahead of the beam on every line: frame 2 shows only the new picture.`;
+    else s += `<span class="pill bad">tearing</span> the beam overtakes the loader at line ${tear}: from there down frame 2 still shows the old picture (red area = lines still showing the old picture).`;
+    document.getElementById("brLog").innerHTML = s;
+  }
+  function initBeam() {
+    const sp = document.getElementById("brSpeeds");
+    SPEEDS.forEach(([hp, lb]) => {
+      const b = document.createElement("button"); b.textContent = lb + " MHz"; b.dataset.hp = hp;
+      b.setAttribute("aria-pressed", hp === BR.hp ? "true" : "false");
+      b.onclick = () => { BR.hp = hp; sp.querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", +x.dataset.hp === hp ? "true" : "false")); drawBeam(); };
+      sp.appendChild(b);
+    });
+    const bp = document.getElementById("brBpp");
+    [1, 2, 4, 8].forEach(v => {
+      const b = document.createElement("button"); b.textContent = v; b.dataset.v = v;
+      b.setAttribute("aria-pressed", v === BR.bpp ? "true" : "false");
+      b.onclick = () => { BR.bpp = v; bp.querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", +x.dataset.v === v ? "true" : "false")); drawBeam(); };
+      bp.appendChild(b);
+    });
+    const sb = document.getElementById("brSnd");
+    sb.onclick = () => { BR.snd = !BR.snd; sb.setAttribute("aria-pressed", BR.snd ? "true" : "false"); drawBeam(); };
+    drawBeam();
+  }
+
+  // ------------------------------------------------------------ 15. media: sound ring
+  const RG = { fps: 15, rate: 8000 };
+  function drawRing() {
+    const svg = document.getElementById("rgSvg");
+    svg.innerHTML = "";
+    const aud = Math.round(RG.rate / RG.fps), rate = aud * RG.fps, low = Math.floor(rate * 0.025) + 64;
+    const L = 60, R = 740, T = 14, Bt = 200, TMAX = 500;           // ms
+    const YMAX = Math.max(2048 * 0.25, (low + aud) * 1.25);
+    const xs = t => L + t / TMAX * (R - L), ys = f => Bt - Math.min(f, YMAX) / YMAX * (Bt - T);
+    el("line", { x1: L, y1: Bt, x2: R, y2: Bt, class: "s-muted" }, svg);
+    el("line", { x1: L, y1: T, x2: L, y2: Bt, class: "s-muted" }, svg);
+    for (let t = 0; t <= TMAX; t += 100) el("text", { x: xs(t), y: Bt + 16, "text-anchor": "middle", class: "c-muted", "font-size": 10 }, svg, t + " ms");
+    el("line", { x1: L, y1: ys(low), x2: R, y2: ys(low), class: "s-warn", "stroke-dasharray": "5 4" }, svg);
+    el("text", { x: R, y: ys(low) - 4, "text-anchor": "end", class: "c-warn", "font-size": 11 }, svg, `low water ${low}`);
+    el("text", { x: L - 6, y: ys(0) + 4, "text-anchor": "end", class: "c-muted", "font-size": 10 }, svg, "0");
+    el("text", { x: L - 6, y: ys(low + aud) + 4, "text-anchor": "end", class: "c-muted", "font-size": 10 }, svg, String(low + aud));
+    // simulate in 0.1 ms steps
+    let fill = 0, d = `M ${xs(0)} ${ys(0)}`, loads = 0, minFill = 1e9, started = false, nextTick = 1000 / 60;
+    const dt = 0.1;
+    for (let t = 0; t <= TMAX; t += dt) {
+      if (t >= nextTick) {
+        nextTick += 1000 / 60;
+        el("line", { x1: xs(t), y1: Bt, x2: xs(t), y2: Bt + 4, class: "s-muted" }, svg);
+        if (fill < low) {
+          fill += aud; loads++; started = true;
+          el("rect", { x: xs(t) - 2, y: Bt - 10, width: 4, height: 10, class: "c-accent" }, svg);
+        }
+      }
+      if (started) { fill = Math.max(0, fill - rate * dt / 1000); if (t > 50) minFill = Math.min(minFill, fill); }
+      d += ` L ${xs(t).toFixed(1)} ${ys(fill).toFixed(1)}`;
+    }
+    el("path", { d, fill: "none", class: "s-accent", "stroke-width": 2 }, svg);
+    el("text", { x: L + 6, y: T + 12, class: "c-fg", "font-size": 11 }, svg, "sound bytes waiting in the ring (fill)");
+    let s = `${RG.fps} fps, ${RG.rate} samples/s → <b>${aud}</b> sound bytes per record, rate made exact: ${rate} Hz · low water = 25 ms + 64 = <b>${low}</b> bytes<br>`;
+    s += `${loads} records loaded in 0.5 s (about ${(loads * 2).toFixed(0)} per second ≈ the video's ${RG.fps} fps) · small blue marks = a record loaded at that frame_tick<br>`;
+    s += minFill > 0 ? `<span class="pill ok">never runs dry</span> lowest fill ${Math.floor(minFill)} bytes; a picture's sound starts at most ${(1000 * low / rate).toFixed(0)} ms after the picture.` :
+      `<span class="pill bad">runs dry</span>`;
+    document.getElementById("rgLog").innerHTML = s;
+  }
+  function initRing() {
+    const f = document.getElementById("rgFps");
+    [10, 15, 20, 30].forEach(v => {
+      const b = document.createElement("button"); b.textContent = v; b.dataset.v = v;
+      b.setAttribute("aria-pressed", v === RG.fps ? "true" : "false");
+      b.onclick = () => { RG.fps = v; f.querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", +x.dataset.v === v ? "true" : "false")); drawRing(); };
+      f.appendChild(b);
+    });
+    const r = document.getElementById("rgRate");
+    [8000, 11025, 16000].forEach(v => {
+      const b = document.createElement("button"); b.textContent = v + " Hz"; b.dataset.v = v;
+      b.setAttribute("aria-pressed", v === RG.rate ? "true" : "false");
+      b.onclick = () => { RG.rate = v; r.querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", +x.dataset.v === v ? "true" : "false")); drawRing(); };
+      r.appendChild(b);
+    });
+    drawRing();
+  }
+
+  // ------------------------------------------------------------ 15. media: planner
+  const KINDS = ["picture", "animation", "video + sound", "sound"];
+  const PLAN0 = [
+    ["BAD APPLE (60 s cut)", "video + sound", 1, 10, 60, 8000],
+    ["RICK ROLL", "video + sound", 4, 10, 15, 8000],
+    ["JUMP SCARE", "video + sound", 8, 10, 4, 8000],
+    ["LOSS MEME", "video + sound", 4, 10, 8, 8000],
+    ["WIN PICTURE", "picture", 8, 1, 1, 8000],
+    ["TETORIS SONG", "sound", 8, 1, 120, 8000],
+    ["OIIA CAT", "video + sound", 4, 15, 3, 8000],
+    ["SOUND EFFECTS", "sound", 8, 1, 10, 8000]
+  ];
+  let PLAN = PLAN0.map(r => r.slice());
+  const FREE = 7340032, OVERHEAD = 4096 + 262144;                 // header + directory, verify block
+  function itemBytes(r) {
+    const [, kind, bpp, fps, secs, rate] = r;
+    const pix = 2400 * bpp, pal = 2 * (1 << bpp);
+    const frames = Math.max(1, Math.round(fps * secs));
+    if (kind === "picture") return pal + pix;
+    if (kind === "animation") return pal + frames * pix;
+    if (kind === "video + sound") return pal + frames * (pix + Math.round(rate / Math.max(1, fps)));
+    return Math.ceil(secs * rate / 1024) * 1024;
+  }
+  function drawPlan() {
+    const tb = document.getElementById("plTable");
+    tb.innerHTML = "";
+    const head = document.createElement("tr");
+    ["item", "kind", "bpp", "fps", "seconds", "sound rate", "bytes", ""].forEach(h => { const th = document.createElement("th"); th.textContent = h; head.appendChild(th); });
+    tb.appendChild(head);
+    let total = OVERHEAD;
+    PLAN.forEach((r, i) => {
+      const tr = document.createElement("tr");
+      const inp = (j, type, w) => {
+        const td = document.createElement("td");
+        const e = document.createElement("input"); e.type = type; e.value = r[j]; e.style.width = w;
+        if (type === "number") { e.min = 0; e.step = "any"; }
+        e.setAttribute("aria-label", ["item", "kind", "bpp", "fps", "seconds", "sound rate"][j] + " " + (i + 1));
+        e.onchange = () => { r[j] = type === "number" ? Math.max(0, +e.value || 0) : e.value; drawPlan(); };
+        td.appendChild(e); tr.appendChild(td);
+      };
+      inp(0, "text", "170px");
+      const tdk = document.createElement("td"), sk = document.createElement("select");
+      sk.setAttribute("aria-label", "kind " + (i + 1));
+      KINDS.forEach(k => { const o = document.createElement("option"); o.textContent = k; if (k === r[1]) o.selected = true; sk.appendChild(o); });
+      sk.onchange = () => { r[1] = sk.value; drawPlan(); };
+      tdk.appendChild(sk); tr.appendChild(tdk);
+      const tdb = document.createElement("td"), sb = document.createElement("select");
+      sb.setAttribute("aria-label", "bpp " + (i + 1));
+      [1, 2, 4, 8].forEach(k => { const o = document.createElement("option"); o.textContent = k; if (k === r[2]) o.selected = true; sb.appendChild(o); });
+      sb.onchange = () => { r[2] = +sb.value; drawPlan(); };
+      sb.disabled = r[1] === "sound";
+      tdb.appendChild(sb); tr.appendChild(tdb);
+      inp(3, "number", "60px"); inp(4, "number", "70px"); inp(5, "number", "80px");
+      const by = itemBytes(r); total += by;
+      const tdv = document.createElement("td"); tdv.textContent = (by / 1024).toFixed(0) + " KB"; tdv.style.textAlign = "right"; tr.appendChild(tdv);
+      const tdx = document.createElement("td"), bx = document.createElement("button"); bx.textContent = "×"; bx.setAttribute("aria-label", "remove row " + (i + 1));
+      bx.onclick = () => { PLAN.splice(i, 1); drawPlan(); };
+      tdx.appendChild(bx); tr.appendChild(tdx);
+      tb.appendChild(tr);
+    });
+    // bar
+    const svg = document.getElementById("plBar");
+    svg.innerHTML = "";
+    const W = 740, X = 10;
+    el("rect", { x: X, y: 8, width: W, height: 26, fill: "none", class: "s-muted" }, svg);
+    let x = X;
+    const segs = [["header + verify", OVERHEAD]].concat(PLAN.map(r => [r[0], itemBytes(r)]));
+    segs.forEach(([nm, by], i) => {
+      const wd = Math.min(by / FREE * W, X + W - x);
+      if (wd <= 0) return;
+      el("rect", { x, y: 8, width: wd, height: 26, class: i === 0 ? "c-muted" : (i % 2 ? "c-accent" : "c-accent-soft"), stroke: "var(--panel)" }, svg).appendChild(
+        Object.assign(document.createElementNS(NS, "title"), { textContent: `${nm}: ${(by / 1024).toFixed(0)} KB` }));
+      x += wd;
+    });
+    const pct = 100 * total / FREE;
+    el("text", { x: X, y: 52, class: pct > 100 ? "c-warn" : "c-fg", "font-size": 12 }, svg,
+      `${(total / 1048576).toFixed(2)} MB of 7.00 MB used (${pct.toFixed(0)} %)${pct > 100 ? "  TOO BIG" : ""}`);
+    document.getElementById("plLog").innerHTML =
+      `per second of video: 1 bpp ${(2.4 * 10 + 8).toFixed(0)} KB at 10 fps · 4 bpp ${(9.6 * 10 + 8).toFixed(0)} KB · 8 bpp ${(19.2 * 10 + 8).toFixed(0)} KB (all with 8 kHz sound) · sound alone 8 KB/s<br>` +
+      `the same numbers as <code>make_media.py</code> prints (it also rounds every item up to 4 KB).`;
+  }
+  function initPlan() {
+    document.getElementById("plAdd").onclick = () => { PLAN.push(["NEW ITEM", "video + sound", 4, 10, 5, 8000]); drawPlan(); };
+    document.getElementById("plReset").onclick = () => { PLAN = PLAN0.map(r => r.slice()); drawPlan(); };
+    drawPlan();
+  }
+
   // ------------------------------------------------------------ wire-up
   function update() { drawWide(); readWide(); drawCollide(); drawLock(); drawScreen(); }
   drawFsm(); showFsm();
   buildClear(); drawClear();
   buildBcd(); drawBcd();
   drawLfsr();
-  drawMsg(); calcGarb(); drawSdAll(); drawTimeline(); initTasks(); initCat();
+  drawMsg(); calcGarb(); drawSdAll(); drawTimeline(); initTasks(); initCat(); initSpi(); initBeam(); initRing(); initPlan();
   update();
   inspect(FX0 + 4 * 16 + 7, FY0 + 1 * 16 + 7);
 })();

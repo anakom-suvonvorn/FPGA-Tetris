@@ -24,9 +24,14 @@ never written VHDL by hand or opened the Vivado GUI. Read in order:
    tasks (incl. HEX), attacks over the link (incl. LOCK), bonuses, random time
    ranges, mirror / flip / blind / bouncers /
    the spinning OIIA cat, and how they are tested (on the `chaos` git branch).
-8. [Visual guide](tetris_visual.html) (open in a browser, or
+8. [Pictures and sound from the flash chip](08_flash_walkthrough.md): what
+   the SPI flash is, talking SPI, the STARTUPE2 clock trick, how pictures
+   (palette, bits per pixel) and sound (8-bit samples) are stored, the
+   media player (frame buffer, sound ring, pacing, tearing), test 06 and the
+   pretend-flash testbench, and what fits in 7 MB (on the `media` branch).
+9. [Visual guide](tetris_visual.html) (open in a browser, or
    https://claude.ai/artifact/28Mdg6vDhCJzwXsmgR6Cdb): interactive diagrams
-   for Parts 5, 6 and 7.
+   for Parts 5, 6, 7 and 8.
 
 Quick start for Vivado:
 

@@ -1,6 +1,6 @@
 # HANDOFF: project state for Claude (read this first after a context reset)
 
-Last updated: **2026-10-19**, right before a context compaction. Keep this
+Last updated: **2026-10-19** (chaos round 2 + test 06 done). Keep this
 file current whenever something important changes. Durable facts also live in
 Claude's memory (`...\.claude\projects\D--All-files-Me-university-digital-system-assignment\memory\`:
 `digital-system-final-project.md`, `git-workflow.md`).
@@ -11,31 +11,44 @@ Claude's memory (`...\.claude\projects\D--All-files-Me-university-digital-system
 
 * Game = **"Tetris Duel, CHAOS edition"**, versus Tetris on two EDGE
   Spartan-7 boards. Agreed 4-layer plan:
-  1. **versus core**: DONE in code + sim (git tag `v1-versus` on `main`).
-  2. **chaos** (slide-switch tasks → attacks / bonuses): DONE in code + sim
-     on git branch **`chaos`** (checked out now). NOT yet tested on hardware.
-  3. **media** from the board's SPI flash (loss videos e.g. Bad Apple /
-     rick roll / jump scare / loss meme, win thing, "Tetoris" song, custom
-     SFX clips, OIIA sound): **NEXT**. Start with a hardware test
-     (`tests\06_flash_read`): read the S25FL064L flash from user logic via
-     the `STARTUPE2` primitive (CCLK is a dedicated pin), after writing a
-     data file into flash at an offset with openFPGALoader (bitstream is
-     ~0.5 MB of the 8 MB; ~7 MB free). Then a Python converter
-     (ffmpeg/PIL → frames, downscale/dither/RLE; audio → 8 kHz 8-bit or
-     4-bit), a media player block (flash reader → BRAM frame buffer e.g.
-     160x120 1-bit or 80x60 4-bit, + audio stream into the sigma-delta mixer).
-     LUT budget: chaos build is 66 % LUTs, BRAM 0 % used (10 tiles free).
-  4. extra mini-games (snake / pong / dino) if time is left.
-* **Last thing the user said:** "prepare for compact" (this file). Before
-  that, I finished chaos and asked them:
-  * physical order of slide switches SW6..SW13 on the board (panel draws
-    SW13 on the left; BINARY assumes SW13 = 128) - **unanswered**;
-  * whether to **push** to GitHub - **unanswered, don't push until yes**.
-* **Next action after compaction:** wait for / ask the user. Likely: their
-  hardware test of chaos (and versus with the PC fake opponent), then
-  layer 3 media. Second board arrives "sometime this week" (then test 04 +
-  real two-board versus). Speakers for the audio jack: group will try to get
-  some.
+  1. **versus core**: DONE (tag `v1-versus` on `main`).
+  2. **chaos**: DONE on branch **`chaos`**. Round 1 was played on hardware
+     by the user (single board); their feedback became **round 2**
+     (commit 9faa68f + docs): panel hidden except during a task ("CHAOS MODE
+     ON" text only), new task HEX (7 tasks), new attack LOCK (id 8: buttons
+     locked until the victim finishes a task, chaos_task `hurry`), every time
+     a random range (`rand_range` in chaos_pkg), random zone widths, 5–10
+     bouncers, BLIND draws locked cells as empty, SINK immediate (S_SINK from
+     S_PLAY + S_SINK_CHK), garbage 3–5 rows per lock. All sims PASS. Build
+     6022 LUTs (75 %), WNS +4.2 ns. Round 2 not yet tried on hardware.
+     Still to do later: the real OIIA cat (picture + sound from flash) - the
+     user said "we'll come back to this later".
+  3. **media**: branch **`media`** (checked out; = chaos + test 06). **Test 06
+     (`tests\06_flash_read`) is built + simulated, waiting for the user's
+     hardware run.** It reads the S25FL064L via STARTUPE2 (CCLK) at
+     25/12.5/6.25/3.125 MHz, shows ID, the media file (`TDMF`) from flash
+     address 0x100000, plays items (pictures 160x120 with palette 1/2/4/8
+     bpp, animations, picture+sound, sound), VERIFY of a 256 KB LFSR block,
+     load time, underruns. Files: `src\media\spi_flash.vhd`,
+     `src\media\media_player.vhd` (6 BRAM tiles, ~700 LUTs), `tools\make_media.py`
+     (Pillow + ffmpeg; `--demo`, `--item kind:path,...`, `--sim`),
+     `tools\flash_media.bat` (openFPGALoader `-f -B spiOverJtag -o 0x100000`,
+     plus `check`), `sim\tb_flash_read` + `flash_model` (PASS).
+     `media\media.bin` = demo set (5 items, 1.5 MB). Docs: Part 8 +
+     visual guide sections 14–15 (published).
+     **The user decides what media to make from the test results.** Space is
+     the limit (7 MB), not speed.
+  4. extra mini-games if time is left.
+* **Next action:** wait for the user's test 06 results (checklist in
+  `tests\06_flash_read\README.md`) and their media choices; then build the
+  player into the game (loss video, win picture, Tetoris song, OIIA cat
+  picture + sound, SFX). LUT budget is tight: game 75 % + player ~9 %;
+  candidates to save LUTs: text layers, bouncers (10 compare blocks),
+  rand_range multipliers. Untested risk: openFPGALoader writing a raw .bin at
+  an offset (the `check` mode tells).
+* User answers 2026-10-19: switch order SW13 left .. SW6 right (as drawn).
+  **Never push to GitHub** unless the user explicitly says so.
+* Second board "sometime this week" (then test 04 + real two-board versus).
 * **Deadline: Fri 30 Oct 2026, 16:00** (queue closes 09:00). Docs, video and
   brochure need ~3 days, so building should stop around 26–27 Oct.
 
@@ -72,9 +85,10 @@ Claude's memory (`...\.claude\projects\D--All-files-Me-university-digital-system
   C14 D14 E13 F13 F14 G14 D13 D12 E12 F12. Link uses pin 5 (L14) tx, pin 6
   (M13) rx (PULLUP), GND pin 2. Crossed wires + 330 Ω.
 * Buzzer B14 (jumper J6), audio jack L/R A13/B13 (driven directly by pins;
-  sigma-delta - not yet heard on hardware), PS/2 C12/E11. Flash pins for
-  Spartan-7 not in the Builder table (only Spartan-6 P-numbers) - look up the
-  XC7S15 FTGB196 config pins (D00..D03, FCS_B; CCLK via STARTUPE2).
+  sigma-delta - not yet heard on hardware), PS/2 C12/E11. **Flash** (from
+  Vivado `get_package_pins`, not yet hardware-verified): FCS_B C11, D00/MOSI
+  B11, D01/MISO B12, D02 D10, D03 C10 (drive both high), CCLK A8 = only via
+  STARTUPE2.USRCCLKO. Chip S25FL064L (ID 01 60 17), 8 MB; bitstream ~0.54 MB.
 * Toolchain: the user's labs use the TA's Schematic Studio + **FPGA Builder**
   (`D:\setup\FPGA_Builder_Package_V9`, bundled Vivado 2025.2 batch, read_vhdl
   = VHDL-93, programs with openFPGALoader `-c ft2232 -m` / flash `-f -B
@@ -98,21 +112,24 @@ src\game\           tetris_pkg, text_pkg (5x7 font), chaos_pkg,
                     tetris_sound
 game\               top_tetris.vhd, project.txt, pins.xdc, README.md,
                     build\top_tetris.bit, screenshot_*.png
-tests\01..05\       hardware tests (top, project.txt, pins.xdc, README, .bit)
+tests\01..06\       hardware tests (top, project.txt, pins.xdc, README, .bit)
+src\media\          spi_flash, media_player (layer 3)
+media\              media.bin (make_media.py --demo output)
 sim\                testbenches + .prj (paths relative to sim\)
 tools\              build.bat, build_all.bat, program.bat, sim.bat,
                     vivado_gui.bat (+ make_vivado_project.tcl),
                     load_into_builder.bat/.py, ppm2png.py,
                     fake_opponent.py (PC plays the rival; pyserial),
-                    remap_doc_lines.py (fix docs L-numbers after code edits)
+                    remap_doc_lines.py (fix docs L-numbers after code edits),
+                    make_media.py, flash_media.bat (media into flash)
 vivado\             throw-away GUI projects (git-ignored)
 ```
 
 **Git** (remote origin = github.com/anakom-suvonvorn/FPGA-Tetris):
-`main` = stable, tag `v1-versus`. Branch `chaos` (current) has the chaos
-layer, commits 4122307, 304be72, 1acaa5d, 07a2835 (+ this handoff). **Not
-pushed.** Plan: merge `chaos` → `main` after the user's hardware test; new
-branch per layer (e.g. `media`). Each branch has its own built
+`main` = stable, tag `v1-versus`. Branch `chaos` = chaos layer (round 2
+included). Branch `media` (current) = chaos + test 06 + Part 8 docs.
+**Never pushed; never push** unless the user says so. Plan: merge `chaos` →
+`main` after the user's hardware test. Each branch has its own built
 `game\build\top_tetris.bit`.
 
 ### Design summary (details in docs\learn 05/06/07)
@@ -125,17 +142,18 @@ branch per layer (e.g. `media`). Each branch has its own built
 * versus_link: 1-byte msgs type(7..5)+value(4..0): 0 HEARTBEAT(height, every
   6 frames), 1 GARBAGE n, 2 LOST, 3 START, 4 ATTACK id, 5..7 free. link_ok =
   byte within 30 frames. Garbage 2/3/4 lines → 1/2/4, cancels pending first,
-  ≤8 rows per lock. Win = rival's LOST while playing; DRAW = rival's LOST
+  3–5 rows per lock (random). Win = rival's LOST while playing; DRAW = rival's LOST
   while I lost < 6 frames ago (both boards decide the same way, no extra msg).
-* Chaos: task every 10–14 s (first after 10 s); success → attack (5/8, only
-  if link_ok) or bonus. Attacks 0 MIRROR 1 FLIP 2 BLIND 3 BOUNCE 4 OIIA
-  5 GARBAGE(+3) 6 CURSED(S/Z) 7 SPEED; bonuses 0 FREEZE 1 SINK(2 rows,
-  cancel pending) 2 I-PIECE. chaos_render = overlay (ov_on/ov_rgb) drawn last
+* Chaos: task every 10–17 s (random; first after 10 s); 7 tasks (FLIP MATCH
+  BINARY HANDS HOLD TIMING HEX); success → attack (5/8, only if link_ok) or
+  bonus. Attacks 0 MIRROR 1 FLIP 2 BLIND 3 BOUNCE 4 OIIA 5 GARBAGE(+3)
+  6 CURSED(S/Z) 7 SPEED 8 LOCK; bonuses 0 FREEZE 1 SINK(2 rows, now,
+  cancel pending) 2 I-PIECE. All durations random ranges (chaos_pkg). chaos_render = overlay (ov_on/ov_rgb) drawn last
   in tetris_render stage 2; 1-clock latency like text_layer.
 * Sound: tetris_sound, Korobeiniki ROM + 13 SFX, mix music 3 + sfx 7 →
   'loudness' 0..15 → 'bucket' sigma-delta → audio pins; buzzer = sfx only.
-* Builds (tools\build.bat game): chaos = 5263 LUTs (66 %), 1799 FFs, 0 BRAM,
-  WNS +5.8 ns.
+* Builds (tools\build.bat game): chaos round 2 = 6022 LUTs (75 %), 0 BRAM,
+  WNS +4.2 ns. Test 06: 1749 LUTs, 6 BRAM tiles, WNS +6.9 ns.
 * Sims (all PASS on `chaos`): tb_tetris_core (robot, cell invariant),
   tb_versus (two cores + links), tb_chaos (task solver → attacks over link →
   effects), tb_chaos_core (freeze/speed/next/sink), screenshots:
@@ -162,7 +180,10 @@ branch per layer (e.g. `media`). Each branch has its own built
   mixer (bucket), 12 playable chaos task panel, 13 cat spin. Edit via Python
   patch scripts written to the scratchpad (inline heredocs with long JS broke
   bash once), then `node --check` the extracted script, then publish.
-* Use git as described in §3; ask before pushing.
+  Sections 14 SPI (bit stepper) and 15 media (beam race / tearing, sound
+  ring pacing, 7 MB planner) added 2026-10-19 (version 7). Local preview:
+  launch.json "docs" in the session folder serves docs/learn on :8765.
+* Use git as described in §3; never push.
 * Explain decisions plainly; the user catches logic gaps (e.g. the DRAW
   question) - answer honestly, fix wording/code.
 
@@ -183,5 +204,8 @@ branch per layer (e.g. `media`). Each branch has its own built
   user.
 * Don't overwrite the Builder's fpga_builder.json; the user runs
   `tools\load_into_builder.bat game`.
-* Resource watch: 66 % LUTs. Text layers (12 instances) are a likely place
+* VHDL is case-insensitive: this bit me twice more (port `t_hands` vs
+  constant `T_HANDS`, constant `RING` vs signal `ring`). Big BRAMs: Vivado
+  maps a 19,200 x 8 array to 8 tiles; split into 4K-deep banks by hand (5).
+* Resource watch: 75 % LUTs. Text layers (12 instances) are a likely place
   to save LUTs if media needs room.
