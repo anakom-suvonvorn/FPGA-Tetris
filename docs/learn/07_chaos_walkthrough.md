@@ -32,12 +32,13 @@ Contents:
 
 ## 7.0 What it does
 
-* **SW21** turns chaos on (on both boards, or it is one-sided). The right
+* **SW6** turns chaos on (on both boards, or it is one-sided). The right
   side of the screen then just says **CHAOS MODE ON**, nothing else: no
   countdown, so you never know when the next task comes.
 * Every 10–17 s (random) a **task** pops up in a panel on the right, with a
   sound. The 7-segment display counts down the seconds left. You do the
-  task with the **task switches SW6..SW13** while still playing Tetris with
+  task with the **task switches**, the 8 leftmost slide switches
+  (SW22, SW21, SW19, SW17, SW15, SW13, SW12, SW11), while still playing Tetris with
   the buttons.
 * Finish it in time and you get a reward: with a rival connected, 5 times in
   8 an **attack** on the rival, otherwise a **bonus** for yourself. With no
@@ -50,9 +51,9 @@ Contents:
 | Task | What you do | Time allowed |
 |---|---|---|
 | FLIP | flip the shown switch 10 times | 7–9 s |
-| MATCH | copy a pattern of 8 lights onto SW13..SW6 | 10–13 s |
-| BINARY | set a decimal number (1..255) in binary on SW13..SW6 | 13–17 s |
-| HEX | set a 2-digit hex number (like `A4` = 1010 0100) on SW13..SW6 | 11–14 s |
+| MATCH | copy a pattern of 8 lights onto the 8 task switches | 10–13 s |
+| BINARY | set a decimal number (1..255) in binary on the task switches | 13–17 s |
+| HEX | set a 2-digit hex number (like `A4` = 1010 0100) on the task switches | 11–14 s |
 | HANDS | don't touch any button for 3–5 s (shown on the panel; pieces keep falling!) | 9–12 s |
 | HOLD | keep a bouncing bar in the green zone (40–60 px wide) for 3–4 s; the switch pushes it up | 13–16 s |
 | TIMING | flip the switch while the moving marker (2–4 px per frame) is in the green zone (28–44 px, new place and width after each hit), 3 times in a row | 10–13 s |
@@ -179,7 +180,7 @@ last time, nothing happens and the next frame tries again (the same retry
 trick as the 7-bag in S_PICK). Then set the task up:
 
 * `frames`: the time allowed, `rand_range(TASK_LO(t), TASK_HI(t), rnd2)`
-* `sel`: which of the 8 switches (random 0..7, shown as SW6..SW13)
+* `sel`: which of the 8 switches (random 0..7, shown as its board label SW11..SW22)
 * `target`: a random 8-bit pattern / number, guaranteed **not** equal to
   the switches right now (otherwise MATCH would be solved before you start)
 * `step`: TIMING's marker speed, 2..4 px per frame
@@ -289,7 +290,7 @@ and `ov_rgb` (which colour). `tetris_render` draws it on top of its own
 picture as the very last step. Same timing as `text_layer`: all from (x, y),
 registered once, ready for tetris_render's stage 2.
 
-### Moving things (L123–153)
+### Moving things (L128–158)
 
 Once per frame: the 10 **bouncers** (L70–83: positions, per-square speeds
 `SPX`/`SPY`, colours `BCOL`, direction bits) move and bounce off the field
@@ -297,33 +298,34 @@ edges, like the bouncing square of test 01 times ten. All 10 always move;
 only the first `n_bounce` are drawn. The **cat** (L85–89) does the same,
 and `spin` counts frames.
 
-### Text (L155–203)
+### Text (L160–208)
 
 Two 16-character panel lines and the banner, three `text_layer`s. Each line
 starts from a fixed template (`L1_TXT`, `L2_TXT`, one per task + one for
 "no task") and `put_digit` writes numbers into it: the switch number
-(`sel + 6` → "SW13"), the BINARY number (hundreds/tens/ones by dividing by
-100 and 10), the HEX digits (L182: a hex digit 0..15 *is* its character
+(`SW_NUM(sel)`, a table of the 8 board labels: the board skips the
+numbers 14, 16, 18, 20 used by the buttons, so it can't be a formula), the BINARY number (hundreds/tens/ones by dividing by
+100 and 10), the HEX digits (L187: a hex digit 0..15 *is* its character
 code, `0`..`9` then `A`..`F`, so no conversion at all), the HANDS seconds
-(L186), the TIMING hit count. With no task (L162) line 1 is
+(L191), the TIMING hit count. With no task (L167) line 1 is
 `CHAOS MODE ON` and line 2 is empty.
 
-### Geometry (L205–336)
+### Geometry (L210–341)
 
-* **The panel** (L224–281): with no task (L226) only the first text line's
+* **The panel** (L229–286): with no task (L231) only the first text line's
   area is marked (no box, nothing else), so just the words show. During a
-  task: a purple frame, **red while my buttons are LOCKED** (L235), and dark
+  task: a purple frame, **red while my buttons are LOCKED** (L240), and dark
   inside. Below the text: the MATCH target lamps; **8 switch pictures** (a
-  slot with a knob at the top = on or bottom = off, SW13 on the left; the
+  slot with a knob at the top = on or bottom = off, SW22 on the left like on the board; the
   switch the task wants is shown in orange); the **meter** (dark, green
   zone, white marker) for HOLD / TIMING; the **progress bar**; the **time
-  bar** (L272: 11 px per second, red in the last 3 seconds). The switch
+  bar** (L277: 11 px per second, red in the last 3 seconds). The switch
   under a pixel is `7 − px / 24` (8 columns of 24 px).
-* **Banner** (L283–296): a black band, text colour by banner number (red
+* **Banner** (L288–301): a black band, text colour by banner number (red
   incoming / failed, gold sent, green bonus).
-* **Bouncers** (L298–306): `if i < n_bounce and (inside square i)`, colour
+* **Bouncers** (L303–311): `if i < n_bounce and (inside square i)`, colour
   `BCOL(i)`.
-* **The cat** (L308–331): 64 × 64 px = the 16 × 16 picture at 4× (`dy / 4`,
+* **The cat** (L313–336): 64 × 64 px = the 16 × 16 picture at 4× (`dy / 4`,
   `dx / 4`: free shifts). The **spin** is faked with 4 pictures, chosen by
   `spin(4 downto 3)` (each lasts 8 frames):
 
@@ -338,7 +340,7 @@ code, `0`..`9` then `A`..`F`, so no conversion at all), the HANDS seconds
   its vertical axis. Pixel value 0 is see-through: `ov_on` stays '0' there,
   so the field shows between the cat's ears.
 
-### Output (L338–344)
+### Output (L343–349)
 
 The text pixels arrive at the same edge as the `r_*` registers, so they are
 merged combinationally: text on top of the panel / band it belongs to
@@ -351,17 +353,17 @@ registered geometry colour.
 
 ### `tetris_core.vhd`
 
-* **New inputs** (L73–78): `fx_freeze`, `fx_speed` (levels while '1'),
+* **New inputs** (L76–81): `fx_freeze`, `fx_speed` (levels while '1'),
   `fx_next_bad`, `fx_next_i`, `fx_sink` (pulses).
-* **Gravity** in S_PLAY (L387–400): FREEZE skips it; SPEED compares with
-  `gravity_frames(speed_level(level))`, `speed_level` (L231–234) = level +
+* **Gravity** in S_PLAY (L409–422): FREEZE skips it; SPEED compares with
+  `gravity_frames(speed_level(level))`, `speed_level` (L237–240) = level +
   6, at most 15.
-* **Next piece** (L685–698): after the `case`, CURSED sets `next_p` to S or Z
+* **Next piece** (L707–720): after the `case`, CURSED sets `next_p` to S or Z
   (picked by one LFSR bit), I PIECE to I, and `next_sh` to match, so the
   preview updates at once.
-* **SINK** (L699–702): adds 2 to `sink_left` and sets `p := 0` (waiting
+* **SINK** (L721–724): adds 2 to `sink_left` and sets `p := 0` (waiting
   garbage cancelled). The rows go **at once**: S_PLAY checks `sink_left`
-  first (L376) and jumps to **S_SINK** (L656–673), which is S_GARB
+  first (L398) and jumps to **S_SINK** (L678–695), which is S_GARB
   backwards:
 
   ```vhdl
@@ -372,13 +374,13 @@ registered geometry colour.
   ```
 
   The bottom row falls out of the field, one row per clock. The falling
-  piece stays where it is on the screen. **S_SINK_CHK** (L675–682) then
+  piece stays where it is on the screen. **S_SINK_CHK** (L697–704) then
   checks it still fits: normally yes, because the stack moved *away* from
   it. But if a block was hanging right above the piece (the piece had slid
   under an overhang), that block has now moved down into it; then the piece
   is lifted one row at a time until it fits. Then S_GHOST works out the new
   ghost and play goes on.
-* **Garbage per lock** (L604–610): at most 3, 4 or 5 rows (random, from 2
+* **Garbage per lock** (L626–632): at most 3, 4 or 5 rows (random, from 2
   LFSR bits) come in after one lock; the rest stays in the red meter for the
   next locks.
 
@@ -391,14 +393,14 @@ LOST > **ATTACK** > GARBAGE > HEARTBEAT (L141–144). Received ones become
 
 ### `tetris_render.vhd`
 
-* **FLIP** (L184, L284): the row read from the field is `19 − row`, and the
+* **FLIP** (L185, L285): the row read from the field is `19 − row`, and the
   in-cell `py` is `15 − py` (`not y(3 downto 0)`), so even the bevel flips.
   The piece and ghost use the same row, so the whole field turns over.
-* **BLIND** (L311): `elsif s1_occ_bit = '1' and fx_blind = '0'`: with BLIND
+* **BLIND** (L312): `elsif s1_occ_bit = '1' and fx_blind = '0'`: with BLIND
   on, a locked cell skips the "draw a block" branch completely and is drawn
   exactly like an empty cell (field background + grid lines), so there is
   nothing at all to see. The falling piece and its ghost stay visible.
-* **Overlay** (L398–400): `if ov_on = '1' then c := ov_rgb;` as the last
+* **Overlay** (L399–401): `if ov_on = '1' then c := ov_rgb;` as the last
   step before the output registers.
 
 ### `tetris_sound.vhd`
@@ -410,20 +412,21 @@ event inputs (L215–220).
 
 ### `top_tetris.vhd`
 
-* SW21 = chaos on, SW6..SW13 = `task_sw` (bit 0 = SW6 ... bit 7 = SW13); all
-  in the 13-bit synchronizer.
-* **MIRROR** (L192–193): `c_left <= a_right when fx_mirror = '1' else a_left;`
+* SW6 = chaos on, the 8 leftmost switches = `task_sw` (bit 7 = SW22 the
+  leftmost ... bit 0 = SW11); all 13 go through `switch_filter` (bounce
+  removed, see Part 2.7). Settings are all at the right end.
+* **MIRROR** (L196–197): `c_left <= a_right when fx_mirror = '1' else a_left;`
   and the same the other way. The swap happens *before* the core, which never
   knows.
-* **LOCK** (L195–199): every button action is ANDed with `not fx_locked`
+* **LOCK** (L199–203): every button action is ANDed with `not fx_locked`
   (`g_left <= c_left and not fx_locked;` ...), so while locked the core
-  gets no actions at all. `touch` (L201) is taken *before* the lock, so the
+  gets no actions at all. `touch` (L205) is taken *before* the lock, so the
   HANDS task still notices presses.
-* **Garbage** (L204–205): from the rival's GARBAGE message *or* the GARBAGE
+* **Garbage** (L208–209): from the rival's GARBAGE message *or* the GARBAGE
   attack (+3), merged into one input.
-* `chaos_en <= chaos_s and playing` (L246) enables task and fx;
-  `hurry => fx_locked` (L252) connects the lock to chaos_task.
-* The 7-segment display (L311–325) shows `--ss` (seconds left) during a task.
+* `chaos_en <= chaos_s and playing` (L250) enables task and fx;
+  `hurry => fx_locked` (L256) connects the lock to chaos_task.
+* The 7-segment display (L315–329) shows `--ss` (seconds left) during a task.
 
 ### `tools/fake_opponent.py`
 
@@ -474,15 +477,15 @@ visible).
 
 ## 7.7 Try it on the board
 
-1. Load `game`. Put **SW21 up** (chaos on): `CHAOS MODE ON` appears on the
+1. Load `game`. Put **SW6 up** (chaos on): `CHAOS MODE ON` appears on the
    right. Start a game with SW18.
 2. After 10–17 s a task appears on the right, and the 7-segment display
-   counts down. Use **SW6..SW13** (SW13 is the leftmost, like on the panel).
+   counts down. Use the **8 leftmost switches** (same order as the panel).
 3. With one board, the PC can attack you:
-   `python tools\fake_opponent.py COM3` (SW22 up), then `x 4` (cat),
+   `python tools\fake_opponent.py COM3` (SW7 up), then `x 4` (cat),
    `x 0` (mirror), `x 1` (flip), `x 8` (lock) ... Solved tasks send attacks
    to the PC, which prints them.
-4. Two boards: both SW21 up, SW22 down, cable as before.
+4. Two boards: both SW6 up, SW7 down, cable as before.
 
 Next layer: **media** (videos and sound clips from the board's flash), see
 [Part 8](08_flash_walkthrough.md) and test 06.
@@ -495,14 +498,14 @@ From playing round 1 on the board:
 
 | Feedback | Change | Where |
 |---|---|---|
-| The panel and the "next task in" timer spoil the surprise | panel only during a task, otherwise just `CHAOS MODE ON`; no countdown | chaos_render L162, L226 |
-| BINARY is fine (watch the progress bar), but add a hex version | new task HEX: two hex digits | chaos_pkg, chaos_task L201, chaos_render L182 |
+| The panel and the "next task in" timer spoil the surprise | panel only during a task, otherwise just `CHAOS MODE ON`; no countdown | chaos_render L167, L231 |
+| BINARY is fine (watch the progress bar), but add a hex version | new task HEX: two hex digits | chaos_pkg, chaos_task L201, chaos_render L187 |
 | Green zones always the same width | HOLD 40..60 px per task; TIMING 28..44 px, new width after each hit | chaos_task L182–188, L240 |
 | Everything with a time should be a random range | tasks, gaps, attacks, freeze, HANDS / HOLD goals, TIMING speed | chaos_pkg L77–90, `rand_range` |
-| You could ignore tasks and just play Tetris | new attack LOCK: buttons locked until you finish a task | chaos_fx, chaos_task `hurry`, top_tetris L195 |
-| SINK only happened at the next lock | SINK right away, from S_PLAY | tetris_core L376, S_SINK_CHK |
+| You could ignore tasks and just play Tetris | new attack LOCK: buttons locked until you finish a task | chaos_fx, chaos_task `hurry`, top_tetris L199 |
+| SINK only happened at the next lock | SINK right away, from S_PLAY | tetris_core L398, S_SINK_CHK |
 | FREEZE too long (10 s) | 3..5 s | chaos_pkg FREEZE_LO/HI |
 | Too few bouncers | 5..10 | chaos_fx, chaos_render |
-| BLIND still showed grey blocks | locked blocks not drawn at all | tetris_render L311 |
-| 8 garbage rows at once is too much | at most 3..5 per lock | tetris_core L604 |
+| BLIND still showed grey blocks | locked blocks not drawn at all | tetris_render L312 |
+| 8 garbage rows at once is too much | at most 3..5 per lock | tetris_core L627 |
 | The OIIA cat isn't the real one | later, with the media layer (real picture + sound from flash) | |

@@ -7,7 +7,7 @@
 --   * the TASK panel, right side       x 428..627, y 284..467
 --       only while a task runs (otherwise just the words CHAOS MODE ON,
 --       so a task always comes as a surprise). Two text lines, the 8 task
---       switches (SW13 left .. SW6 right), target lights (MATCH), a meter
+--       switches (SW22 left .. SW11 right, like the board), target lights (MATCH), a meter
 --       with a green zone (HOLD, TIMING), a progress bar and a time bar.
 --       The frame turns red while my buttons are LOCKED.
 --   * the BANNER under the field       x 176..423, y 444..467
@@ -107,6 +107,11 @@ architecture rtl of chaos_render is
     return r;
   end function;
 
+  -- the board label of task switch 0..7 (bit 0 = SW11 ... bit 7 = SW22, the
+  -- 8 leftmost switches; the board skips the numbers used by the buttons)
+  type swnum_t is array (0 to 7) of integer range 0 to 31;
+  constant SW_NUM : swnum_t := (11, 12, 13, 15, 17, 19, 21, 22);
+
   type lines_t is array (0 to N_TASKS) of std_logic_vector(95 downto 0);
   constant L1_TXT : lines_t := (
     to_codes("FLIP THE SWITCH "), to_codes("COPY THE LIGHTS "), to_codes("SET IN BINARY:  "),
@@ -114,7 +119,7 @@ architecture rtl of chaos_render is
     to_codes("SET IN HEX:     "),
     to_codes(" CHAOS MODE ON  "));
   constant L2_TXT : lines_t := (
-    to_codes("SW00 TEN TIMES  "), to_codes("WITH SW13-SW6   "), to_codes("      000       "),
+    to_codes("SW00 TEN TIMES  "), to_codes("WITH SW22-SW11  "), to_codes("      000       "),
     to_codes("NO BUTTONS 0 SEC"), to_codes("GREEN WITH SW00 "), to_codes("SW00  HITS: 0/3 "),
     to_codes("       00       "),
     to_codes("                "));
@@ -157,7 +162,7 @@ begin
     variable l1, l2 : std_logic_vector(95 downto 0);
     variable swn, v : integer range 0 to 255;
   begin
-    swn := t_sel + 6;                              -- switch index 0..7 -> SW6..SW13
+    swn := SW_NUM(t_sel);                          -- switch index 0..7 -> its label SW11..SW22
     v   := to_integer(unsigned(t_target));
     if t_active = '0' then
       l1 := L1_TXT(N_TASKS);                       -- just "CHAOS MODE ON"
@@ -242,7 +247,7 @@ begin
         end if;
         if xi >= PX0 and xi < PX0 + 192 then
           px := xi - PX0;
-          i8 := 7 - px / 24;                           -- switch number under x (SW13 left)
+          i8 := 7 - px / 24;                           -- switch number under x (SW22 left)
           -- target lights (MATCH): a small lamp per switch
           if t_active = '1' and t_task = T_MATCH and yi >= 338 and yi < 346 and (px mod 24) >= 6 and (px mod 24) < 18 then
             if t_target(i8) = '1' then c := x"FE3"; else c := x"332"; end if;

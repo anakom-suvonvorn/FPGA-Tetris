@@ -1,7 +1,7 @@
 """
 fake_opponent.py - the PC pretends to be the second board (versus mode test)
 
-Set slide switch SW22 ON on the board (link over USB instead of the J5 cable),
+Set slide switch SW7 ON on the board (link over USB instead of the J5 cable),
 close PuTTY / the VS Code serial monitor, then run:
 
     python tools\\fake_opponent.py COM3
@@ -13,7 +13,7 @@ every message the board sends, and lets you type commands:
     g 3      send 3 garbage lines
     l        send LOST    (the board wins)
     h 12     pretend my stack is 12 rows high (the RIVAL bar)
-    x 4      send chaos ATTACK number 4 (needs SW21 chaos on, on the board):
+    x 4      send chaos ATTACK number 4 (needs SW6 chaos on, on the board):
              0 mirror  1 flip  2 blind  3 bouncers  4 OIIA cat
              5 garbage 6 cursed next  7 speed  8 lock (buttons locked until a task is done)
     a        auto mode on/off: stack grows, random garbage every few seconds

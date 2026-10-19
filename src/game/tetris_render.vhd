@@ -51,6 +51,7 @@ entity tetris_render is
     next_shape : in  shape_t;
     next_color : in  color_t;
     playing    : in  std_logic;
+    can_start  : in  std_logic;                  -- PRESS START only after the cool-down
     game_over  : in  std_logic;
     paused     : in  std_logic;
     level      : in  integer range 0 to 15;
@@ -276,7 +277,7 @@ begin
       if in_f and yi >= 192 and yi < 240 and result /= 0 then
         s1_banner_res <= '1';
       end if;
-      if in_f and yi >= 256 and yi < 288 and playing = '0' then
+      if in_f and yi >= 256 and yi < 288 and can_start = '1' then
         s1_banner_press <= '1';
       end if;
 
@@ -351,7 +352,7 @@ begin
           c := x"FD3";                            -- gold frame: I won
         elsif game_over = '1' then
           c := x"C22";                            -- red frame: I lost
-        elsif playing = '0' then
+        elsif can_start = '1' then
           c := x"2C2";                            -- green frame: press to start
         else
           c := FRAME;

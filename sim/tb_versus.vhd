@@ -15,6 +15,8 @@
 --   * garbage is sent and arrives (GARBAGE messages, grey rows appear)
 --   * the game ends with one board showing WIN and the other LOSE
 --   * both sides see link_ok while connected
+--   * cool-down: a start press right after the game ends is ignored; one
+--     1.5 s (90 frames) later starts both boards again
 --
 -- Run with:  tools\sim.bat tb_versus
 -- ============================================================================
@@ -31,6 +33,7 @@ architecture sim of tb_versus is
   constant CPB        : integer := 8;
 
   signal clk        : std_logic := '0';
+  signal cool_done, cool_ok : boolean := false;
   signal done       : boolean := false;
   signal frame_tick : std_logic := '0';
   signal line_ab, line_ba : std_logic;      -- A -> B and B -> A
@@ -254,6 +257,27 @@ begin
     while play_a = '1' loop
       play_piece(occ_a, col_a, x_a, play_a, evt_a, clk, frame_tick, a_rot, a_left, a_right, a_hard, false, seed);
     end loop;
+    -- cool-down check: press start at once (like a hard drop that was on its
+    -- way when the game ended) - nothing may happen
+    for i in 1 to 5 loop wait until rising_edge(clk) and frame_tick = '1'; end loop;
+    press(a_hard, clk, frame_tick);
+    for i in 1 to 30 loop wait until rising_edge(clk) and frame_tick = '1'; end loop;
+    if play_a = '1' or play_b = '1' then
+      report "cool-down: a press 5 frames after the game started a new one" severity error;
+    else
+      report "cool-down: press right after the game was ignored";
+      -- after the cool-down a press starts both boards again
+      for i in 1 to 70 loop wait until rising_edge(clk) and frame_tick = '1'; end loop;
+      press(a_hard, clk, frame_tick);
+      for i in 1 to 10 loop wait until rising_edge(clk) and frame_tick = '1'; end loop;
+      if play_a = '1' and play_b = '1' then
+        report "cool-down: a press after 1.5 s started both boards";
+        cool_ok <= true;
+      else
+        report "cool-down: a press after 1.5 s did not start the boards" severity error;
+      end if;
+    end if;
+    cool_done <= true;
     wait;
   end process;
 
@@ -292,6 +316,10 @@ begin
       report "no garbage was sent in this game (test too short to check garbage)" severity warning;
     elsif not grey_seen then
       report "garbage was sent but no grey row ever appeared" severity error; errors := errors + 1;
+    end if;
+    wait until cool_done;
+    if not cool_ok then
+      errors := errors + 1;
     end if;
     if errors = 0 then
       report "TEST PASSED";

@@ -7,7 +7,8 @@ never written VHDL by hand or opened the Vivado GUI. Read in order:
    schematic thinking (entity = symbol, signal = wire, process(clk) =
    flip-flops, ...), plus our house rules and common errors.
 2. [The building blocks, line by line](02_blocks_walkthrough.md):
-   `common_pkg`, `debounce`, `seg7_scan`, `vga_sync`, `uart_tx`, `uart_rx`.
+   `common_pkg`, `debounce`, `seg7_scan`, `vga_sync`, `uart_tx`, `uart_rx`,
+   `switch_filter`.
 3. [The tests and testbenches, line by line](03_tests_walkthrough.md):
    the 5 hardware tests, `project.txt`, `pins.xdc`, and the 3 testbenches.
 4. [Vivado](04_vivado.md): opening our designs in the GUI, schematic view,

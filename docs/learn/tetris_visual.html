@@ -376,7 +376,7 @@ canvas { display: block; max-width: 100%; height: auto; border-radius: 4px; imag
 <!-- ================================================================ 12 -->
 <section id="tasks">
   <h2><span class="tag">chaos_task · chaos_render</span>Try the chaos tasks</h2>
-  <p>This panel runs the same rules as <code>chaos_task.vhd</code> at 60 frames a second, and draws the same panel as <code>chaos_render.vhd</code>. Click the switches below (SW13 on the left, like the panel) to do the task. "press a button" stands for any Tetris button (it matters for HANDS). On the board you'd be doing this <i>while</i> playing Tetris. Every length of time (time allowed, HANDS / HOLD goal, zone width, marker speed) is picked at random from its range each time you press "new task", like <code>rand_range</code> does in hardware. In the game the panel only appears when a task starts; between tasks the screen just says CHAOS MODE ON.</p>
+  <p>This panel runs the same rules as <code>chaos_task.vhd</code> at 60 frames a second, and draws the same panel as <code>chaos_render.vhd</code>. Click the switches below (the 8 leftmost slide switches of the board, SW22 on the left, like the panel) to do the task. "press a button" stands for any Tetris button (it matters for HANDS). On the board you'd be doing this <i>while</i> playing Tetris. Every length of time (time allowed, HANDS / HOLD goal, zone width, marker speed) is picked at random from its range each time you press "new task", like <code>rand_range</code> does in hardware. In the game the panel only appears when a task starts; between tasks the screen just says CHAOS MODE ON.</p>
   <div class="stage">
     <div class="controls" role="group" aria-label="Task" id="tkBtns"></div>
     <div class="row2">
@@ -1492,14 +1492,15 @@ canvas { display: block; max-width: 100%; height: auto; border-radius: 4px; imag
   const TASKS = [
     { n: "FLIP", l1: "FLIP THE SWITCH", lo: 420, hi: 540, how: "Flip the orange switch 10 times. chaos_task counts edges: sw(sel) xor sw_d(sel)." },
     { n: "MATCH", l1: "COPY THE LIGHTS", lo: 600, hi: 780, how: "Make the switches equal the yellow lights. Success when sw = target." },
-    { n: "BINARY", l1: "SET IN BINARY:", lo: 780, hi: 1020, how: "Set the number in binary: SW13 = 128, SW12 = 64 ... SW6 = 1. Success when sw = target. Tip: watch the progress bar go up or down as you flip." },
+    { n: "BINARY", l1: "SET IN BINARY:", lo: 780, hi: 1020, how: "Set the number in binary: SW22 = 128, SW21 = 64 ... SW11 = 1. Success when sw = target. Tip: watch the progress bar go up or down as you flip." },
     { n: "HANDS", l1: "HANDS OFF!", lo: 540, hi: 720, how: "Don't press any button for 3–5 s (picked at random, shown on the panel). Each press sets the counter 'good' back to 0." },
     { n: "HOLD", l1: "KEEP THE BAR IN", lo: 780, hi: 960, how: "Switch on = the bar's velocity goes up, off = it falls (velocity −1 per frame, max ±4). Keep it in the green (40–60 px wide) for 3–4 s in total." },
     { n: "TIMING", l1: "FLIP IN GREEN", lo: 600, hi: 780, how: "The marker sweeps 2–4 px per frame. Flip the orange switch while it is in the green (28–44 px wide, new place and width after each hit): 3 hits in a row. A miss sets the count back to 0." },
-    { n: "HEX", l1: "SET IN HEX:", lo: 660, hi: 840, how: "Set the 2 hex digits in binary: the left digit on SW13..SW10, the right one on SW9..SW6. A = 1010, 4 = 0100, so A4 = 1010 0100." }
+    { n: "HEX", l1: "SET IN HEX:", lo: 660, hi: 840, how: "Set the 2 hex digits in binary: the left digit on SW22, SW21, SW19, SW17, the right one on SW15, SW13, SW12, SW11. A = 1010, 4 = 0100, so A4 = 1010 0100." }
   ];
   // rand_range from chaos_pkg: lo + r * (hi - lo + 1) / 256, r = a random byte
   const rr = (lo, hi) => lo + Math.floor(Math.floor(Math.random() * 256) * (hi - lo + 1) / 256);
+  const SWN = [11, 12, 13, 15, 17, 19, 21, 22];   // board label of task switch 0..7 (chaos_render SW_NUM)
   const TK = { task: 2, sw: 0x5A, swd: 0x5A, sel: 3, target: 173, cnt: 0, frames: 900, good: 0, goal: 180, step: 3, pos: 96, vel: 0, up: true, zlo: 60, zw: 40, done: "", last: 0 };
   function tkNew(t) {
     TK.task = t; TK.cnt = 0; TK.good = 0; TK.pos = 96; TK.vel = 0; TK.up = true;
@@ -1567,7 +1568,7 @@ canvas { display: block; max-width: 100%; height: auto; border-radius: 4px; imag
     host.querySelectorAll("button").forEach(b => {
       const i = +b.dataset.i, on = (TK.sw >> i) & 1;
       b.setAttribute("aria-pressed", on ? "true" : "false");
-      b.textContent = `SW${6 + i} ${on ? "▲" : "▼"}`;
+      b.textContent = `SW${SWN[i]} ${on ? "▲" : "▼"}`;
     });
   }
   function drawTaskPanel() {
@@ -1582,9 +1583,9 @@ canvas { display: block; max-width: 100%; height: auto; border-radius: 4px; imag
     g.font = "bold 11px 'IBM Plex Mono', monospace"; g.textBaseline = "top";
     g.fillStyle = "#fff"; g.fillText(TASKS[t].l1, X, Y + 4);
     let l2 = "";
-    const swn = TK.sel + 6;
+    const swn = SWN[TK.sel];
     if (t === 0) l2 = `SW${swn} TEN TIMES`;
-    if (t === 1) l2 = "WITH SW13-SW6";
+    if (t === 1) l2 = "WITH SW22-SW11";
     if (t === 2) l2 = `      ${String(TK.target).padStart(3, "0")}`;
     if (t === 3) l2 = `NO BUTTONS ${Math.floor(TK.goal / 60)} SEC`;
     if (t === 6) l2 = `       ${TK.target.toString(16).toUpperCase().padStart(2, "0")}`;
@@ -1614,7 +1615,7 @@ canvas { display: block; max-width: 100%; height: auto; border-radius: 4px; imag
       g.fillText(TK.done, X + 2, 160);
     }
     document.getElementById("tkLog").innerHTML =
-      `task ${t} (${TASKS[t].n}) · sel = ${TK.sel} (SW${TK.sel + 6}) · target = ${TK.target} = ${TK.target.toString(2).padStart(8, "0")} · ` +
+      `task ${t} (${TASKS[t].n}) · sel = ${TK.sel} (SW${SWN[TK.sel]}) · target = ${TK.target} = ${TK.target.toString(2).padStart(8, "0")} · ` +
       `sw = ${TK.sw.toString(2).padStart(8, "0")} · progress ${prog}/191 · ${secs} s left` + (t === 4 ? ` · bar ${TK.pos}, velocity ${TK.vel}, good ${TK.good}/${TK.goal}` : "") + (t === 3 ? ` · good ${TK.good}/${TK.goal}` : "") +
       (t === 5 ? ` · marker step ${TK.step} px, zone ${TK.zlo}..${TK.zlo + TK.zw}` : "");
   }
