@@ -1,6 +1,6 @@
 # HANDOFF: project state for Claude (read this first after a context reset)
 
-Last updated: **2026-10-19** (chaos round 2 + test 06 done). Keep this
+Last updated: **2026-10-19** (two-board fixes on all branches; test 06 waiting). Keep this
 file current whenever something important changes. Durable facts also live in
 Claude's memory (`...\.claude\projects\D--All-files-Me-university-digital-system-assignment\memory\`:
 `digital-system-final-project.md`, `git-workflow.md`).
@@ -39,6 +39,18 @@ Claude's memory (`...\.claude\projects\D--All-files-Me-university-digital-system
      **The user decides what media to make from the test results.** Space is
      the limit (7 MB), not speed.
   4. extra mini-games if time is left.
+* **Two-board session (2026-10-19, user + friend, real J5 cable):** versus
+  works well. Fixes made on `main` and merged into `chaos` and `media`:
+  1.5 s **start cool-down** after a game (tetris_core `cool`, `can_start`
+  output; PRESS START only shows after it), **switch_filter** (integrator
+  debounce, 1 ms samples, LIMIT 10) + PULLDOWN on all slide switches,
+  **settings moved to the right**. Physical order of the 16 slide switches,
+  left → right (confirmed by the user): SW22 SW21 SW19 SW17 SW15 SW13 SW12
+  SW11 | SW10 SW9 SW8 | SW7 SW6 SW5 SW4 SW2. Now: task switches = the 8
+  leftmost (task_sw bit 7 = SW22 J1 ... bit 0 = SW11 L2), SW8–10 free,
+  SW7 N10 = USB link, SW6 P12 = chaos on, SW5 sfx, SW4 music, SW2 pause.
+  Panel labels via `SW_NUM` table in chaos_render. Build: main 3496 LUTs
+  (44 %), chaos 6200 LUTs (77.5 %), WNS +4.6 ns.
 * **Next action:** wait for the user's test 06 results (checklist in
   `tests\06_flash_read\README.md`) and their media choices; then build the
   player into the game (loss video, win picture, Tetoris song, OIIA cat
@@ -75,8 +87,11 @@ Claude's memory (`...\.claude\projects\D--All-files-Me-university-digital-system
   SW18 J12 centre, SW20 J11 right, SW23 L13 bottom.
 * Slide switches (16): SW2 K11, SW4 M11, SW5 N14, SW6 P12, SW7 N10, SW8 P10,
   SW9 M10, SW10 N4, SW11 L2, SW12 P3, SW13 N1, SW15 M2, SW17 L1, SW19 J3,
-  SW21 K3, SW22 J1. Game uses: SW2 pause, SW4 music, SW5 sfx, SW22 link via
-  USB, SW21 chaos on, SW6..SW13 task switches. Free: SW15, SW17, SW19.
+  SW21 K3, SW22 J1. On the board left → right: SW22 SW21 SW19 SW17 SW15 SW13
+  SW12 SW11 SW10 SW9 SW8 SW7 SW6 SW5 SW4 SW2. Game uses: the 8 leftmost =
+  task switches, SW7 USB link, SW6 chaos, SW5 sfx, SW4 music, SW2 pause.
+  Free: SW8, SW9, SW10. They bounce badly and float when held halfway:
+  always switch_filter + PULLDOWN.
 * 7-seg segments a..g,dp = L3 P4 P2 M3 M1 J4 K4 J2 (active-low); digit
   enables H4 (left) H3 H2 H1 (right), **ACTIVE-HIGH** (from the user's Lab 7).
 * USB serial (FT2232 ch. B, COM3 on the user's PC): **G1 = from PC (FPGA rx),
