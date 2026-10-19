@@ -46,6 +46,9 @@ use ieee.numeric_std.all;
 use work.tetris_pkg.all;
 
 entity tetris_core is
+  generic (
+    COOLDOWN_FRAMES : integer := 90             -- 1.5 s after a game before a new start
+  );
   port (
     clk        : in  std_logic;
     frame_tick : in  std_logic;
@@ -88,6 +91,7 @@ entity tetris_core is
     next_shape : out shape_t;
     next_color : out color_t;
     playing    : out std_logic;     -- a game is running
+    can_start  : out std_logic;     -- not playing and the cool-down is over (PRESS START)
     game_over  : out std_logic;     -- the last game ended (field shown grey)
 
     -- score
@@ -168,6 +172,8 @@ architecture rtl of tetris_core is
   signal hole      : integer range 0 to COLS - 1 := 0;
   signal result_r  : integer range 0 to 4 := 0;
   signal lose_age  : integer range 0 to 63 := 63;    -- frames since I lost (for DRAW)
+  signal cool      : integer range 0 to 255 := 0;    -- frames left before a new start is allowed
+  signal playing_d : std_logic := '0';
   signal start_o, lost_o, garb_o : std_logic := '0';
   signal garb_o_n  : integer range 0 to 31 := 0;
   signal height_r  : integer range 0 to 20 := 0;
@@ -277,6 +283,16 @@ begin
       if frame_tick = '1' and lose_age < 63 then
         lose_age <= lose_age + 1;
       end if;
+      -- cool-down: when a game ends (playing goes 1 -> 0, for any reason),
+      -- the buttons can't start a new one for COOLDOWN_FRAMES. Otherwise a
+      -- hard drop pressed just as the rival tops out would start the next
+      -- round by accident.
+      playing_d <= playing_r;
+      if playing_d = '1' and playing_r = '0' then
+        cool <= COOLDOWN_FRAMES;
+      elsif frame_tick = '1' and cool > 0 then
+        cool <= cool - 1;
+      end if;
       -- random number source: a 16-bit LFSR stepping every clock. When it is
       -- sampled depends on when the player presses buttons, so the piece
       -- order is different every game.
@@ -295,7 +311,13 @@ begin
 
         -- ---------------------------------------------- title / game over
         when S_IDLE =>
-          if req_hard = '1' or req_rot = '1' then
+          if cool > 0 then
+            req_hard <= '0';                        -- cooling down: forget presses
+            req_rot  <= '0';
+            if start_in = '1' then                  -- (the other board may still start us)
+              state <= S_INIT;
+            end if;
+          elsif req_hard = '1' or req_rot = '1' then
             start_o <= '1';                         -- tell the other board to start too
             state   <= S_INIT;
           elsif start_in = '1' then                 -- the other board started
@@ -760,6 +782,7 @@ begin
   next_shape <= next_sh;
   next_color <= std_logic_vector(to_unsigned(next_p, 3));
   playing    <= playing_r;
+  can_start  <= '1' when playing_r = '0' and cool = 0 else '0';
   game_over  <= over_r;
   lines_bcd  <= lines_r;
   level      <= level_r;

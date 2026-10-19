@@ -1,0 +1,2 @@
+vhdl work "../src/common/switch_filter.vhd"
+vhdl work "tb_switch_filter.vhd"

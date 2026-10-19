@@ -11,13 +11,18 @@
 --              SW23 soft drop (hold)
 --
 --   SW18 (centre) also starts a round; in versus it starts both boards.
+--   After a game ends the buttons can't start a new one for 1.5 s (so a
+--   hard drop pressed just as the rival loses doesn't start the next round).
 --
--- Slide switches:
---   SW2  pause            SW4  music on        SW5  sound effects on
---   SW22 link to the PC over USB instead of the J5 cable (test with
+-- Slide switches (a row of 16; left = SW22 ... right = SW2). Like a
+-- two-sided controller: the left 8 are the chaos task switches, the right
+-- end holds the settings, and SW8..SW10 are left free as a gap.
+--   SW22 SW21 SW19 SW17 SW15 SW13 SW12 SW11   task switches (bit 7 .. bit 0)
+--   SW7  link to the PC over USB instead of the J5 cable (test with
 --        tools\fake_opponent.py, the PC plays the other board)
---   SW21 CHAOS on (tasks + attacks)
---   SW6..SW13  the task switches (SW13 = left of the panel picture, bit 7)
+--   SW6  CHAOS on (tasks + attacks)
+--   SW5  sound effects on    SW4  music on    SW2  pause (rightmost)
+--   All slide switches go through switch_filter (bounce removed).
 --
 -- Versus rules: clearing 2 / 3 / 4 lines sends 1 / 2 / 4 garbage lines.
 -- Lines you clear first cancel garbage waiting for you (red meter left of
@@ -51,7 +56,8 @@ entity top_tetris is
     DEBOUNCE_CYCLES   : integer := 250_000;       -- 5 ms; testbenches use less
     LINK_CLKS_PER_BIT : integer := CLKS_PER_BIT;  -- 115200 baud
     CHAOS_FIRST_DELAY : integer := 600;           -- frames until the first task
-    CHAOS_FORCE_TASK  : integer := -1             -- testbenches: always this task
+    CHAOS_FORCE_TASK  : integer := -1;            -- testbenches: always this task
+    SW_TICK_CYCLES    : integer := 50_000         -- switch_filter sample: 1 ms
   );
   port (
     clk       : in  std_logic;                       -- H11
@@ -63,9 +69,9 @@ entity top_tetris is
     sw_pause  : in  std_logic;                       -- K11 SW2
     sw_music  : in  std_logic;                       -- M11 SW4
     sw_sfx    : in  std_logic;                       -- N14 SW5
-    sw_usb    : in  std_logic;                       -- J1  SW22
-    sw_chaos  : in  std_logic;                       -- K3  SW21
-    sw_task   : in  std_logic_vector(7 downto 0);    -- SW13..SW6
+    sw_usb    : in  std_logic;                       -- N10 SW7
+    sw_chaos  : in  std_logic;                       -- P12 SW6
+    sw_task   : in  std_logic_vector(7 downto 0);    -- SW22 (bit 7, leftmost) .. SW11 (bit 0)
     link_tx   : out std_logic;                       -- L14 J5 pin 5
     link_rx   : in  std_logic;                       -- M13 J5 pin 6
     usb_tx    : out std_logic;                       -- F2  to the PC
@@ -92,7 +98,7 @@ architecture rtl of top_tetris is
 
   -- inputs
   signal btns        : std_logic_vector(4 downto 0);
-  signal sw_raw, sw_s1, sw_s : std_logic_vector(12 downto 0) := (others => '0');
+  signal sw_raw, sw_s : std_logic_vector(12 downto 0);
   signal pause_s, music_s, sfx_s, usb_s, chaos_s : std_logic;
   signal task_sw     : std_logic_vector(7 downto 0);
   signal a_left, a_right, a_rot, a_soft, a_hard : std_logic;
@@ -111,6 +117,7 @@ architecture rtl of top_tetris is
   signal next_shape  : shape_t;
   signal next_color  : color_t;
   signal playing     : std_logic;
+  signal can_start   : std_logic;
   signal game_over   : std_logic;
   signal lines_bcd   : std_logic_vector(15 downto 0);
   signal level       : integer range 0 to 15;
@@ -166,15 +173,12 @@ begin
   -- buttons, in the order tetris_input expects
   btns <= btn_hard & btn_soft & btn_rot & btn_right & btn_left;
 
-  -- slide switches are outside the clock's world: synchronise them
+  -- slide switches are outside the clock's world and they bounce:
+  -- synchronise and clean them
   sw_raw <= sw_task & sw_chaos & sw_usb & sw_sfx & sw_music & sw_pause;
-  process(clk)
-  begin
-    if rising_edge(clk) then
-      sw_s1 <= sw_raw;
-      sw_s  <= sw_s1;
-    end if;
-  end process;
+  u_sw : entity work.switch_filter
+    generic map (N => 13, TICK_CYCLES => SW_TICK_CYCLES)
+    port map (clk => clk, sw_in => sw_raw, sw_out => sw_s);
   pause_s <= sw_s(0);
   music_s <= sw_s(1);
   sfx_s   <= sw_s(2);
@@ -218,12 +222,12 @@ begin
       occ => occ, colf => colf,
       cur_shape => cur_shape, cur_color => cur_color, cur_x => cur_x, cur_y => cur_y,
       ghost_y => ghost_y, next_shape => next_shape, next_color => next_color,
-      playing => playing, game_over => game_over,
+      playing => playing, can_start => can_start, game_over => game_over,
       lines_bcd => lines_bcd, level => level,
       clear_evt => clear_evt, clear_n => clear_n
     );
 
-  -- the link: listen on the J5 cable, or on the USB serial port when SW22 is
+  -- the link: listen on the J5 cable, or on the USB serial port when SW7 is
   -- on. Send on both (whoever isn't listening just ignores it).
   rx_line <= usb_rx when usb_s = '1' else link_rx;
   link_tx <= tx_line;
@@ -289,7 +293,7 @@ begin
       occ => occ, colf => colf,
       cur_shape => cur_shape, cur_color => cur_color, cur_x => cur_x, cur_y => cur_y,
       ghost_y => ghost_y, next_shape => next_shape, next_color => next_color,
-      playing => playing, game_over => game_over, paused => pause_s, level => level,
+      playing => playing, can_start => can_start, game_over => game_over, paused => pause_s, level => level,
       lines_bcd => lines_bcd, result => result, pending => pending,
       opp_height => opp_height, link_ok => link_ok,
       fx_flip => fx_flip, fx_blind => fx_blind, ov_on => ov_on, ov_rgb => ov_rgb,

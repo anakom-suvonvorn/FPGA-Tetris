@@ -31,18 +31,22 @@ The 5 push buttons form a cross:
 |---|---|
 | SW14 (left) | move left (hold = keeps moving) |
 | SW16 (top) | rotate clockwise |
-| SW18 (centre) | hard drop; **also starts a round (on both boards in versus)** |
+| SW18 (centre) | hard drop; **also starts a round (on both boards in versus)**, from 1.5 s after the last round ended (PRESS START shows when it's allowed) |
 | SW20 (right) | move right (hold = keeps moving) |
 | SW23 (bottom) | soft drop (hold) |
+
+All settings are on the far right of the row of 16 slide switches, so they
+are out of the way. Slide switches are debounced (`switch_filter`), and held
+halfway they read as off.
 
 | Slide switch | Up (on) means |
 |---|---|
 | SW2 | pause |
 | SW4 | music (Tetris theme) |
 | SW5 | sound effects |
-| SW22 | link to the PC over USB instead of the J5 cable |
-| SW21 | **CHAOS** on (tasks + attacks) |
-| SW6..SW13 | the task switches (SW13 = left in the panel picture) |
+| SW7 | link to the PC over USB instead of the J5 cable |
+| SW6 | **CHAOS** on (tasks + attacks) |
+| SW22 SW21 SW19 SW17 SW15 SW13 SW12 SW11 | the 8 task switches: the 8 leftmost on the board, same order as in the panel picture |
 
 ## The screen
 
@@ -74,18 +78,18 @@ The 5 push buttons form a cross:
   practically the same instant, before either LOST message arrives: DRAW.
 * SW18 after a round starts the next one on both boards.
 
-## CHAOS (SW21 up)
+## CHAOS (SW6 up)
 
 The right side only says **CHAOS MODE ON**. At a random moment (every
 10–17 s) a task pops up in a purple panel there, with a sound; the
-7-segment display counts down its seconds. Do it with **SW6..SW13** (SW13 =
-leftmost) while you keep playing. Every time is random within a range.
+7-segment display counts down its seconds. Do it with the **8 leftmost switches** (SW22 =
+leftmost ... SW11) while you keep playing. Every time is random within a range.
 
 | Task | Do this |
 |---|---|
 | FLIP | flip the shown switch 10 times |
 | MATCH | copy the 8 lights onto the switches |
-| BINARY | set the number in binary (SW13 = 128 ... SW6 = 1) |
+| BINARY | set the number in binary (SW22 = 128 ... SW11 = 1) |
 | HEX | set the 2 hex digits in binary (`A4` = 1010 0100) |
 | HANDS | don't touch any button for 3–5 s (the panel says how long) |
 | HOLD | keep the bar in the green for 3–4 s: the switch pushes it up, it falls by itself |
@@ -111,11 +115,11 @@ Same as test 04 (test that first):
    J5 pin 2  (GND) -------------------------  J5 pin 2  (GND)
 ```
 
-SW22 down (off) on both boards. Within half a second both show **LINKED**.
+SW7 down (off) on both boards. Within half a second both show **LINKED**.
 
 ## Testing versus with ONE board (the PC plays the other board)
 
-1. Load the game, put **SW22 up** (link over USB).
+1. Load the game, put **SW7 up** (link over USB).
 2. Close PuTTY and the VS Code serial monitor (only one program can use COM3).
 3. Run: `python tools\fake_opponent.py COM3`. The board shows **LINKED**,
    and the RIVAL bar follows the PC's height.
@@ -126,7 +130,7 @@ SW22 down (off) on both boards. Within half a second both show **LINKED**.
    * `l` the PC loses → the board shows **WIN!**;
    * `a` auto mode: the PC's stack grows and it sends random garbage;
    * `x 4` attack the board with the OIIA cat (`x 0`..`x 8`: all 9 attacks,
-     `x 8` = LOCK; needs SW21 up on the board);
+     `x 8` = LOCK; needs SW6 up on the board);
    * clear 2+ lines on the board → the PC prints "board sends n garbage".
 
 ## Sound

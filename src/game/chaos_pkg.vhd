@@ -18,7 +18,7 @@
 --
 -- NUMBERS
 --   tasks   0 FLIP     flip one switch 10 times                   (7-9 s)
---           1 MATCH    copy a pattern of 8 lights with SW6..SW13  (10-13 s)
+--           1 MATCH    copy a pattern of 8 lights with SW22..SW11 (10-13 s)
 --           2 BINARY   set a decimal number in binary             (13-17 s)
 --           3 HANDS    don't touch any button for 3-5 seconds     (9-12 s)
 --           4 HOLD     keep a bar in the green zone for 3-4 s     (13-16 s)

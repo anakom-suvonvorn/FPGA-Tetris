@@ -6,7 +6,7 @@
 --   Two states:
 --     WAIT  count down a random 10..17 s (nothing is shown: it's a surprise)
 --     RUN   one task is running; it either succeeds or its time runs out
---   Every task works on the 8 task switches sw(7..0) = SW13..SW6, and keeps
+--   Every task works on the 8 task switches sw(7..0) = SW22..SW11, and keeps
 --   a few numbers that chaos_render draws in the right panel:
 --     sel       which switch the task is about (FLIP, HOLD, TIMING)
 --     target    the pattern (MATCH) or the number (BINARY, HEX)
@@ -45,7 +45,7 @@ entity chaos_task is
     paused      : in  std_logic;
     versus      : in  std_logic;                      -- a rival is connected
     hurry       : in  std_logic;                      -- LOCK attack: a task now, please
-    sw          : in  std_logic_vector(7 downto 0);   -- SW13..SW6, synchronised
+    sw          : in  std_logic_vector(7 downto 0);   -- SW22..SW11, debounced
     touch       : in  std_logic;                      -- any button action (pulse)
     -- for the panel
     active      : out std_logic;                      -- a task is running
