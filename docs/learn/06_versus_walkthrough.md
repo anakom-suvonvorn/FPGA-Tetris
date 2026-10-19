@@ -25,7 +25,7 @@ Contents:
 ## 6.0 What changed
 
 ```
-                                     J5 cable or USB (SW22)
+                                     J5 cable or USB (SW7) 
                                           ▲      │
                                     tx    │      ▼  rx
  buttons ─► tetris_input ─► tetris_core ◄──► versus_link        (NEW)
@@ -136,26 +136,35 @@ is out or the other board is off. Then the core plays single player.
 | `garb_in` + `garb_in_n`: garbage arrived | `garb_out` + `garb_out_n`: send this garbage |
 | `opp_lost`: the other board topped out | `height`, `pending`, `result` |
 
-`result` (L164–168): 0 nothing, 1 WIN, 2 LOSE, 3 DRAW, 4 GAME OVER
+`result` (L170–174): 0 nothing, 1 WIN, 2 LOSE, 3 DRAW, 4 GAME OVER
 (single player).
 
-### Starting together (S_IDLE, L280)
+### Starting together (S_IDLE, L296)
 
 Pressing start on either board sends START (`start_o` pulse → link →
 cable). The other board's `start_in` makes it leave S_IDLE too. Both
 boards start within ~0.1 ms of each other. A START that arrives while
 already playing is ignored, because only S_IDLE looks at it.
 
-### `pending`: garbage waiting for me (L251–256, L638–642)
+**Cool-down.** Found playing on two boards: you press hard drop, and in that
+same moment the rival tops out. Your board jumps to WIN and the hard drop
+lands in S_IDLE, which starts the next round on both boards. So for 1.5 s
+after a game ends, S_IDLE ignores the buttons (Part 5, S_IDLE). A START
+message from the other board is still accepted: that board has the same
+cool-down, so it can only send START once its 1.5 s are over too.
+`tb_versus` checks both: a press 5 frames after the end does nothing, a
+press after the cool-down starts both boards.
+
+### `pending`: garbage waiting for me (L257–262, L660–664)
 
 `pending_r` holds the number of garbage lines that arrived but haven't come
 in yet (the red meter). Up to three things change it in one clock:
 S_INIT (→ 0), S_ATTACK (cancel / take some out), and new garbage arriving.
 So, like `gsum` above, the process copies it into variable `p` at the start
-(L256), every part works on `p`, and the end of the process writes it back
-once (L642), after adding newly arrived garbage (L638–641).
+(L262), every part works on `p`, and the end of the process writes it back
+once (L664), after adding newly arrived garbage (L660–663).
 
-### S_ATTACK (L559): turning lines into garbage
+### S_ATTACK (L581): turning lines into garbage
 
 Runs after S_SCORE, every time a piece locks.
 
@@ -183,7 +192,7 @@ Then: anything left to send → `garb_out` pulse. And if I **cleared
 nothing** while garbage waits, up to `MAX_GARB_PER_LOCK` (8) lines come in
 now → S_HOLE.
 
-### S_HOLE (L587) and S_GARB (L596): garbage rising from the bottom
+### S_HOLE (L609) and S_GARB (L618): garbage rising from the bottom
 
 S_HOLE picks the hole column, a random 0..9 from the LFSR (4 bits, retry if
 ≥ 10, the same trick as S_PICK).
@@ -212,7 +221,7 @@ anything, shifting would push it off the field, so **I lose**.
 * **Lose** (no room to spawn, or garbage push-out): `over_r`, `playing_r = 0`,
   `lost_o` pulse (→ LOST message), `result_r` = LOSE (or GAME OVER if no
   link), `lose_age = 0`.
-* **Win** (L621): when `opp_lost` arrives while I'm playing → `result_r = WIN`,
+* **Win** (L643): when `opp_lost` arrives while I'm playing → `result_r = WIN`,
   stop, go to S_IDLE. This is written **after** the `case`, so it overrides
   whatever state the `case` chose in that clock ("last assignment wins").
   Receiving LOST means "you won", **at once**: the game stops in that clock,
@@ -242,7 +251,7 @@ anything, shifting would push it off the field, so **I lose**.
   alone and loses much later, that late LOST must not turn my old LOSE into
   a DRAW.
 
-### Stack height (L646–660)
+### Stack height (L668–682)
 
 A separate clocked process scans rows 19 → 0. Each non-empty row
 overwrites `h`, so after the loop `h` = 20 − (highest non-empty row).
@@ -301,24 +310,24 @@ each character 24 × 32, 4 characters = 96 px wide.
 
 New inputs: `lines_bcd`, `result`, `pending`, `opp_height`, `link_ok`.
 
-**Nine text layers** (L138–155), each a separate copy of `text_layer`
+**Nine text layers** (L139–156), each a separate copy of `text_layer`
 placed at a fixed spot: NEXT, LEVEL, LINES, the line number, RIVAL, the link
 status, PRESS START, the result word, GAME OVER. Fixed text comes from
 constants (`TXT_NEXT`...), because VHDL-93 doesn't allow a function call in
 a port map (our rule from Part 1). Changing text is chosen by signals:
 
-* `num_chars` (L129): the 4 BCD digits, with "00" added to make 6-bit codes.
-* `link_chars` (L131): " LINKED" or "NO LINK".
-* `res_chars` (L132): "WIN!" / "LOSE" / "DRAW" chosen with `with result select`.
+* `num_chars` (L130): the 4 BCD digits, with "00" added to make 6-bit codes.
+* `link_chars` (L132): " LINKED" or "NO LINK".
+* `res_chars` (L133): "WIN!" / "LOSE" / "DRAW" chosen with `with result select`.
 
 **Stage 1 additions:**
-* garbage meter (L239): the 8 px column left of the field, filled
+* garbage meter (L240): the 8 px column left of the field, filled
   if `y ≥ 400 − 16 × pending`, so it grows upwards, 16 px per waiting line;
-* rival bar (L252): same idea with `opp_height`;
-* dark bands (L265): rows behind the result text and PRESS START, so the
+* rival bar (L253): same idea with `opp_height`;
+* dark bands (L266): rows behind the result text and PRESS START, so the
   text is readable over blocks.
 
-**Stage 2 additions** (L315 on): inside the field, the banner is drawn
+**Stage 2 additions** (L316 on): inside the field, the banner is drawn
 *last*, so it covers blocks. Result colours: gold WIN!, red LOSE / GAME
 OVER, white DRAW. The field frame turns gold when you win. Outside the
 field, new layers: the meter (red on dark red), the rival bar (grey, red
@@ -447,9 +456,11 @@ output keeps correcting itself and never drifts from the right average.
 ## 6.6 `top_tetris.vhd`
 
 * **Generic `LINK_CLKS_PER_BIT`**: 434 normally (115200 baud).
-* **Four switches** through one 2-FF synchronizer as a 4-bit bus (L127):
-  pause, music, sound effects, and SW22 = "use USB".
-* **Link source** (L165): `rx_line <= usb_rx when usb_s = '1' else link_rx;`.
+* **Four switches** through `switch_filter` as a 4-bit bus (L131–136):
+  pause (SW2), music (SW4), sound effects (SW5), and SW7 = "use USB". All
+  settings sit at the right end of the row of slide switches (SW7 was SW22
+  before the switch re-layout).
+* **Link source** (L167): `rx_line <= usb_rx when usb_s = '1' else link_rx;`.
   A 2-to-1 mux picks which wire the link listens to. It *sends* on both
   wires always: the J5 pin and the USB line. Nobody listening is harmless.
 * **Pull-ups** in `pins.xdc` on both receive pins: an unplugged J5 pin then
@@ -508,11 +519,11 @@ every 0.1 s, another prints what the board sends, and you type commands
 
 ## 6.8 Try it on the board
 
-1. **One board + PC:** load `game`, SW22 up, run
+1. **One board + PC:** load `game`, SW7 up, run
    `python tools\fake_opponent.py COM3`. LINKED appears; try `g 3`, `h 15`,
    `l`, and clear 2 lines yourself.
 2. **Two boards:** run test 04 first (cable check), then load `game` on both,
-   SW22 down, wire J5 as in `game/README.md`, press SW18 on either board.
+   SW7 down, wire J5 as in `game/README.md`, press SW18 on either board.
 3. **Sound:** headphones / speakers in the audio jack, SW4 + SW5 up.
 
 Next layer: **chaos**. The free message types 100..111 will carry attacks

@@ -31,16 +31,20 @@ The 5 push buttons form a cross:
 |---|---|
 | SW14 (left) | move left (hold = keeps moving) |
 | SW16 (top) | rotate clockwise |
-| SW18 (centre) | hard drop; **also starts a round (on both boards in versus)** |
+| SW18 (centre) | hard drop; **also starts a round (on both boards in versus)**, from 1.5 s after the last round ended (PRESS START shows when it's allowed) |
 | SW20 (right) | move right (hold = keeps moving) |
 | SW23 (bottom) | soft drop (hold) |
+
+All settings are on the far right of the row of 16 slide switches, so they
+are out of the way. Slide switches are debounced (`switch_filter`), and held
+halfway they read as off.
 
 | Slide switch | Up (on) means |
 |---|---|
 | SW2 | pause |
 | SW4 | music (Tetris theme) |
 | SW5 | sound effects |
-| SW22 | link to the PC over USB instead of the J5 cable |
+| SW7 | link to the PC over USB instead of the J5 cable |
 
 ## The screen
 
@@ -83,11 +87,11 @@ Same as test 04 (test that first):
    J5 pin 2  (GND) -------------------------  J5 pin 2  (GND)
 ```
 
-SW22 down (off) on both boards. Within half a second both show **LINKED**.
+SW7 down (off) on both boards. Within half a second both show **LINKED**.
 
 ## Testing versus with ONE board (the PC plays the other board)
 
-1. Load the game, put **SW22 up** (link over USB).
+1. Load the game, put **SW7 up** (link over USB).
 2. Close PuTTY and the VS Code serial monitor (only one program can use COM3).
 3. Run: `python tools\fake_opponent.py COM3`. The board shows **LINKED**,
    and the RIVAL bar follows the PC's height.

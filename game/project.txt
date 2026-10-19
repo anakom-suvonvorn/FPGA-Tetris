@@ -6,6 +6,7 @@ src/common/common_pkg.vhd
 src/game/tetris_pkg.vhd
 src/game/text_pkg.vhd
 src/common/debounce.vhd
+src/common/switch_filter.vhd
 src/common/seg7_scan.vhd
 src/common/vga_sync.vhd
 src/common/uart_tx.vhd

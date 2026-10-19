@@ -7,10 +7,10 @@ set_property -dict { PACKAGE_PIN J13  IOSTANDARD LVCMOS33 } [get_ports {btn_rot}
 set_property -dict { PACKAGE_PIN J12  IOSTANDARD LVCMOS33 } [get_ports {btn_hard}]   ;# push button SW18 (centre of the cross)
 set_property -dict { PACKAGE_PIN L13  IOSTANDARD LVCMOS33 } [get_ports {btn_soft}]   ;# push button SW23 (bottom of the cross)
 set_property -dict { PACKAGE_PIN J11  IOSTANDARD LVCMOS33 } [get_ports {btn_right}]   ;# push button SW20 (right of the cross)
-set_property -dict { PACKAGE_PIN K11  IOSTANDARD LVCMOS33 } [get_ports {sw_pause}]   ;# slide switch SW2
-set_property -dict { PACKAGE_PIN M11  IOSTANDARD LVCMOS33 } [get_ports {sw_music}]   ;# slide switch SW4: music on
-set_property -dict { PACKAGE_PIN N14  IOSTANDARD LVCMOS33 } [get_ports {sw_sfx}]   ;# slide switch SW5: sound effects on
-set_property -dict { PACKAGE_PIN J1   IOSTANDARD LVCMOS33 } [get_ports {sw_usb}]   ;# slide switch SW22: link via USB (PC)
+set_property -dict { PACKAGE_PIN K11  IOSTANDARD LVCMOS33 PULLDOWN true } [get_ports {sw_pause}]   ;# slide switch SW2
+set_property -dict { PACKAGE_PIN M11  IOSTANDARD LVCMOS33 PULLDOWN true } [get_ports {sw_music}]   ;# slide switch SW4: music on
+set_property -dict { PACKAGE_PIN N14  IOSTANDARD LVCMOS33 PULLDOWN true } [get_ports {sw_sfx}]   ;# slide switch SW5: sound effects on
+set_property -dict { PACKAGE_PIN N10  IOSTANDARD LVCMOS33 PULLDOWN true } [get_ports {sw_usb}]   ;# slide switch SW7: link via USB (PC)
 set_property -dict { PACKAGE_PIN L14  IOSTANDARD LVCMOS33 } [get_ports {link_tx}]   ;# J5 pin 5: to the other board
 set_property -dict { PACKAGE_PIN M13  IOSTANDARD LVCMOS33 PULLUP true } [get_ports {link_rx}]   ;# J5 pin 6: from the other board (pull-up: unplugged = idle)
 set_property -dict { PACKAGE_PIN F2   IOSTANDARD LVCMOS33 } [get_ports {usb_tx}]   ;# USB serial, to the PC

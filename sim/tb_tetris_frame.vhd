@@ -2,7 +2,7 @@
 -- tb_tetris_frame.vhd  -  "screenshots" of Tetris Duel, no monitor needed
 --
 -- Simulates the whole top_tetris (with a very short debounce). A pretend PC
--- is connected to the USB serial input (SW22 on) and plays the other board:
+-- is connected to the USB serial input (SW7 on) and plays the other board:
 -- it sends heartbeats (rival stack height 9), and before the first
 -- screenshot it sends 3 garbage lines (they wait in the red meter).
 -- The robot player presses the buttons to start and drop a few pieces.
@@ -49,7 +49,7 @@ begin
   clk <= not clk after 10 ns when not done else clk;
 
   dut : entity work.top_tetris
-    generic map (DEBOUNCE_CYCLES => 20)
+    generic map (DEBOUNCE_CYCLES => 20, SW_TICK_CYCLES => 50)
     port map (clk => clk, btn_left => b_left, btn_rot => b_rot, btn_hard => b_hard,
               btn_soft => b_soft, btn_right => b_right,
               sw_pause => '0', sw_music => '1', sw_sfx => '1', sw_usb => '1',

@@ -1,12 +1,13 @@
 # Part 2: The building blocks, line by line (`src/common/`)
 
-These six files are the "parts library" every design uses. Open each file
+These seven files are the "parts library" every design uses. Open each file
 next to this page. Line numbers (`L12`) refer to the file as it is now.
 Skipped lines are comments or blank.
 
 Order: [common_pkg](#21-common_pkgvhd) → [debounce](#22-debouncevhd) →
 [seg7_scan](#23-seg7_scanvhd) → [vga_sync](#24-vga_syncvhd) →
-[uart_tx](#25-uart_txvhd) → [uart_rx](#26-uart_rxvhd)
+[uart_tx](#25-uart_txvhd) → [uart_rx](#26-uart_rxvhd) →
+[switch_filter](#27-switch_filtervhd)
 
 ---
 
@@ -720,5 +721,59 @@ L103   valid <= valid_r;
 simulation proves the *logic*. It can't prove that the FPGA pin we named is
 the one the USB chip is really wired to. That's what test 05 checks on the
 board.
+
+---
+
+## 2.7 `switch_filter.vhd`
+
+Added after the first two-board games: flipping a slide switch quickly (or
+holding it halfway) could look like many flips, which made the chaos FLIP
+task trivial. Two causes:
+
+* **Bounce.** Like a button, a switch contact chatters for a few ms when it
+  moves (Part 2.2 shows what that looks like).
+* **Halfway = not connected.** A slide switch connects its middle pin to
+  either 3.3 V or 0 V. In between it touches neither, the FPGA pin "floats"
+  and reads whatever noise is around. Fix in `pins.xdc`: `PULLDOWN true` on
+  every slide switch pin, a weak resistor inside the FPGA that pulls a
+  floating pin to 0. A real switch position easily overpowers it.
+
+The filter is an **integrator**: it adds up evidence instead of reacting
+to single samples.
+
+```vhdl
+L27  generic (N : integer := 4; TICK_CYCLES : integer := 50_000; LIMIT : integer := 10);
+```
+`N` switches at once; one sample every `TICK_CYCLES` clocks (1 ms); `LIMIT`
+samples to change the output.
+
+```vhdl
+L50  s1 <= sw_in;  s2 <= s1;
+```
+The usual 2-flip-flop synchroniser (Part 1): from here on `s2` is safe.
+
+```vhdl
+L52  if tick_n = TICK_CYCLES - 1 then        -- once per millisecond
+L55    if s2(i) = '1' then
+L56      if cnt(i) = LIMIT then q(i) <= '1'; else cnt(i) <= cnt(i) + 1; end if;
+L57    else
+L58      if cnt(i) = 0 then q(i) <= '0'; else cnt(i) <= cnt(i) - 1; end if;
+```
+Each switch has a counter `cnt` between 0 and 10. A 1 sample moves it up, a
+0 sample moves it down. The output `q` only turns on when the counter is
+full and only turns off when it is empty. A clean flip from 0 to 1 takes
+11 ms to come through. During bounce the samples are a mix of 0s and 1s:
+the counter wanders up and down but needs **10 more** samples of the new
+position than of the old one before the output moves. So one flip always
+gives exactly one change, and noise never gets through.
+
+Compare with `debounce.vhd` (buttons): that one waits for the input to be
+*perfectly* stable for 5 ms, and restarts its wait on every flicker. Both
+work; the integrator is cheaper for many inputs (one shared millisecond
+counter, a 4-bit counter per switch) and still settles while the noise
+continues.
+
+Tested by `sim/tb_switch_filter.vhd`: 10 flips with random bounce → exactly
+10 output changes. **TEST PASSED.**
 
 Next: [Part 3: the test designs and testbenches](03_tests_walkthrough.md)

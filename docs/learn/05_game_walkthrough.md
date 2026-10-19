@@ -359,7 +359,7 @@ Soft drop (DAS = 2, ARR = 2): acts on the press, then every 2 frames.
 
 The biggest file. Read its header (L1–39) first, then this section.
 
-### The ports (L45–89)
+### The ports (L45–93)
 
 **In:** clock, frame tick, pause, and the five action pulses.
 **Out:** everything the renderer needs (field, piece shape/colour/position,
@@ -371,12 +371,12 @@ it cleared). Versus mode will use that pulse to send garbage to the opponent.
 800 wires. Allowed because both sides `use work.tetris_pkg.all` and so
 agree on the type.
 
-### The registers (L93–173)
+### The registers (L97–179)
 
 ```vhdl
-L93  type state_t is (S_IDLE, S_INIT, S_PICK, ..., S_GARB);   -- 21 states (3 of them for versus, Part 6)
-L100  signal occ_r : occ_field_t := (others => (others => '0'));
-L101  signal col_r : col_field_t := (others => (others => '0'));
+L97  type state_t is (S_IDLE, S_INIT, S_PICK, ..., S_GARB);   -- 21 states (3 of them for versus, Part 6)
+L104  signal occ_r : occ_field_t := (others => (others => '0'));
+L105  signal col_r : col_field_t := (others => (others => '0'));
 ```
 
 `(others => (others => '0'))`: a nested aggregate: "every row = (every bit
@@ -397,14 +397,14 @@ The rest, grouped:
 | score | `lines_r` (BCD), `level_r`, `lvl_cnt`, `evt_r`, `evt_n` | |
 | flags | `playing_r`, `over_r` | |
 
-### Idea 1: "try" with one collision checker (L178–203, L243)
+### Idea 1: "try" with one collision checker (L184–209, L249)
 
 Almost every rule is "**would the piece fit there?**": moving, rotating,
 falling, spawning, finding the ghost. The core has exactly **one** circuit
 that answers it:
 
 ```vhdl
-L243  collide <= collides(occ_r, cand_sh, cand_x, cand_y);
+L249  collide <= collides(occ_r, cand_sh, cand_x, cand_y);
 ```
 
 It always looks at the **candidate** registers. To test a position, a state
@@ -424,24 +424,24 @@ would need five or more copies, plus the ghost would need up to 20 copies
 (one per row). Since we have 833,333 clocks per frame, it's far cheaper to
 build one checker and ask it questions one after another.
 
-### The `collides` function, step by step (L178–203)
+### The `collides` function, step by step (L184–209)
 
 ```vhdl
-L183  for r in 0 to 3 loop                 -- each row of the 4x4 box
-L184    ry := y + r;                       -- which board row that is
-L185    if ry > ROWS - 1 then
-L186      wide := (others => '1');         -- below the floor: solid
-L187    elsif ry < 0 then
-L188      wide := "1110000000000111";      -- above the top: only walls
-L189    else
-L190      wide := "111" & o(ry) & "111";   -- walls + the real field row
-L191    end if;
-L192    for c in 0 to 3 loop               -- each column of the box
-L193      if sh(4*r + c) = '1' then        -- the piece has a block here
-L194        if x + c < 0 or x + c > 15 then
-L195          hit := '1';                  -- outside even the walls
-L196        elsif wide(x + c) = '1' then
-L197          hit := '1';                  -- block meets wall/floor/cell
+L189  for r in 0 to 3 loop                 -- each row of the 4x4 box
+L190    ry := y + r;                       -- which board row that is
+L191    if ry > ROWS - 1 then
+L192      wide := (others => '1');         -- below the floor: solid
+L193    elsif ry < 0 then
+L194      wide := "1110000000000111";      -- above the top: only walls
+L195    else
+L196      wide := "111" & o(ry) & "111";   -- walls + the real field row
+L197    end if;
+L198    for c in 0 to 3 loop               -- each column of the box
+L199      if sh(4*r + c) = '1' then        -- the piece has a block here
+L200        if x + c < 0 or x + c > 15 then
+L201          hit := '1';                  -- outside even the walls
+L202        elsif wide(x + c) = '1' then
+L203          hit := '1';                  -- block meets wall/floor/cell
 ```
 
 For each of the 4 box rows, build a 16-bit "wide row": 3 wall bits, the 10
@@ -467,13 +467,13 @@ In hardware the two loops are unrolled (copied 4×4 times). `o(ry)` with a
 variable `ry` is a 20-to-1 mux of 10-bit rows; `wide(x + c)` is a 16-to-1
 mux of single bits.
 
-### Idea 2: requests vs. this frame's work (L131–134, L271–275, L357–378)
+### Idea 2: requests vs. this frame's work (L135–138, L287–291, L379–400)
 
 Button pulses can arrive at **any clock**, but the rules run once per frame.
 So each action has two flags:
 
 ```vhdl
-L271  if act_left = '1' then req_left <= '1'; end if;     -- (and the other 4)
+L287  if act_left = '1' then req_left <= '1'; end if;     -- (and the other 4)
 ```
 
 At the very top of the clocked process, outside the `case`: any action
@@ -481,7 +481,7 @@ pulse sets its `req_` flag ("requested"), whatever state we're in. It stays
 `'1'` until used.
 
 ```vhdl
-L357  when S_PLAY =>
+L379  when S_PLAY =>
         if frame_tick = '1' and pause = '0' then
           w_left  <= req_left  or act_left;     -- take this frame's actions...
           ...
@@ -529,20 +529,29 @@ state <= S_ROT;
 Each `when` below is one box. Every "skip" path (button not pressed) just
 moves to the next box, so a quiet frame takes only a handful of clocks.
 
-#### S_IDLE (L280): title / game over
+#### S_IDLE (L296): title / game over
 
 Waits for a hard-drop (or rotate) request, then S_INIT. At power-up the field
 is empty and the frame is green. After a game over the field keeps its
 blocks (shown grey). In versus it also leaves when the other board's START
 message arrives, and pressing start sends START (Part 6 §6.2).
 
-#### S_INIT (L288): new game
+**Cool-down** (L269–278, L297–302): when a game ends, presses are ignored
+for 1.5 s (`COOLDOWN_FRAMES` = 90 frames), so a hard drop that was on its way
+when the game ended doesn't start the next one. `cool` is loaded when
+`playing_r` goes from 1 to 0 (`playing_d` is `playing_r` one clock ago: the
+same edge-detector trick as the buttons), wherever in the state machine the
+game ended. While `cool > 0`, S_IDLE throws the requests away (otherwise the
+press would be remembered and start the game the moment the cool-down
+ends). `can_start` (L702) tells the renderer when to show PRESS START.
+
+#### S_INIT (L310): new game
 
 Clears both field arrays in **one clock** (`occ_r <= (others => EMPTY_OCC)`
 loads 0 into all 800 flip-flops at once), resets lines, level, bag and all
 requests, sets `playing_r`.
 
-#### S_PICK (L309): the 7-bag randomiser
+#### S_PICK (L331): the 7-bag randomiser
 
 ```vhdl
 rnd := to_integer(unsigned(lfsr(2 downto 0)));       -- random 0..7
@@ -555,7 +564,7 @@ if rnd < 7 then
     next_p <= rnd;                                   -- new one waits
 ```
 
-**The random source:** `lfsr` (L266) is a 16-bit *linear feedback shift
+**The random source:** `lfsr` (L282) is a 16-bit *linear feedback shift
 register*: each clock it shifts left and the new bit 0 is the XOR of bits
 15, 13, 12, 10. With these "taps" it goes through all 65,535 non-zero values
 before repeating. Not truly random, but it changes every 20 ns, and **when**
@@ -577,7 +586,7 @@ dozen. Nobody notices.
 first pick only fills `next_p` (`have_next <= '1'`, stay in S_PICK), the
 second pick moves it to `cur_p` and goes on.
 
-#### S_SPAWN / S_SPAWN_CHK (L329, L342)
+#### S_SPAWN / S_SPAWN_CHK (L351, L364)
 
 Put the piece at rotation 0, position (6, 0), load `cur_sh` from the ROM,
 **and the same values into the candidate**, then reset the lock timers.
@@ -587,12 +596,12 @@ S_SPAWN_CHK reads `collide`: if the new piece overlaps the stack, there's no
 room: **game over** (`over_r`, back to S_IDLE; in versus it also sends LOST
 to the other board, Part 6). Otherwise go and compute the ghost.
 
-#### S_PLAY (L357): wait for the frame tick
+#### S_PLAY (L379): wait for the frame tick
 
 Explained above (Idea 2). While `pause = '1'` the tick is ignored, so the
 game freezes. Requests still pile up, which is harmless.
 
-#### S_ROT / S_ROT_CHK (L379, L392): rotate with wall kicks
+#### S_ROT / S_ROT_CHK (L401, L414): rotate with wall kicks
 
 ```vhdl
 when S_ROT =>
@@ -626,7 +635,7 @@ itself with a new `cand_x`. (Official SRS has bigger per-piece kick tables
 including upward kicks; ours is a simpler version that covers the common
 cases.)
 
-#### S_MOVE / S_MOVE_CHK (L410, L424): left / right
+#### S_MOVE / S_MOVE_CHK (L432, L446): left / right
 
 ```vhdl
 if (w_left xor w_right) = '1' then
@@ -636,7 +645,7 @@ Only if exactly one of them is pressed (both = cancel out). Candidate =
 1 column over; accept if no collision. Restarts the lock timer (with the
 15-reset limit).
 
-#### S_DOWN / S_DOWN_CHK (L435, L445): fall one row
+#### S_DOWN / S_DOWN_CHK (L457, L467): fall one row
 
 If gravity says so (`w_grav`) or soft drop is pressed, and it's **not** a
 hard drop: candidate = one row lower. If it fits, accept, and reset the
@@ -646,7 +655,7 @@ gravity counter, so the piece doesn't fall twice in a row.
 If it doesn't fit, nothing happens: the piece is resting on something, and
 S_LOCKCHK decides when it locks.
 
-#### S_GHOST / S_GHOST_CHK (L456, L462): how far could it fall?
+#### S_GHOST / S_GHOST_CHK (L478, L484): how far could it fall?
 
 ```vhdl
 when S_GHOST =>
@@ -666,7 +675,7 @@ simply jumps there. At most ~20 clocks.
 
 If `ghost_r = cur_yr`, the piece can't fall at all: it's **landed**.
 
-#### S_LOCKCHK (L471): lock now?
+#### S_LOCKCHK (L493): lock now?
 
 ```vhdl
 if w_hard = '1' then                  -- hard drop: jump to the ghost, lock
@@ -686,7 +695,7 @@ The **lock delay** gives the player half a second to slide a landed piece
 before it sticks: that's what makes fast levels playable. Since this state
 runs once per frame, `lock_cnt` counts frames.
 
-#### S_LOCK (L491): write the piece into the field (4 clocks)
+#### S_LOCK (L513): write the piece into the field (4 clocks)
 
 ```vhdl
 row  := cur_yr + lock_r;                         -- board row of box row lock_r
@@ -698,7 +707,7 @@ if row >= 0 and row <= ROWS - 1 then
       col_r(row)(3*c + 2 downto 3*c) <= std_logic_vector(to_unsigned(cur_p, 3));
 ```
 
-One box row per clock, `lock_r` = 0, 1, 2, 3. `placed_row` (L206) shifts the
+One box row per clock, `lock_r` = 0, 1, 2, 3. `placed_row` (L212) shifts the
 4 bits of box row `r` to their board columns: for each board column c, the
 box column above it is `j = c + 3 − x`; if j is 0..3, copy that shape bit.
 OR-ing it into the row adds the blocks without touching the others. The
@@ -712,7 +721,7 @@ clocks cost nothing.
 
 After the 4th row: set up the line clear (`rd = wr = 19`) → S_CLEAR.
 
-#### S_CLEAR (L515): remove full rows (one row per clock)
+#### S_CLEAR (L537): remove full rows (one row per clock)
 
 ```vhdl
 if rd >= 0 then
@@ -759,12 +768,12 @@ small hardware.
 At the end: `evt_r <= '1'` with `evt_n = cleared` → the `clear_evt` /
 `clear_n` outputs (for versus mode: "I cleared 2 lines").
 
-#### S_SCORE (L539): count lines, level up
+#### S_SCORE (L561): count lines, level up
 
 Adds the cleared lines **one per clock** (`score_left` counts down):
 `lines_r <= bcd_inc(lines_r)` and every 10th line `level_r + 1` (max 15).
 
-`bcd_inc` (L220) adds 1 to a 4-digit **BCD** number (each 4 bits = one
+`bcd_inc` (L226) adds 1 to a 4-digit **BCD** number (each 4 bits = one
 decimal digit 0..9; you did BCD in the labs): from the lowest digit up, a 9
 becomes 0 and carries, anything else gets +1 and stops. We keep the lines
 in BCD so the 7-segment display can show them directly, with no binary-to-
@@ -772,7 +781,7 @@ decimal converter (the "double dabble" from your lab).
 
 Then → S_ATTACK (turns cleared lines into garbage for the other board, Part 6 §6.2), and from there S_PICK for the next piece.
 
-### Outputs (L662–684)
+### Outputs (L684–707)
 
 Each internal register is copied to its out port (Part 1 rule: never read an
 out port, so the core keeps internal `_r` copies). `cur_color` is the piece
@@ -790,12 +799,12 @@ This section explains the playfield, next box and level squares. Versus
 added text, the garbage meter, the rival bar and the result banner to the
 same two stages: see Part 6 §6.4.
 
-### Layout constants (L73–84)
+### Layout constants (L74–85)
 
 ```vhdl
-L73  constant FX0 : integer := 240;  constant FY0 : integer := 80;    -- field
-L75  constant NX0 : integer := 432;  constant NY0 : integer := 80;    -- next piece
-L76  constant LX0 : integer := 432;  constant LY0 : integer := 176;   -- level squares
+L74  constant FX0 : integer := 240;  constant FY0 : integer := 80;    -- field
+L76  constant NX0 : integer := 432;  constant NY0 : integer := 80;    -- next piece
+L77  constant LX0 : integer := 432;  constant LY0 : integer := 176;   -- level squares
 ```
 
 All are **multiples of 16** on purpose: then "pixel position inside its cell"
@@ -822,7 +831,7 @@ the same 2 registers (`s1_hs` → `vga_hs`), so everything is delayed equally
 and the picture lines up perfectly. (The monitor can't tell: the whole image
 is just 2 clocks = 1 pixel "later", and the sync with it.)
 
-### Stage 1 (L158–281): what's under this pixel?
+### Stage 1 (L159–282): what's under this pixel?
 
 ```vhdl
 in_f := xi >= FX0 and xi < FX0 + FW and yi >= FY0 and yi < FY0 + FH;
@@ -868,7 +877,7 @@ is a 4 px border.
 Everything else (`s1_px`, `s1_py`, video_on, sync) is just copied into
 stage-1 registers.
 
-### Stage 2 (L284–395): choose the colour
+### Stage 2 (L285–396): choose the colour
 
 A priority list. The first match wins, like layers in a drawing program:
 
@@ -886,7 +895,7 @@ A priority list. The first match wins, like layers in a drawing program:
  otherwise            → background x"113" (dark blue)
 ```
 
-`bevel(c, px, py)` (L114): top/left pixel of a cell → `lighten(c)`,
+`bevel(c, px, py)` (L115): top/left pixel of a cell → `lighten(c)`,
 bottom/right → `darken(c)`, else `c`. That 1-pixel light/dark edge makes
 flat squares look like raised blocks.
 
@@ -897,17 +906,17 @@ into the output registers.
 
 ## 5.5 `top_tetris.vhd`: wiring it together
 
-The top is only wiring, plus a 2-FF synchronizer for the slide switches.
+The top is only wiring, plus `switch_filter` for the slide switches.
 (Versus added the link, sound, and three switches; Part 6 §6.6 covers those.)
 
-* **L40–70, ports:** clock, the 5 buttons, 4 slide switches, the link and USB
+* **L43–74, ports:** clock, the 5 buttons, 4 slide switches, the link and USB
   serial pins, audio, VGA, 7-segment. The generics `DEBOUNCE_CYCLES` and
   `LINK_CLKS_PER_BIT` let testbenches use smaller numbers.
-* **L74–116:** one signal per wire between the blocks. The array-type
+* **L78–121:** one signal per wire between the blocks. The array-type
   signals (`occ`, `colf`) carry 800 bits from core to renderer.
-* **L119:** `vga_sync`. `pix_en => open`: the renderer doesn't need it
+* **L124:** `vga_sync`. `pix_en => open`: the renderer doesn't need it
   (the 2-clock pixel just gets computed twice).
-* **L124:**
+* **L129:**
   ```vhdl
   btns <= btn_hard & btn_soft & btn_rot & btn_right & btn_left;
   ```
@@ -915,14 +924,15 @@ The top is only wiring, plus a 2-FF synchronizer for the slide switches.
   bit 4 = hard drop; `&` puts the leftmost item at the top bit). This is the
   one line to change if you want different buttons for different actions
   (or change the pins in `pins.xdc`).
-* **L127–138:** the 4 slide switches go through one 2-FF synchronizer as a
-  4-bit bus, then get names (`pause_s`, `music_s`, ...).
-* **L140–163:** `tetris_input` and `tetris_core`. Notice how every output of
+* **L131–140:** the 4 slide switches go through `switch_filter` (Part 2,
+  §2.7: synchroniser + bounce filter) as a 4-bit bus, then get names
+  (`pause_s`, `music_s`, ...).
+* **L142–165:** `tetris_input` and `tetris_core`. Notice how every output of
   the core goes on with the same name: `cur_x => cur_x`. Left of `=>` is the
   block's port, right is the top's signal. Same name on both sides keeps it
   readable.
-* **L165–199:** link and sound (Part 6), and `tetris_render` (L179).
-* **L201–208:** lines on the 7-segment display. Each BCD digit (4 bits) goes
+* **L167–201:** link and sound (Part 6), and `tetris_render` (L181).
+* **L203–210:** lines on the 7-segment display. Each BCD digit (4 bits) goes
   through `hex7` (Part 2 §2.1), and since a BCD digit is only ever 0..9, the
   hex decoder shows normal decimal digits.
 
