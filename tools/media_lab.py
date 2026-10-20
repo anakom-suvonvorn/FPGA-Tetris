@@ -511,9 +511,9 @@ def jevil_frames():
 
 
 def draw_jevil(img, frames, t):
-    """floats around the whole screen on a figure-of-eight; a new pose 20 times a second
-    (every 3rd screen frame)"""
-    rgb, alpha = frames[int(t * 20) % len(frames)]
+    """floats around the whole screen on a figure-of-eight; a new pose 16 times a second
+    (every 3.75 screen frames: the board alternates 4 and 3)"""
+    rgb, alpha = frames[int(t * 16) % len(frames)]
     h, w = alpha.shape
     x = int(320 - w / 2 + 230 * math.sin(2 * math.pi * t / 6.1))
     y = int(240 - h / 2 + 150 * math.sin(2 * math.pi * t / 3.7 + 0.6))
