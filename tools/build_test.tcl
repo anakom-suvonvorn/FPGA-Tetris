@@ -48,6 +48,7 @@ route_design
 
 # ---- reports ----
 report_utilization     -file "$bdir/utilization.txt"
+report_utilization -hierarchical -file "$bdir/utilization_by_block.txt"
 report_timing_summary  -file "$bdir/timing.txt"
 set wns [get_property SLACK [get_timing_paths -max_paths 1 -nworst 1 -setup]]
 puts "=================================================="

@@ -19,3 +19,7 @@ vivado/
 game/build/*
 !game/build/*.bit
 sim/media_sim.bin
+
+# source media and renders (large, not ours to publish)
+media/*
+!media/media.bin

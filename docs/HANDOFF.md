@@ -51,6 +51,20 @@ Claude's memory (`...\.claude\projects\D--All-files-Me-university-digital-system
   SW7 N10 = USB link, SW6 P12 = chaos on, SW5 sfx, SW4 music, SW2 pause.
   Panel labels via `SW_NUM` table in chaos_render. Build: main 3496 LUTs
   (44 %), chaos 6200 LUTs (77.5 %), WNS +4.6 ns.
+* **Test 06 PASSED on hardware (2026-10-20):** ID, media file, all items,
+  VERIFY 0 bad (83 ms / 256 KB), no underruns, A/V in sync; only tearing at
+  3.125 MHz (expected). The user collected media in `media\` (git-ignored:
+  music/, effects/, lose/, win/, friends' pictures). **Media plan v1**:
+  `tools\media_plan.py` (the list) → `python tools\media_lab.py [ids]`
+  (FPGA-accurate renders + sizes into mediaenders\, git-ignored) →
+  `python tools\media_page.py` → open `mediaenders\plan.html` (local only:
+  friends' photos + others' videos; don't publish). Proposed: 16 kHz 4-bit IMA
+  ADPCM sound, delta+RLE picture codec (SKIP/FILL/COPY ops, see media_lab
+  rle_bytes), modes bg (hollow blocks over dimmed video) / full / over
+  (green key) / panel (2x picture in the right panel), audio track + short
+  video loop for attacks, Jevil + face sprites. Proposed set 6.76 MB (97 %).
+  LUT risk: ~+1,500 on 6,200. Waiting for the user's decisions (list on
+  the page). `utilization_by_block.txt` now written by every build.
 * **Next action:** wait for the user's test 06 results (checklist in
   `tests\06_flash_read\README.md`) and their media choices; then build the
   player into the game (loss video, win picture, Tetoris song, OIIA cat
