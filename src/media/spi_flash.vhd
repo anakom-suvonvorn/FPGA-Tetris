@@ -34,8 +34,10 @@
 -- INTERFACE
 --   start (pulse, while busy = '0') with cmd, use_addr, addr, len (bytes).
 --   Every byte read gives one clock of dout_valid with dout. done = pulse at
---   the very end. There is no "wait" signal: the user must take each byte
---   in the clock it arrives (at most one byte every 16 clocks).
+--   the very end. The user must take each byte in the clock it arrives (at
+--   most one byte every 16 clocks) - or hold it back: while 'hold' is '1'
+--   the next byte does not start (SCLK just stays low; SPI chips don't mind
+--   a pause). media_engine uses that while it writes long runs of pixels.
 -- ============================================================================
 library ieee;
 use ieee.std_logic_1164.all;
@@ -51,6 +53,7 @@ entity spi_flash is
     use_addr    : in  std_logic;
     addr        : in  unsigned(23 downto 0);
     len         : in  unsigned(23 downto 0);
+    hold        : in  std_logic := '0';          -- '1' = don't start the next byte yet
     busy        : out std_logic;
     -- data
     dout        : out std_logic_vector(7 downto 0);
@@ -132,7 +135,9 @@ begin
 
         -- data in on MISO, MSB first, one byte after another
         when S_READ =>
-          if half_done then
+          if hold = '1' and n_in = 0 and sclk_r = '0' then
+            ph <= 0;                               -- wait before the next byte
+          elsif half_done then
             if sclk_r = '0' then
               sclk_r <= '1';
             else

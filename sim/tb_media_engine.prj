@@ -1,0 +1,7 @@
+vhdl work "../src/common/common_pkg.vhd"
+vhdl work "../src/common/vga_sync.vhd"
+vhdl work "../src/media/spi_flash.vhd"
+vhdl work "../src/media/adpcm_dec.vhd"
+vhdl work "../src/media/media_engine.vhd"
+vhdl work "flash_model.vhd"
+vhdl work "tb_media_engine.vhd"
