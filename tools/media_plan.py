@@ -50,8 +50,8 @@ PLAN = [
 
     # ------------------------------------------------------------------ attacks (background video + its sound)
     dict(id='atk_badapple', group='attack', title='Bad Apple!!', kind='av', mode='bg', keep=True,
-         src=M + 'effects/【東方】Bad Apple!! ＰＶ【影絵】 - kasidid2 (360p).mp4', start=0, dur=84,
-         bpp=1, fps=10, rate=16000, loop=None, fade=1.5, dim=0.5),
+         src=M + 'effects/【東方】Bad Apple!! ＰＶ【影絵】 - kasidid2 (360p).mp4', start=0, dur=84.2,
+         bpp=1, fps=10, rate=16000, loop=None, fade=0.4, dim=0.5),
     dict(id='atk_oiia_psy', group='attack', title='OIIA OIIA (psytrance remix)', kind='av', mode='bg', keep=True,
          src=M + 'effects/Oiiai Cat Psytrance Remix - 鱼头VishKop (1080p).mp4', start=0, dur=43.75,
          bpp=4, fps=10, rate=16000, loop=None, fade=0.2),
