@@ -26,7 +26,7 @@ if "%~1"=="" (
   exit /b 1
 )
 if not exist "%~f1" (
-  echo No such file: %~1   - make it first: python tools\make_game_media.py   (or tools\make_media.py ... --demo)
+  echo No such file: %~1   - make it first: python tools\make_game_media.py   ^(or tools\make_media.py ... --demo^)
   exit /b 1
 )
 echo Writing %~f1 into the flash at 0x100000 ...
