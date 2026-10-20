@@ -42,6 +42,7 @@ FREE = 7_340_032
 OUT_FPS = 30                      # render frame rate (the board draws 60; 30 looks the same in a video)
 DIM = 0.75                        # background video brightness behind the game (3/4: cheap in hardware)
 RING = 3                          # hollow block: pixels of the block that stay
+HOLLOW = False                    # blocks stay solid (hollow looked weird on the real renders)
 
 # ============================================================== ADPCM (IMA, 4 bits)
 STEPS = [7, 8, 9, 10, 11, 12, 13, 14, 16, 17, 19, 21, 23, 25, 28, 31, 34, 37, 41, 45, 50, 55, 60, 66, 73,
@@ -292,7 +293,7 @@ def see_through(base):
             centre = cell[8, 8].astype(int)
             if centre.max() < 0x40:                    # empty cell: all of it, except a ghost outline
                 m[y:y + CELL, x:x + CELL] = cell.astype(int).max(axis=2) <= 0x60
-            else:                                      # a block: hollow
+            elif HOLLOW:                               # a block: hollow (tried, looked odd)
                 m[y + RING:y + CELL - RING, x + RING:x + CELL - RING] = True
     # text bands over the field (WIN!/LOSE, PRESS START) stay solid
     return m
@@ -500,11 +501,11 @@ def jevil_frames():
 
 
 def draw_jevil(img, frames, t):
-    """floats around the whole screen on a slow figure-of-eight, frame every 2 screen frames"""
-    rgb, alpha = frames[int(t * 30) % len(frames)]
+    """floats around the whole screen on a slow figure-of-eight; a new pose 8 times a second"""
+    rgb, alpha = frames[int(t * 8) % len(frames)]
     h, w = alpha.shape
-    x = int(320 - w / 2 + 230 * math.sin(2 * math.pi * t / 6.1))
-    y = int(240 - h / 2 + 150 * math.sin(2 * math.pi * t / 3.7 + 0.6))
+    x = int(320 - w / 2 + 230 * math.sin(2 * math.pi * t / 11.0))
+    y = int(240 - h / 2 + 150 * math.sin(2 * math.pi * t / 6.8 + 0.6))
     x = max(0, min(640 - w, x))
     y = max(0, min(480 - h, y))
     reg = img[y:y + h, x:x + w]

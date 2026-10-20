@@ -21,7 +21,7 @@ OUT = os.path.join(ROOT, 'media', 'renders')
 FREE = 7_340_032
 
 MODE = {
-    'bg': 'background: whole screen behind the game, blocks drawn hollow',
+    'bg': 'background: whole screen behind the game (blocks stay solid)',
     'full': 'whole screen, covers the game, result text on top',
     'over': 'on top of the game, green screen see-through',
     'panel': 'picture in the right panel (2x)',
@@ -30,8 +30,10 @@ MODE = {
 GROUPS = [
     ('music', 'In-game music', 'Plays from the flash during a round, one after the other (a playlist), '
               'and stops while a media attack plays its own sound.'),
-    ('attack', 'Media attacks', 'New chaos attacks you send to the rival: their screen becomes the video, '
-               'their music is replaced by its sound, and their blocks turn hollow so they can still play.'),
+    ('attack', 'Media attacks', 'New chaos attacks you send to the rival: the video plays behind their game '
+               '(everywhere except on the blocks) and its sound replaces their music. Each board counts down the '
+               'length of the media attack it sent, plus a gap, and does not send another until then, so they never '
+               'come back to back.'),
     ('sprite', 'Sprites', 'Small pictures drawn on top of everything: Jevil during his attack, '
                'and your friends\' faces on the BOUNCERS attack instead of plain squares.'),
     ('lose', 'When you lose (one picked at random)', ''),
@@ -216,7 +218,8 @@ ol.q li { margin-bottom: 6px; max-width: 72ch; }
     <tr><td>picture decompression</td><td>delta + run-length: only changed pixels are stored, in runs</td><td>~200 LUTs</td></tr>
     <tr><td>ADPCM decoder</td><td>4-bit sound → 16-bit samples</td><td>~150 LUTs</td></tr>
     <tr><td>two streams</td><td>a long sound track + a short video loop read in turns</td><td>~100 LUTs</td></tr>
-    <tr><td>display modes</td><td>background + hollow blocks, full screen, see-through on top, panel picture</td><td>~150 LUTs</td></tr>
+    <tr><td>display modes</td><td>background behind the game, full screen, see-through on top, panel picture</td><td>~120 LUTs</td></tr>
+    <tr><td>media attack cool-down</td><td>the sender counts down the attack's length + a gap; until then it sends normal attacks only</td><td>~40 LUTs</td></tr>
     <tr><td>sprites</td><td>Jevil (4 frames of 48 × 50, 2×) and faces on the bouncers (32 × 32)</td><td>~200 LUTs, 2 BRAM tiles</td></tr>
     <tr><td>music player</td><td>playlist from flash; stops for media attacks, carries on after</td><td>~80 LUTs (replaces the tune ROM)</td></tr>
   </table></div>
@@ -227,16 +230,19 @@ ol.q li { margin-bottom: 6px; max-width: 72ch; }
 </section>
 
 <section id="questions">
-  <h2>Decisions for you</h2>
+  <h2>Decided (2026-10-20)</h2>
   <ol class="q">
-    <li>Music: which tracks? Proposed Teto SV + the original (1.8 MB). Eurobeat (1.6 MB) or metal (1.0 MB) only fit if something else goes.</li>
-    <li>Media attacks last as long as their sound: Bad Apple 84 s, OIIA and Jevil 60 s each. Normal attacks last 5–12 s.
-      Keep the full length (the rival plays a whole minute on hollow blocks), or shorter?</li>
-    <li>Win / lose: full-screen video and pictures, or the small panel pictures, or both kinds in the random pick (as now)?</li>
-    <li>The rickroll compilation is 34 s: all of it, or one random rickroll of the ten (~3 s each)?</li>
-    <li>Jump scares: Foxy and the Puppet (as proposed), or the full FNaF 2 set (0.65 MB more)?</li>
-    <li>Which of the friends' pictures go where (the panel pictures on win / lose are a good fit for side-eye, stare, scream, disappointed)?</li>
+    <li>Music: Teto SV + the original, as a playlist.</li>
+    <li>Blocks stay solid during media attacks (hollow looked odd). Media attacks keep their full length, with a
+      cool-down on the sender so they never come back to back.</li>
+    <li>OIIA: only the psytrance remix, the real video (not a loop), 0:00 to 0:44.45, ending on the fart.
+      Bad Apple at 10 pictures a second. Jevil: 0:20.2 (where the intro ends) to 1:00.5, 0.5 s fade.
+      Jevil changes pose 8 times a second and floats slower.</li>
+    <li>Win / lose: mixed, as shown. The whole rickroll compilation. Jump scares: Foxy and the Puppet.</li>
+    <li>No other friends' pictures for now (the four faces stay on the bouncers).</li>
   </ol>
+  <p><b>Please check:</b> does OIIA end on the right sound? There is a loud hit at 0:42.95 and another sound at
+    0:43.9 to 0:44.4; the music comes back at 0:44.5, so the cut is just before that.</p>
 </section>
 </main>
 

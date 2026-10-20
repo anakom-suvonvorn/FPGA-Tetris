@@ -63,8 +63,14 @@ Claude's memory (`...\.claude\projects\D--All-files-Me-university-digital-system
   rle_bytes), modes bg (hollow blocks over dimmed video) / full / over
   (green key) / panel (2x picture in the right panel), audio track + short
   video loop for attacks, Jevil + face sprites. Proposed set 6.76 MB (97 %).
-  LUT risk: ~+1,500 on 6,200. Waiting for the user's decisions (list on
-  the page). `utilization_by_block.txt` now written by every build.
+  LUT risk: ~+1,500 on 6,200. Decisions 2026-10-20 (in media_plan.py + the page): music Teto SV +
+  original; blocks stay SOLID in bg mode (hollow rejected); OIIA = psytrance
+  only, real video 0..44.45 s; Bad Apple 10 fps; Jevil audio 20.2..60.5 s,
+  0.5 s fade, pose 8x/s, slower float; win/lose mixed; whole rickroll; Foxy
+  + Puppet; no other friend pictures (faces stay on bouncers). NEW RULE:
+  media-attack cool-down on the SENDER (attack length + a gap; until then
+  chaos_task only sends normal attacks). Total 6.9 MB (94 %). Open: user to
+  confirm the OIIA end sound. `utilization_by_block.txt` now written by every build.
 * **Next action:** wait for the user's test 06 results (checklist in
   `tests\06_flash_read\README.md`) and their media choices; then build the
   player into the game (loss video, win picture, Tetoris song, OIIA cat
