@@ -1,88 +1,109 @@
 # HANDOFF: project state for Claude (read this first after a context reset)
 
-Last updated: **2026-10-19** (two-board fixes on all branches; test 06 waiting). Keep this
-file current whenever something important changes. Durable facts also live in
-Claude's memory (`...\.claude\projects\D--All-files-Me-university-digital-system-assignment\memory\`:
+Last updated: **2026-10-20**, right before a context compaction (media plan
+approved, game integration NOT started). Keep this file current whenever
+something important changes. Durable facts also live in Claude's memory
+(`...\.claude\projects\D--All-files-Me-university-digital-system-assignment\memory\`:
 `digital-system-final-project.md`, `git-workflow.md`).
 
 ---
 
 ## 0. Where we are RIGHT NOW (start here)
 
-* Game = **"Tetris Duel, CHAOS edition"**, versus Tetris on two EDGE
-  Spartan-7 boards. Agreed 4-layer plan:
-  1. **versus core**: DONE (tag `v1-versus` on `main`).
-  2. **chaos**: DONE on branch **`chaos`**. Round 1 was played on hardware
-     by the user (single board); their feedback became **round 2**
-     (commit 9faa68f + docs): panel hidden except during a task ("CHAOS MODE
-     ON" text only), new task HEX (7 tasks), new attack LOCK (id 8: buttons
-     locked until the victim finishes a task, chaos_task `hurry`), every time
-     a random range (`rand_range` in chaos_pkg), random zone widths, 5–10
-     bouncers, BLIND draws locked cells as empty, SINK immediate (S_SINK from
-     S_PLAY + S_SINK_CHK), garbage 3–5 rows per lock. All sims PASS. Build
-     6022 LUTs (75 %), WNS +4.2 ns. Round 2 not yet tried on hardware.
-     Still to do later: the real OIIA cat (picture + sound from flash) - the
-     user said "we'll come back to this later".
-  3. **media**: branch **`media`** (checked out; = chaos + test 06). **Test 06
-     (`tests\06_flash_read`) is built + simulated, waiting for the user's
-     hardware run.** It reads the S25FL064L via STARTUPE2 (CCLK) at
-     25/12.5/6.25/3.125 MHz, shows ID, the media file (`TDMF`) from flash
-     address 0x100000, plays items (pictures 160x120 with palette 1/2/4/8
-     bpp, animations, picture+sound, sound), VERIFY of a 256 KB LFSR block,
-     load time, underruns. Files: `src\media\spi_flash.vhd`,
-     `src\media\media_player.vhd` (6 BRAM tiles, ~700 LUTs), `tools\make_media.py`
-     (Pillow + ffmpeg; `--demo`, `--item kind:path,...`, `--sim`),
-     `tools\flash_media.bat` (openFPGALoader `-f -B spiOverJtag -o 0x100000`,
-     plus `check`), `sim\tb_flash_read` + `flash_model` (PASS).
-     `media\media.bin` = demo set (5 items, 1.5 MB). Docs: Part 8 +
-     visual guide sections 14–15 (published).
-     **The user decides what media to make from the test results.** Space is
-     the limit (7 MB), not speed.
-  4. extra mini-games if time is left.
-* **Two-board session (2026-10-19, user + friend, real J5 cable):** versus
-  works well. Fixes made on `main` and merged into `chaos` and `media`:
-  1.5 s **start cool-down** after a game (tetris_core `cool`, `can_start`
-  output; PRESS START only shows after it), **switch_filter** (integrator
-  debounce, 1 ms samples, LIMIT 10) + PULLDOWN on all slide switches,
-  **settings moved to the right**. Physical order of the 16 slide switches,
-  left → right (confirmed by the user): SW22 SW21 SW19 SW17 SW15 SW13 SW12
-  SW11 | SW10 SW9 SW8 | SW7 SW6 SW5 SW4 SW2. Now: task switches = the 8
-  leftmost (task_sw bit 7 = SW22 J1 ... bit 0 = SW11 L2), SW8–10 free,
-  SW7 N10 = USB link, SW6 P12 = chaos on, SW5 sfx, SW4 music, SW2 pause.
-  Panel labels via `SW_NUM` table in chaos_render. Build: main 3496 LUTs
-  (44 %), chaos 6200 LUTs (77.5 %), WNS +4.6 ns.
-* **Test 06 PASSED on hardware (2026-10-20):** ID, media file, all items,
-  VERIFY 0 bad (83 ms / 256 KB), no underruns, A/V in sync; only tearing at
-  3.125 MHz (expected). The user collected media in `media\` (git-ignored:
-  music/, effects/, lose/, win/, friends' pictures). **Media plan v1**:
-  `tools\media_plan.py` (the list) → `python tools\media_lab.py [ids]`
-  (FPGA-accurate renders + sizes into media\renders\, git-ignored) →
-  `python tools\media_page.py` → open `media\renders\plan.html` (local only:
-  friends' photos + others' videos; don't publish). Proposed: 16 kHz 4-bit IMA
-  ADPCM sound, delta+RLE picture codec (SKIP/FILL/COPY ops, see media_lab
-  rle_bytes), modes bg (hollow blocks over dimmed video) / full / over
-  (green key) / panel (2x picture in the right panel), audio track + short
-  video loop for attacks, Jevil + face sprites. Proposed set 6.76 MB (97 %).
-  LUT risk: ~+1,500 on 6,200. Decisions 2026-10-20 (in media_plan.py + the page): music Teto SV +
-  original; blocks stay SOLID in bg mode (hollow rejected); OIIA = psytrance
-  only, real video 0..43.75 s (fart tail, first drum at 43.90); Bad Apple 10 fps; Jevil audio 20.2..60.5 s,
-  0.5 s fade, pose 16x/s, float periods 6.1 / 3.7 s; jump scares de-fringed; win/lose mixed; whole rickroll; Foxy
-  + Puppet; no other friend pictures (faces stay on bouncers). NEW RULE:
-  media-attack cool-down on the SENDER (attack length + a gap; until then
-  chaos_task only sends normal attacks). Total 6.9 MB (94 %). Open: user to
-  confirm the OIIA end sound. `utilization_by_block.txt` now written by every build.
-* **Next action:** wait for the user's test 06 results (checklist in
-  `tests\06_flash_read\README.md`) and their media choices; then build the
-  player into the game (loss video, win picture, Tetoris song, OIIA cat
-  picture + sound, SFX). LUT budget is tight: game 75 % + player ~9 %;
-  candidates to save LUTs: text layers, bouncers (10 compare blocks),
-  rand_range multipliers. Untested risk: openFPGALoader writing a raw .bin at
-  an offset (the `check` mode tells).
-* User answers 2026-10-19: switch order SW13 left .. SW6 right (as drawn).
-  **Never push to GitHub** unless the user explicitly says so.
-* Second board "sometime this week" (then test 04 + real two-board versus).
-* **Deadline: Fri 30 Oct 2026, 16:00** (queue closes 09:00). Docs, video and
-  brochure need ~3 days, so building should stop around 26–27 Oct.
+### Status of the 4 layers
+* Game = **"Tetris Duel, CHAOS edition"**, versus Tetris on two EDGE boards.
+  1. **versus core**: `main` (tag `v1-versus` + later fixes). Played on two
+     real boards with a friend on 2026-10-19: works.
+  2. **chaos**: branch `chaos` (round 2 of feedback done, see docs Part 7 §7.8).
+  3. **media**: branch **`media`** (checked out) = chaos + test 06 + media
+     plan tools. **Test 06 PASSED on hardware 2026-10-20** (ID 016017, media
+     file found, VERIFY 0 bad in 83 ms, no sound underruns, A/V sync; tearing
+     only at 3.125 MHz). **Media plan approved by the user (v3, 2026-10-20).
+     NEXT: build it into the game** (see "Build order" below). The user said
+     "before we continue with doing the game ... prepare for a compact" -> after
+     the compaction, start building (they already agreed to the order).
+  4. extra mini-games: probably no time.
+* Fixes on ALL branches (made on `main`, merged main -> chaos -> media):
+  1.5 s start cool-down after a game (tetris_core `cool`, output `can_start`),
+  `src/common/switch_filter.vhd` (integrator debounce) + PULLDOWN on every
+  slide switch, settings on the right. Slide switches left -> right on the
+  board: SW22 SW21 SW19 SW17 SW15 SW13 SW12 SW11 | SW10 SW9 SW8 | SW7 SW6 SW5
+  SW4 SW2. Game: 8 leftmost = task switches (task_sw bit7 = SW22 J1 ... bit0
+  = SW11 L2), SW7 N10 = USB link, SW6 P12 = chaos on, SW5 sfx, SW4 music,
+  SW2 pause. SW8-10 free.
+* Builds: main 3,496 LUTs (44 %); chaos/media game 6,200 LUTs (77.5 %), WNS
+  +4.6 ns, 0 BRAM. Test 06: 1,749 LUTs, 6 BRAM tiles. Builds now also write
+  `build\utilization_by_block.txt` (per-block numbers are muddled by Vivado's
+  flattening; tetris_core ~3,000 is the real big one).
+* **Never push to GitHub.** Commit on the branch as you go.
+* **Deadline Fri 30 Oct 2026 16:00**; stop building ~26-27 Oct (docs, video,
+  brochure need ~3 days).
+
+### The media plan (approved, v3)
+Files: `tools/media_plan.py` (THE list, every item + settings),
+`tools/media_lab.py` (FPGA-accurate renders + sizes -> `media/renders/`,
+`python tools/media_lab.py [ids]`), `tools/media_page.py` (writes
+`media/renders/plan.html`; local only, never publish: friends' photos and
+other people's videos). `media/*` is git-ignored except `media/media.bin`
+(test 06 demo). Sources: `media/music`, `media/effects`, `media/lose`,
+`media/win` + friend pictures in `media/` (not used).
+
+Approved set = 6.88 MB of 7.34 MB (94 %):
+| item | how | notes |
+|---|---|---|
+| music_teto_sv (0-141.2 s) + music_original (83.6 s) | sound only, playlist, 2 s / 1.5 s fade | user OK'd; eurobeat + metal are in the plan unticked |
+| atk_badapple 0-84 s | bg mode, 1 bpp, 10 fps, dim 1/2 | media attack |
+| atk_oiia_psy 0-43.75 s | bg mode, 4 bpp, 10 fps, REAL video (no loop), fade 0.2 | ends on the fart tail; first drum at 43.90 s |
+| atk_jevil | bg mode, jevil_background.mp4 loop (0-3.4 s), 2 bpp 10 fps; audio THE WORLD REVOLVING 20.2-60.5 s, fade 0.5 | + Jevil sprite |
+| spr_jevil | 8 gif frames, 48x50, 4 bpp (7 colours, alpha), drawn 2x; new pose every 4th screen frame (15/s); floats on a Lissajous over the WHOLE screen: x = 320-w/2 + 230 sin(2pi t/6.1), y = 240-h/2 + 150 sin(2pi t/3.7 + 0.6) | user tuned 30 -> 8 -> 20 -> 16 -> 15 |
+| spr_faces | the 4 webp faces in media/effects, 32x32, 8 bpp, shared palette, on the bouncers (picked at random) | bouncers become 32 px |
+| lose: rickroll (all 34 s, full, 4 bpp 10 fps), foxy + puppet jump scares (over mode, green key + de-fringe, 8 bpp 15 fps; puppet = FNaF 2 video 1.0-2.0 s), loss0/1/2 images (full, 4 bpp) | random pick on lose | |
+| win: yippee video (full, 8 bpp 10 fps), diabeetus / miku / teto (panel, 8 bpp) | random pick on win | |
+
+Decided by the user: blocks stay SOLID in bg mode (hollow rejected); win/lose
+mixed (full-screen ones + panel pictures); no other friend pictures.
+**New rule: media-attack cool-down on the SENDER**: when I send a media attack
+(Bad Apple / OIIA / Jevil) I count down its length + a gap (e.g. 10 s); until
+then my chaos_task only sends normal attacks. Media attacks keep their full
+length (40-84 s); their sound replaces the rival's music meanwhile.
+
+### Formats decided in media_lab.py (the hardware must match)
+* Sound: **4-bit IMA ADPCM at 16 kHz** (8 KB/s), standard step table (89) and
+  index table, predictor/index start at 0 per item; decode -> 16-bit ->
+  sigma-delta (wider than the current 8-bit bucket). `adpcm_roundtrip`.
+* Pictures: 160x120, per-item palette (2^bpp x 12-bit), **delta + run-length**
+  per frame (`rle_bytes`): byte `00nnnnnn` SKIP n+1 unchanged pixels,
+  `01nnnnnn` FILL n+1 pixels with the next byte's colour, `1nnnnnnn` COPY n+1
+  literal pixels packed bpp bits MSB first. First frame of an item / loop =
+  no SKIPs (keyframe). Frame buffer keeps the previous frame, so SKIP is free.
+  Records will need a length header (variable size). Encoder exists only as a
+  size estimator -> must become a real encoder in make_media.py.
+* Display modes: `bg` (video behind the game: screen background + empty field
+  incl. grid show the video at `dim` 3/4 or 1/2; blocks/ghost/text solid),
+  `full` (covers everything, result band y 192-240 on top), `over` (palette
+  index 0 = see-through, drawn on top of the game), `panel` (96x88 picture at
+  2x in the right panel, x 430.., y 286.., 4 px frame gold/red).
+* Attack items = a long sound track + optional short video loop (two streams
+  read in turns) - only Jevil uses the loop now; OIIA/Bad Apple are full A/V.
+
+### Build order (agreed), measure LUTs after each step
+1. **Music from flash**: integrate media_player into top_tetris (STARTUPE2,
+   flash pins C11 B11 B12 D10 C10 as in tests/06 pins.xdc), ADPCM decoder,
+   playlist (teto -> original -> ...), replaces the Korobeiniki ROM music;
+   SFX synth stays and mixes in. Make make_media.py build the game file from
+   media_plan.py (ADPCM + RLE + directory > 16 items).
+2. **Win / lose media**: random pick on game end; full / over / panel modes.
+3. **Media attacks** (3 new attack ids over the link; chaos_task sender
+   cool-down; bg mode + dim; their sound replaces the music, music resumes).
+4. **Sprites**: Jevil floating (sprite RAM loaded from flash), faces on the
+   bouncers.
+LUT risk: ~+1,500 on 6,200 -> ~95 %. If tight: drop sprites first, remove the
+ROM cat, the Korobeiniki ROM, some text layers. BRAM: player 6 tiles, sprites
+~2-3 more (of 10).
+
+### Docs still owed for the media layer
+Part 9 walkthrough (media in the game) + visual guide sections, once built.
+Part 8 covers test 06 (spi_flash, media_player, make_media).
 
 ## 1. The assignment (short)
 
