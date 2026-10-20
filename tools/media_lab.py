@@ -177,11 +177,21 @@ def quantise(frames, bpp, key=None, dither=False):
     """PIL RGB frames -> (palette as list of (r,g,b) screen colours, list of index arrays).
     With key: index 0 = see-through (green pixels), the others from the rest."""
     if key:
-        masks = [green_mask(np.array(f)) for f in frames]
-        clean = []
-        for f, m in zip(frames, masks):
+        masks, clean = [], []
+        for f in frames:
             a = np.array(f)
+            m = green_mask(a)
+            # the fringe: pixels next to the green screen that are still greenish
+            near = m.copy()
+            near[1:, :] |= m[:-1, :]; near[:-1, :] |= m[1:, :]
+            near[:, 1:] |= m[:, :-1]; near[:, :-1] |= m[:, 1:]
+            ai = a.astype(np.int16)
+            mx = np.maximum(ai[..., 0], ai[..., 2])
+            m |= near & (ai[..., 1] > mx + 10)
+            # "despill": no pixel left may be greener than its red or blue
+            a[..., 1] = np.minimum(ai[..., 1], mx).astype(np.uint8)
             a[m] = 0
+            masks.append(m)
             clean.append(Image.fromarray(a))
         pal, pimg = mm.make_palette(clean, bpp) if bpp > 1 else ([(0, 0, 0), (255, 255, 255)], None)
         n = 1 << bpp
@@ -501,11 +511,12 @@ def jevil_frames():
 
 
 def draw_jevil(img, frames, t):
-    """floats around the whole screen on a slow figure-of-eight; a new pose 8 times a second"""
-    rgb, alpha = frames[int(t * 8) % len(frames)]
+    """floats around the whole screen on a figure-of-eight; a new pose 20 times a second
+    (every 3rd screen frame)"""
+    rgb, alpha = frames[int(t * 20) % len(frames)]
     h, w = alpha.shape
-    x = int(320 - w / 2 + 230 * math.sin(2 * math.pi * t / 11.0))
-    y = int(240 - h / 2 + 150 * math.sin(2 * math.pi * t / 6.8 + 0.6))
+    x = int(320 - w / 2 + 230 * math.sin(2 * math.pi * t / 6.1))
+    y = int(240 - h / 2 + 150 * math.sin(2 * math.pi * t / 3.7 + 0.6))
     x = max(0, min(640 - w, x))
     y = max(0, min(480 - h, y))
     reg = img[y:y + h, x:x + w]

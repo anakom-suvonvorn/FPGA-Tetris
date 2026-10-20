@@ -65,8 +65,8 @@ Claude's memory (`...\.claude\projects\D--All-files-Me-university-digital-system
   video loop for attacks, Jevil + face sprites. Proposed set 6.76 MB (97 %).
   LUT risk: ~+1,500 on 6,200. Decisions 2026-10-20 (in media_plan.py + the page): music Teto SV +
   original; blocks stay SOLID in bg mode (hollow rejected); OIIA = psytrance
-  only, real video 0..44.45 s; Bad Apple 10 fps; Jevil audio 20.2..60.5 s,
-  0.5 s fade, pose 8x/s, slower float; win/lose mixed; whole rickroll; Foxy
+  only, real video 0..43.3 s (ends on the fart); Bad Apple 10 fps; Jevil audio 20.2..60.5 s,
+  0.5 s fade, pose 20x/s, float periods 6.1 / 3.7 s; jump scares de-fringed; win/lose mixed; whole rickroll; Foxy
   + Puppet; no other friend pictures (faces stay on bouncers). NEW RULE:
   media-attack cool-down on the SENDER (attack length + a gap; until then
   chaos_task only sends normal attacks). Total 6.9 MB (94 %). Open: user to

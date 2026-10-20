@@ -235,14 +235,12 @@ ol.q li { margin-bottom: 6px; max-width: 72ch; }
     <li>Music: Teto SV + the original, as a playlist.</li>
     <li>Blocks stay solid during media attacks (hollow looked odd). Media attacks keep their full length, with a
       cool-down on the sender so they never come back to back.</li>
-    <li>OIIA: only the psytrance remix, the real video (not a loop), 0:00 to 0:44.45, ending on the fart.
+    <li>OIIA: only the psytrance remix, the real video (not a loop), 0:00 to 0:43.3, ending right after the fart.
       Bad Apple at 10 pictures a second. Jevil: 0:20.2 (where the intro ends) to 1:00.5, 0.5 s fade.
-      Jevil changes pose 8 times a second and floats slower.</li>
+      Jevil changes pose 20 times a second and floats at the first speed. Green fringe removed from the jump scares.</li>
     <li>Win / lose: mixed, as shown. The whole rickroll compilation. Jump scares: Foxy and the Puppet.</li>
     <li>No other friends' pictures for now (the four faces stay on the bouncers).</li>
   </ol>
-  <p><b>Please check:</b> does OIIA end on the right sound? There is a loud hit at 0:42.95 and another sound at
-    0:43.9 to 0:44.4; the music comes back at 0:44.5, so the cut is just before that.</p>
 </section>
 </main>
 
