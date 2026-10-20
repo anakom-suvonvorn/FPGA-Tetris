@@ -13,8 +13,7 @@
 --
 -- EFFECTS: up to 4 (note, frames) steps each, started by game events:
 --   lock, line clear, Tetris, garbage arriving, start, win, lose,
---   and the chaos events (task start / done / failed, attack sent / hit,
---   the OIIA cat). If several start in the same clock, the later 'if' wins.
+--   and the chaos events (task start / done / failed, attack sent / hit). If several start in the same clock, the later 'if' wins.
 --   A new effect replaces the one playing. Need SW5 on.
 --
 -- MIXING TO ONE PIN (see docs\learn\06 section 6.5 for the long version):
@@ -53,7 +52,6 @@ entity tetris_sound is
     task_fail_evt  : in std_logic;
     sent_evt       : in std_logic;                -- I sent an attack
     hit_evt        : in std_logic;                -- an attack hit me
-    oiia_evt       : in std_logic;                -- the cat arrived
     audio      : out std_logic;                   -- to both audio jack pins
     buzz       : out std_logic                    -- effects only, for the buzzer
   );
@@ -65,13 +63,7 @@ architecture rtl of tetris_sound is
   function half_period(n : integer range 0 to 31) return integer is
   begin
     case n is
-      when 1  => return 56818;    -- A4  440.0 Hz
-      when 2  => return 50619;    -- B4  493.9
-      when 3  => return 47778;    -- C5  523.3
-      when 4  => return 42566;    -- D5  587.3
       when 5  => return 37922;    -- E5  659.3
-      when 6  => return 35793;    -- F5  698.5
-      when 7  => return 31888;    -- G5  784.0
       when 8  => return 28409;    -- A5  880.0
       when 9  => return 95555;    -- C4  261.6
       when 10 => return 75843;    -- E4  329.6
@@ -88,9 +80,7 @@ architecture rtl of tetris_sound is
   end function;
 
   constant R  : integer := 0;
-  constant A4 : integer := 1;  constant B4 : integer := 2;  constant C5 : integer := 3;
-  constant D5 : integer := 4;  constant E5 : integer := 5;  constant F5 : integer := 6;
-  constant G5 : integer := 7;  constant A5 : integer := 8;
+  constant E5 : integer := 5;  constant A5 : integer := 8;   -- (1-4, 6, 7 were the melody's)
   constant C4 : integer := 9;  constant E4 : integer := 10; constant G4 : integer := 11;
   constant C3 : integer := 12; constant F2 : integer := 13; constant A2 : integer := 14;
   constant C6 : integer := 15; constant E6 : integer := 16; constant G6 : integer := 17;
@@ -111,8 +101,7 @@ architecture rtl of tetris_sound is
   constant FX_FAIL   : integer := 9;     -- task failed
   constant FX_SENT   : integer := 10;    -- attack sent (a falling "zap")
   constant FX_HIT    : integer := 11;    -- attack arrived (alarm)
-  constant FX_OIIA   : integer := 12;    -- "o - i - i - a" (the spinning cat)
-  constant N_FX      : integer := 13;
+  constant N_FX      : integer := 12;
   type fx_t is array (0 to N_FX - 1, 0 to 3) of integer range 0 to 63;
   constant FX_NOTE : fx_t := (
     (C6, R,  R,  R),
@@ -126,8 +115,7 @@ architecture rtl of tetris_sound is
     (E6, G6, C7, R),
     (C4, F2, R,  R),
     (C7, G6, E6, C6),
-    (A5, E5, A5, E5),
-    (G4, E6, E6, C5));
+    (A5, E5, A5, E5));
   constant FX_FRAMES : fx_t := (
     (2,  0,  0,  0),
     (3,  3,  5,  0),
@@ -140,8 +128,7 @@ architecture rtl of tetris_sound is
     (3,  3,  10, 0),
     (8,  16, 0,  0),
     (2,  2,  2,  5),
-    (6,  6,  6,  6),
-    (10, 7,  7,  16));
+    (6,  6,  6,  6));
 
   -- effect player
   signal fx_id     : integer range 0 to N_FX - 1 := 0;
@@ -186,7 +173,6 @@ begin
       if task_ok_evt    = '1' then start_fx := FX_OK;   end if;
       if sent_evt       = '1' then start_fx := FX_SENT; end if;
       if hit_evt        = '1' then start_fx := FX_HIT;  end if;
-      if oiia_evt       = '1' then start_fx := FX_OIIA; end if;
       if result /= result_d then
         if result = 1 then start_fx := FX_WIN;
         elsif result >= 2 then start_fx := FX_LOSE;

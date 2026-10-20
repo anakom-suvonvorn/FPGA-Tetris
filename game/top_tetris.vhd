@@ -44,7 +44,7 @@
 --     +-- versus_link    messages to/from the other board (uart_tx/uart_rx)
 --     +-- chaos_task     the slide-switch tasks
 --     +-- chaos_fx       attacks / bonuses acting on me, banner
---     +-- chaos_render   task panel, banner, bouncers, cat (an overlay)
+--     +-- chaos_render   task panel, banner, bouncers (an overlay)
 --     +-- tetris_render  game state -> pixel colours (text_multi, + overlay)
 --     +-- media_engine   reads the flash: pictures, sound (adpcm_dec), sprites
 --     |                  (spi_flash; its clock goes out through STARTUPE2)
@@ -172,10 +172,10 @@ architecture rtl of top_tetris is
   signal t_att_id    : integer range 0 to N_ATTACKS - 1;
   signal t_att_id31  : integer range 0 to 31;
   signal t_bonus_id  : integer range 0 to 2;
-  signal fx_mirror, fx_flip, fx_blind, fx_bounce, fx_cat, fx_speed, fx_freeze : std_logic;
+  signal fx_mirror, fx_flip, fx_blind, fx_bounce, fx_speed, fx_freeze : std_logic;
   signal fx_locked   : std_logic;
   signal fx_nbounce  : integer range 5 to 10;
-  signal fx_garb, fx_next_bad, fx_next_i, fx_sink, fx_hit, fx_oiia : std_logic;
+  signal fx_garb, fx_next_bad, fx_next_i, fx_sink, fx_hit : std_logic;
   signal ban_on      : std_logic;
   signal ban_id      : integer range 0 to 31;
   signal ov_on       : std_logic;
@@ -307,17 +307,17 @@ begin
       sent_attack => t_send, sent_id => t_att_id,
       bonus => t_bonus, bonus_id => t_bonus_id, task_ok => t_ok, task_fail => t_fail,
       mirror => fx_mirror, flip => fx_flip, blind => fx_blind, bounce => fx_bounce,
-      n_bounce => fx_nbounce, cat => fx_cat, speed => fx_speed, freeze => fx_freeze,
+      n_bounce => fx_nbounce, speed => fx_speed, freeze => fx_freeze,
       locked => fx_locked,
       garbage => fx_garb, next_bad => fx_next_bad, next_i => fx_next_i, sink => fx_sink,
-      hit_evt => fx_hit, oiia_evt => fx_oiia, media_hit => media_hit, media_id => media_id,
+      hit_evt => fx_hit, media_hit => media_hit, media_id => media_id,
       banner_on => ban_on, banner_id => ban_id
     );
 
   u_crender : entity work.chaos_render
     port map (
       clk => clk, frame_tick => frame_tick, x => x, y => y, enable => chaos_s,
-      bounce => fx_bounce, n_bounce => fx_nbounce, cat => fx_cat, locked => fx_locked,
+      bounce => fx_bounce, n_bounce => fx_nbounce, locked => fx_locked,
       t_active => t_active, t_task => t_task, t_sel => t_sel, t_target => t_target,
       t_sw => task_sw, t_count => t_count, t_meter => t_meter, t_zone_lo => t_zlo,
       t_zone_hi => t_zhi, t_progress => t_prog, t_secs => t_secs, t_offsecs => t_offsecs,
@@ -405,7 +405,7 @@ begin
       playing => playing, pcm => pcm, clear_evt => clear_evt, clear_n => clear_n,
       garb_evt => garb_in, result => result,
       task_start_evt => t_start, task_ok_evt => t_ok, task_fail_evt => t_fail,
-      sent_evt => t_send, hit_evt => fx_hit, oiia_evt => fx_oiia,
+      sent_evt => t_send, hit_evt => fx_hit,
       audio => audio, buzz => buzzer
     );
   audio_l <= audio;

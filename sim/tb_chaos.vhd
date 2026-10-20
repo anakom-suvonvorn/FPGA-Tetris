@@ -61,7 +61,7 @@ architecture sim of tb_chaos is
 
   -- effects on A (bonuses) and on B (attacks)
   signal a_freeze, a_sink, a_next_i : std_logic;
-  signal b_mirror, b_flip, b_blind, b_bounce, b_cat, b_speed : std_logic;
+  signal b_mirror, b_flip, b_blind, b_bounce, b_speed : std_logic;
   signal b_garb, b_next_bad, b_ban_on : std_logic;
   signal b_ban_id   : integer range 0 to 31;
 
@@ -98,9 +98,9 @@ begin
               got_attack => '0', got_id => 0, sent_attack => t_send, sent_id => att_id,
               bonus => t_bonus, bonus_id => bon_id, task_ok => t_ok, task_fail => t_fail,
               mirror => open, flip => open, blind => open, bounce => open, n_bounce => open,
-              cat => open, speed => open, freeze => a_freeze, locked => open,
+              speed => open, freeze => a_freeze, locked => open,
               garbage => open, next_bad => open,
-              next_i => a_next_i, sink => a_sink, hit_evt => open, oiia_evt => open,
+              next_i => a_next_i, sink => a_sink, hit_evt => open,
               banner_on => open, banner_id => open);
 
   u_link_a : entity work.versus_link
@@ -124,10 +124,10 @@ begin
               got_attack => b_got_att, got_id => b_got_id, sent_attack => '0', sent_id => 0,
               bonus => '0', bonus_id => 0, task_ok => b_t_ok, task_fail => '0',
               mirror => b_mirror, flip => b_flip, blind => b_blind, bounce => b_bounce,
-              n_bounce => open, cat => b_cat, speed => b_speed, freeze => open,
+              n_bounce => open, speed => b_speed, freeze => open,
               locked => b_locked, garbage => b_garb,
               next_bad => b_next_bad, next_i => open, sink => open, hit_evt => open,
-              oiia_evt => open, banner_on => b_ban_on, banner_id => b_ban_id);
+              banner_on => b_ban_on, banner_id => b_ban_id);
 
   -- B's task: never comes by itself (long first wait), only when locked
   u_task_b : entity work.chaos_task
@@ -228,7 +228,6 @@ begin
           when A_FLIP    => effect_seen := b_flip = '1';
           when A_BLIND   => effect_seen := b_blind = '1';
           when A_BOUNCE  => effect_seen := b_bounce = '1';
-          when A_OIIA    => effect_seen := b_cat = '1';
           when A_SPEED   => effect_seen := b_speed = '1';
           when A_GARBAGE => effect_seen := b_garb = '1';
           when A_LOCK    => effect_seen := b_locked = '1';

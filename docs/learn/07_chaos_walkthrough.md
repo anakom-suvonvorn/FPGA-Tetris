@@ -17,6 +17,15 @@ Line numbers (`L114`) refer to the files as they are now. The visual guide
 > belongs; the [list of what changed and why](#78-round-2-what-changed-and-why)
 > is at the end.
 
+> **Changed later (Part 9, the media layer):** the OIIA **cat** attack is
+> gone. The real OIIA video replaced it as a media attack, and its logic
+> was needed for room in the chip. The attacks after it moved down by one
+> (GARBAGE 4, CURSED 5, SPEED 6, LOCK 7), the media attacks are 8..10, and
+> the banner numbers moved with them. Everything about the cat below
+> describes the `chaos` branch, where it still exists
+> (`git show chaos:src/game/chaos_render.vhd`); its line numbers are for
+> that branch.
+
 Contents:
 [7.0 What it does](#70-what-it-does) ·
 [7.1 chaos_pkg](#71-chaos_pkgvhd-the-numbers-texts-and-the-cat) ·
@@ -105,12 +114,12 @@ cost about 760 LUTs); timing still fine (WNS +4.2 ns).
 
 Like `tetris_pkg`: no hardware of its own, just shared names.
 
-* **L54–80:** task, attack and bonus numbers as named constants
+* **L55–80:** task, attack and bonus numbers as named constants
   (`T_FLIP` = 0 ... `T_HEX` = 6, `A_MIRROR` = 0 ... `A_LOCK` = 8,
   `B_FREEZE` = 0 ...). The rest of the code uses the names, so the numbers
   only live here. The attack number is also the value of the ATTACK message
   on the cable (5 bits, so up to 31 would fit).
-* **L85, L164–167: `rand_range(lo, hi, r)`** turns a random byte `r`
+* **L85, L156–159: `rand_range(lo, hi, r)`** turns a random byte `r`
   (0..255) into a number from `lo` to `hi`:
 
   ```vhdl
@@ -125,13 +134,13 @@ Like `tetris_pkg`: no hardware of its own, just shared names.
   indexed by the number: `ATTACK_LO(A_FLIP)` = 360, `ATTACK_HI(A_FLIP)` = 600
   = 6..10 s. 0 means "instant". `TASK_LO/HI` = time allowed per task,
   `GAP_LO/HI` = 600..1020 = 10..17 s between tasks, `FREEZE_LO/HI` = 3..5 s.
-* **L107–118, L132–175: banners.** A table of 22 fixed 20-character texts,
+* **L107–118, L126–167: banners.** A table of 22 fixed 20-character texts,
   numbered so the banner number says both *what* and *which*:
   0..8 = `INCOMING: <attack n>` (8 = `LOCKED! DO THE TASK`),
   9..17 = `SENT: <attack n − 9>`, 18..20 = `BONUS: ...`, 21 = `TASK FAILED`.
   The named starts `BAN_SENT` = 9, `BAN_BONUS` = 18, `BAN_FAIL` = 21 let
   chaos_fx pick a banner with simple arithmetic: `BAN_SENT + sent_id`.
-* **L123–125, L178–219: the cat.** 16 × 16 pixels, drawn as text like the
+* **(chaos branch: L108–110, L157–198) the cat** (removed in Part 9). 16 × 16 pixels, drawn as text like the
   font: `.` see-through, `K` black, `G` grey, `W` white, `P` pink. `crow`
   turns one text row into 48 bits (3 bits per pixel), `cat_pixel(r, c)`
   reads one pixel back. In hardware: a 16 × 48-bit ROM.
@@ -248,37 +257,38 @@ dropping 8 bits replaces a real division, which would be expensive.
 
 ## 7.3 `chaos_fx.vhd`: effects on my board
 
-**Timers** (L73–75): `t` is an array of 8 frame counters, one per timed
+**Timers** (L71–73): `t` is an array of 8 frame counters, one per timed
 attack number, and `t_frz` for the FREEZE bonus. An effect is "on" while
-its counter is above 0 (L160–167):
+its counter is above 0 (L157–163):
 
 ```vhdl
 mirror <= '1' when t(A_MIRROR) > 0 else '0';
 ```
 
-Once per frame every counter goes down by 1 (L99–106; a `for` loop = 8
+Once per frame every counter goes down by 1 (L97–104; a `for` loop = 8
 copies of a down-counter). Getting the same attack again restarts it.
 
-**LOCK** (L76, L108–115): not a timer but a flag, `lock_r`. While it is on,
+**LOCK** (L74, L106–113): not a timer but a flag, `lock_r`. While it is on,
 the banner is kept at `LOCKED! DO THE TASK` (number 8) whenever no other
 banner is showing, and the flag goes off with the next `task_ok`. The top
 level uses `locked` to block the buttons and feeds it to chaos_task as
 `hurry`.
 
-**An attack arrives** (L117–136): `got_attack` + `got_id` from versus_link.
+**An attack arrives** (L115–133): `got_attack` + `got_id` from versus_link.
 Banner `got_id` (INCOMING), then: GARBAGE and CURSED are one-clock pulses
 to the core, LOCK sets `lock_r`; all others start their timer with a random
 length, `rand_range(ATTACK_LO(id), ATTACK_HI(id), rnd)`. BOUNCE also picks
-how many squares (5..10, `n_bounce`); OIIA pulses `oiia_evt` for the sound.
+how many squares (5..10, `n_bounce`); OIIA pulsed `oiia_evt` for the sound
+(until Part 9 removed the cat).
 
-**My own results** (L138–155): `SENT` banner (`BAN_SENT + id`); a bonus
+**My own results** (L135–152): `SENT` banner (`BAN_SENT + id`); a bonus
 starts FREEZE's timer (3..5 s) or pulses `sink` / `next_i`; a failed task
 shows `BAN_FAIL`.
 
-**Banner** (L78–79, L177–178): a 150-frame (2.5 s) counter + the banner
+**Banner** (L76–77, L172–173): a 150-frame (2.5 s) counter + the banner
 number.
 
-When chaos is off or no game runs (`enable = '0'`, L93), everything is
+When chaos is off or no game runs (`enable = '0'`, L91), everything is
 reset, including the lock.
 
 ---
@@ -290,48 +300,49 @@ and `ov_rgb` (which colour). `tetris_render` draws it on top of its own
 picture as the very last step. Same timing as `text_layer`: all from (x, y),
 registered once, ready for tetris_render's stage 2.
 
-### Moving things (L143–182)
+### Moving things (L134–163)
 
-Once per frame: the 10 **bouncers** (L76–89: positions, per-square speeds
+Once per frame: the 10 **bouncers** (L71–84: positions, per-square speeds
 `SPX`/`SPY`, colours `BCOL`, direction bits) move and bounce off the field
 edges, like the bouncing square of test 01 times ten. All 10 always move;
-only the first `n_bounce` are drawn. The **cat** (L92–96) does the same,
+only the first `n_bounce` are drawn. The **cat** (removed in Part 9; on the
+chaos branch L85–88) did the same,
 and `spin` counts frames. (Since Part 9 the bouncers don't all move in the
-same clock: `bk` (L90) walks through them one per clock in the 10 clocks
+same clock: `bk` (L85) walks through them one per clock in the 10 clocks
 after `frame_tick`, while the screen is blank, so one set of adders does
 all ten. The picture is exactly the same; it saves ~130 LUTs.)
 
-### Text (L184–238)
+### Text (L165–219)
 
 Two 16-character panel lines and the banner: three lines of text (since
-Part 9 through one `text_multi` with one font ROM, L227–238; before, three
+Part 9 through one `text_multi` with one font ROM, L208–219; before, three
 `text_layer`s). Each line
 starts from a fixed template (`L1_TXT`, `L2_TXT`, one per task + one for
 "no task") and `put_digit` writes numbers into it: the switch number
 (`SW_NUM(sel)`, a table of the 8 board labels: the board skips the
 numbers 14, 16, 18, 20 used by the buttons, so it can't be a formula), the BINARY number (hundreds/tens/ones by dividing by
-100 and 10), the HEX digits (L211: a hex digit 0..15 *is* its character
+100 and 10), the HEX digits (L192: a hex digit 0..15 *is* its character
 code, `0`..`9` then `A`..`F`, so no conversion at all), the HANDS seconds
-(L215), the TIMING hit count. With no task (L191) line 1 is
+(L196), the TIMING hit count. With no task (L172) line 1 is
 `CHAOS MODE ON` and line 2 is empty.
 
-### Geometry (L240–384)
+### Geometry (L221–336)
 
-* **The panel** (L262–319): with no task (L264) only the first text line's
+* **The panel** (L239–296): with no task (L241) only the first text line's
   area is marked (no box, nothing else), so just the words show. During a
-  task: a purple frame, **red while my buttons are LOCKED** (L273), and dark
+  task: a purple frame, **red while my buttons are LOCKED** (L250), and dark
   inside. Below the text: the MATCH target lamps; **8 switch pictures** (a
   slot with a knob at the top = on or bottom = off, SW22 on the left like on the board; the
   switch the task wants is shown in orange); the **meter** (dark, green
   zone, white marker) for HOLD / TIMING; the **progress bar**; the **time
-  bar** (L310: 11 px per second, red in the last 3 seconds). The switch
+  bar** (L287: 11 px per second, red in the last 3 seconds). The switch
   under a pixel is `7 − px / 24` (8 columns of 24 px).
-* **Banner** (L321–334): a black band, text colour by banner number (red
+* **Banner** (L298–311): a black band, text colour by banner number (red
   incoming / failed, gold sent, green bonus).
-* **Bouncers** (L336–348): `if i < n_bounce and (inside square i)`, colour
+* **Bouncers** (L313–325): `if i < n_bounce and (inside square i)`, colour
   `BCOL(i)`. Since Part 9 they are 32 × 32 and the loop also remembers
-  which one was hit (`hb`) for the friends' faces (L349–352, see Part 9).
-* **The cat** (L354–378): 64 × 64 px = the 16 × 16 picture at 4× (`dy / 4`,
+  which one was hit (`hb`) for the friends' faces (L326–329, see Part 9).
+* **The cat** (removed in Part 9; chaos branch L313–336): 64 × 64 px = the 16 × 16 picture at 4× (`dy / 4`,
   `dx / 4`: free shifts). The **spin** is faked with 4 pictures, chosen by
   `spin(4 downto 3)` (each lasts 8 frames):
 
@@ -346,7 +357,7 @@ code, `0`..`9` then `A`..`F`, so no conversion at all), the HANDS seconds
   its vertical axis. Pixel value 0 is see-through: `ov_on` stays '0' there,
   so the field shows between the cat's ears.
 
-### Output (L386–395)
+### Output (L338–347)
 
 The text pixels arrive at the same edge as the `r_*` registers, so they are
 merged combinationally: text on top of the panel / band it belongs to
@@ -411,10 +422,10 @@ LOST > **ATTACK** > GARBAGE > HEARTBEAT (L141–144). Received ones become
 
 ### `tetris_sound.vhd`
 
-Six new effects (L109–115): task pops up (double blip), task done (rising),
-task failed (low buzz), attack sent (falling "zap"), attack hit (alarm),
-and the OIIA jingle (low, high, high, middle: "o-i-i-a"). Started by new
-event inputs (L184–189).
+Five new effects (L99–103): task pops up (double blip), task done (rising),
+task failed (low buzz), attack sent (falling "zap"), attack hit (alarm).
+(There was a sixth, the OIIA jingle, until Part 9 removed the cat.) Started
+by new event inputs (L171–175).
 
 ### `top_tetris.vhd`
 
@@ -475,9 +486,10 @@ the cells of the 2 bottom rows are gone. **TEST PASSED**.
 
 The whole design with chaos on, the first task forced to BINARY, and a
 pretend PC sending ATTACK 4 (cat) and later ATTACK 1 + 3 (flip + bouncers).
+(Since Part 9 the first attack is BLIND, number 2, because the cat is gone.)
 Screenshots in `game/screenshot_chaos_task.png` and
-`game/screenshot_chaos_flip.png` (from round 1: 4 bouncers, panel always
-visible).
+`game/screenshot_chaos_flip.png` (taken again in Part 9: BLIND, then flip +
+32 px bouncers; no media file in the simulation, so no faces).
 
 ---
 
@@ -504,8 +516,8 @@ From playing round 1 on the board:
 
 | Feedback | Change | Where |
 |---|---|---|
-| The panel and the "next task in" timer spoil the surprise | panel only during a task, otherwise just `CHAOS MODE ON`; no countdown | chaos_render L191, L264 |
-| BINARY is fine (watch the progress bar), but add a hex version | new task HEX: two hex digits | chaos_pkg, chaos_task L214, chaos_render L211 |
+| The panel and the "next task in" timer spoil the surprise | panel only during a task, otherwise just `CHAOS MODE ON`; no countdown | chaos_render L172, L241 |
+| BINARY is fine (watch the progress bar), but add a hex version | new task HEX: two hex digits | chaos_pkg, chaos_task L214, chaos_render L192 |
 | Green zones always the same width | HOLD 40..60 px per task; TIMING 28..44 px, new width after each hit | chaos_task L195–201, L253 |
 | Everything with a time should be a random range | tasks, gaps, attacks, freeze, HANDS / HOLD goals, TIMING speed | chaos_pkg L87–105, `rand_range` |
 | You could ignore tasks and just play Tetris | new attack LOCK: buttons locked until you finish a task | chaos_fx, chaos_task `hurry`, top_tetris L238 |
@@ -514,4 +526,4 @@ From playing round 1 on the board:
 | Too few bouncers | 5..10 | chaos_fx, chaos_render |
 | BLIND still showed grey blocks | locked blocks not drawn at all | tetris_render L330 |
 | 8 garbage rows at once is too much | at most 3..5 per lock | tetris_core L627 |
-| The OIIA cat isn't the real one | later, with the media layer (real picture + sound from flash) | |
+| The OIIA cat isn't the real one | done in Part 9: the real OIIA video is a media attack, the ROM cat is gone | |

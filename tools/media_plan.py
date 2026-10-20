@@ -28,6 +28,8 @@ Every item:
   key       'green' = green-screen colour becomes see-through
   fade      seconds of fade-out at the end of the sound
   dim       background brightness behind the game (bg mode): 0.75 or 0.5
+  crop      (x, y, w, h): use only this part of the source picture (before
+            scaling to 160 x 120), e.g. the 4:3 game screen inside a 16:9 video
   keep      True = in the proposed set, False = rendered for comparison only
 """
 
@@ -74,7 +76,8 @@ PLAN = [
          bpp=4, fps=10, rate=16000, loop=None, fade=0.5),
     dict(id='lose_foxy', group='lose', title='Foxy jump scare', kind='av', mode='over', keep=True,
          src=M + 'lose/Fnaf 2 Foxy Jumpscare Green Screen - Eustass Kidd (720p).mp4', start=0, dur=None,
-         bpp=8, fps=15, rate=16000, loop=None, key='green', fade=0.2),
+         bpp=8, fps=15, rate=16000, loop=None, key='green', fade=0.2,
+         crop=(160, 0, 960, 720)),     # the 4:3 game screen in the middle of the 16:9 video
     dict(id='lose_puppet', group='lose', title='Puppet jump scare', kind='av', mode='over', keep=True,
          src=M + 'lose/FNaF 2 Jumpscares Green Screened - Jared Dinosaur (480p).mp4', start=1.0, dur=1.0,
          bpp=8, fps=15, rate=16000, loop=None, key='green', fade=0.2),
@@ -84,6 +87,10 @@ PLAN = [
          src=M + 'lose/loss1.webp', bpp=4),
     dict(id='lose_loss2', group='lose', title='Loss (3)', kind='image', mode='full', keep=True,
          src=M + 'lose/loss2.jpg', bpp=4),
+    dict(id='lose_kakascream', group='lose', title='Kaka scream', kind='image', mode='panel', keep=True,
+         src=M + 'kakascream.png', bpp=8),
+    dict(id='lose_kakadisappointed', group='lose', title='Kaka disappointed', kind='image', mode='panel', keep=True,
+         src=M + 'kakadisappointed.png', bpp=8),
 
     # ------------------------------------------------------------------ when you win (one picked at random)
     dict(id='win_yippee', group='win', title='Yippee cat', kind='av', mode='full', keep=True,

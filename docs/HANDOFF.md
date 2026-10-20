@@ -123,8 +123,17 @@ Jevil + faces). Bad Apple changed by the user to 0-84.2 s, fade 0.4 s.
   left, resolve it), visual guide section 16 (ADPCM, RLE, Jevil path,
   pipeline table). Parts 5-8 line refs remapped; 6.5 notes the sound file
   changed (refs = chaos branch version).
-* NEXT: user tests on hardware with the checklist in docs 9.11; then merge
-  chaos -> main when confirmed.
+* 2026-10-21 after the first board test (docs 9.13): flash_media.bat fixed
+  (unescaped ')' in an if block made it quit silently); Foxy jump scare
+  `crop=(160,0,960,720)` (4:3 screen inside the 16:9 video) so it fills the
+  screen; Kaka scream / disappointed back as lose PANEL pictures (the user
+  meant "keep everything shown, add nothing more"); ROM OIIA cat attack
+  REMOVED (attacks renumbered: GARBAGE 4, CURSED 5, SPEED 6, LOCK 7,
+  APPLE 8, OIIA 9, JEVIL 10; N_ATTACKS 11; banners 0..25), melody-only notes
+  removed. Build now 6,797 LUTs (85 %), slices 98 %, WNS +3.4 ns; media file
+  6.86 MB. User wants unused things removed generally.
+* NEXT: user re-flashes + tests the rest of the checklist in docs 9.11; then
+  merge chaos -> main when confirmed.
 
 ## 1. The assignment (short)
 

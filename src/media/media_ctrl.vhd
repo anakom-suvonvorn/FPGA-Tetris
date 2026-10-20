@@ -19,7 +19,7 @@
 --
 -- The item numbers come from the media file's header (mus_first, ...), so
 -- the plan can change without touching this block - except the 3 attacks,
--- which are fixed: Bad Apple, OIIA, Jevil (chaos_pkg A_APPLE ...).
+-- which are fixed: Bad Apple, OIIA, Jevil (chaos_pkg A_APPLE, A_OIIA, A_JEVIL).
 -- ============================================================================
 library ieee;
 use ieee.std_logic_1164.all;

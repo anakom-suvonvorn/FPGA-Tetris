@@ -7,7 +7,7 @@
 --   * an ATTACK message from the rival (got_attack + got_id, via versus_link)
 --   * a BONUS I earned with a task (bonus + bonus_id, from chaos_task)
 --
--- Timed effects (mirror, flip, blind, bouncers, cat, speed, freeze) each have
+-- Timed effects (mirror, flip, blind, bouncers, speed, freeze) each have
 -- a frame counter: set to a random length (ATTACK_LO..ATTACK_HI frames, see
 -- chaos_pkg) when it starts, counted down once per frame, and the effect is
 -- on while it is above 0. A second hit of the same attack restarts it.
@@ -48,7 +48,6 @@ entity chaos_fx is
     blind       : out std_logic;
     bounce      : out std_logic;
     n_bounce    : out integer range 5 to 10;      -- how many bouncers
-    cat         : out std_logic;
     speed       : out std_logic;
     freeze      : out std_logic;
     locked      : out std_logic;                  -- buttons locked until a task is done
@@ -59,7 +58,6 @@ entity chaos_fx is
     sink        : out std_logic;                  -- remove 2 bottom rows, cancel waiting garbage
     -- for the sound
     hit_evt     : out std_logic;                  -- an attack arrived
-    oiia_evt    : out std_logic;                  -- the cat arrived
     -- media attacks (to media_ctrl)
     media_hit   : out std_logic;
     media_id    : out integer range 0 to 2;
@@ -70,14 +68,14 @@ entity chaos_fx is
 end entity;
 
 architecture rtl of chaos_fx is
-  type timers_t is array (0 to 7) of integer range 0 to 1023;
+  type timers_t is array (0 to 6) of integer range 0 to 1023;
   signal t      : timers_t := (others => 0);         -- one per timed attack number
   signal t_frz  : integer range 0 to 1023 := 0;
   signal lock_r : std_logic := '0';
   signal nb     : integer range 5 to 10 := 5;
   signal ban_t  : integer range 0 to 255 := 0;
   signal ban_id : integer range 0 to 31 := 0;
-  signal g_p, nb_p, ni_p, sk_p, hit_p, oiia_p, m_p : std_logic := '0';
+  signal g_p, nb_p, ni_p, sk_p, hit_p, m_p : std_logic := '0';
   signal m_id   : integer range 0 to 2 := 0;
   signal lfsr   : std_logic_vector(15 downto 0) := x"9E37";
 begin
@@ -88,7 +86,7 @@ begin
     if rising_edge(clk) then
       lfsr <= lfsr(14 downto 0) & (lfsr(15) xor lfsr(13) xor lfsr(12) xor lfsr(10));
       rnd  := to_integer(unsigned(lfsr(7 downto 0)));
-      g_p <= '0'; nb_p <= '0'; ni_p <= '0'; sk_p <= '0'; hit_p <= '0'; oiia_p <= '0'; m_p <= '0';
+      g_p <= '0'; nb_p <= '0'; ni_p <= '0'; sk_p <= '0'; hit_p <= '0'; m_p <= '0';
 
       if enable = '0' then
         t      <= (others => 0);
@@ -98,7 +96,7 @@ begin
       else
         -- count everything down once per frame (not while paused)
         if frame_tick = '1' and paused = '0' then
-          for i in 0 to 7 loop
+          for i in 0 to 6 loop
             if t(i) > 0 then t(i) <= t(i) - 1; end if;
           end loop;
           if t_frz > 0 then t_frz <= t_frz - 1; end if;
@@ -117,19 +115,18 @@ begin
         -- the rival hit me
         if got_attack = '1' and got_id <= N_ATTACKS - 1 then
           hit_p  <= '1';
-          ban_id <= got_id;                          -- banners 0..11: INCOMING
+          ban_id <= got_id;                          -- banners 0..10: INCOMING
           ban_t  <= 150;
           case got_id is
             when A_GARBAGE => g_p    <= '1';
             when A_CURSED  => nb_p   <= '1';
             when A_LOCK    => lock_r <= '1';
-            when A_APPLE | A_OIIA_V | A_JEVIL =>
+            when A_APPLE | A_OIIA | A_JEVIL =>
               m_p  <= '1';
               m_id <= got_id - A_MEDIA;
-            when others    =>
-              if got_id = A_OIIA   then oiia_p <= '1'; end if;
+            when others    =>                        -- the timed ones: 0..3, 6
               if got_id = A_BOUNCE then nb <= rand_range(5, 10, rnd); end if;
-              if got_id <= 7 then
+              if got_id <= 6 then
                 t(got_id) <= rand_range(ATTACK_LO(got_id), ATTACK_HI(got_id), rnd);
               end if;
           end case;
@@ -137,11 +134,11 @@ begin
 
         -- banners for my own task results
         if sent_attack = '1' then
-          ban_id <= BAN_SENT + sent_id;              -- banners 12..23: SENT
+          ban_id <= BAN_SENT + sent_id;              -- banners 11..21: SENT
           ban_t  <= 150;
         end if;
         if bonus = '1' then
-          ban_id <= BAN_BONUS + bonus_id;            -- banners 24..26: BONUS
+          ban_id <= BAN_BONUS + bonus_id;            -- banners 22..24: BONUS
           ban_t  <= 150;
           case bonus_id is
             when B_FREEZE => t_frz <= rand_range(FREEZE_LO, FREEZE_HI, rnd);
@@ -162,7 +159,6 @@ begin
   blind     <= '1' when t(A_BLIND)  > 0 else '0';
   bounce    <= '1' when t(A_BOUNCE) > 0 else '0';
   n_bounce  <= nb;
-  cat       <= '1' when t(A_OIIA)   > 0 else '0';
   speed     <= '1' when t(A_SPEED)  > 0 else '0';
   freeze    <= '1' when t_frz > 0 else '0';
   locked    <= lock_r;
@@ -171,7 +167,6 @@ begin
   next_i    <= ni_p;
   sink      <= sk_p;
   hit_evt   <= hit_p;
-  oiia_evt  <= oiia_p;
   media_hit <= m_p;
   media_id  <= m_id;
   banner_on <= '1' when ban_t > 0 else '0';

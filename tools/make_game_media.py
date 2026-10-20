@@ -315,9 +315,9 @@ def build_item(p):
     pad = '0x00FF00' if p.get('key') else 'black'
     if p.get('loop'):
         ls, ld = p['loop']
-        frames = lab.read_video(p['src'], fps, ls, ld, pad)
+        frames = lab.read_video(p['src'], fps, ls, ld, pad, p.get('crop'))
     else:
-        frames = lab.read_video(p['src'], fps, p.get('start', 0), p.get('dur'), pad)
+        frames = lab.read_video(p['src'], fps, p.get('start', 0), p.get('dur'), pad, p.get('crop'))
     pal, idx = lab.quantise(frames, bpp, key=p.get('key'))
     it.palette = pal_bytes(pal, bpp)
     if p.get('loop'):

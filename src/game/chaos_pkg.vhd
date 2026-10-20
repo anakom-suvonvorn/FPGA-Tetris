@@ -1,7 +1,7 @@
 -- ============================================================================
 -- chaos_pkg.vhd
 -- Shared definitions for the CHAOS layer: task numbers, attack and bonus
--- numbers, how long each effect lasts, the banner texts, and the OIIA cat.
+-- numbers, how long each effect lasts, and the banner texts.
 --
 -- THE IDEA
 --   While chaos is on, a TASK pops up at a random moment (the right panel
@@ -28,18 +28,19 @@
 --           1 FLIP     the field is drawn upside down          (6-10 s)
 --           2 BLIND    locked blocks invisible                 (5-8 s)
 --           3 BOUNCE   5-10 bouncing squares over the field    (8-12 s)
---           4 OIIA     the spinning cat over the field         (6-10 s)
---           5 GARBAGE  +3 garbage lines                        (at once)
---           6 CURSED   the next piece becomes an S or a Z      (at once)
---           7 SPEED    pieces fall much faster                 (8-12 s)
---           8 LOCK     all buttons locked until the victim finishes a task
+--           4 GARBAGE  +3 garbage lines                        (at once)
+--           5 CURSED   the next piece becomes an S or a Z      (at once)
+--           6 SPEED    pieces fall much faster                 (8-12 s)
+--           7 LOCK     all buttons locked until the victim finishes a task
 --                      (a task starts for them right away; fail = another one)
---           9 BAD APPLE   } MEDIA attacks: a video from the flash plays behind
---          10 OIIA OIIA   } the rival's game, its sound replaces their music
---          11 JEVIL       } (Jevil also floats over the screen). Full length
+--           8 BAD APPLE   } MEDIA attacks: a video from the flash plays behind
+--           9 OIIA OIIA   } the rival's game, its sound replaces their music
+--          10 JEVIL       } (Jevil also floats over the screen). Full length
 --                         (40-84 s). The SENDER can't send another media
 --                         attack until it is over + 10 s (MEDIA_COOL).
 --                         Needs the media file in the flash (media_engine).
+--   (Until the media layer, attack 4 was a little OIIA cat drawn from a ROM;
+--   the real OIIA video replaced it.)
 --   bonuses 0 FREEZE   no gravity                              (3-5 s)
 --           1 SINK     remove the 2 bottom rows now, cancel waiting garbage
 --           2 I PIECE  the next piece becomes an I
@@ -60,20 +61,19 @@ package chaos_pkg is
   constant T_TIMING : integer := 5;
   constant T_HEX    : integer := 6;
 
-  constant N_ATTACKS : integer := 12;
+  constant N_ATTACKS : integer := 11;
   constant A_MIRROR  : integer := 0;
   constant A_FLIP    : integer := 1;
   constant A_BLIND   : integer := 2;
   constant A_BOUNCE  : integer := 3;
-  constant A_OIIA    : integer := 4;
-  constant A_GARBAGE : integer := 5;
-  constant A_CURSED  : integer := 6;
-  constant A_SPEED   : integer := 7;
-  constant A_LOCK    : integer := 8;
-  constant A_APPLE   : integer := 9;      -- the 3 media attacks, in the order of
-  constant A_OIIA_V  : integer := 10;     -- the attack items in the media file
-  constant A_JEVIL   : integer := 11;
-  constant A_MEDIA   : integer := 9;      -- ids >= this are media attacks
+  constant A_GARBAGE : integer := 4;
+  constant A_CURSED  : integer := 5;
+  constant A_SPEED   : integer := 6;
+  constant A_LOCK    : integer := 7;
+  constant A_APPLE   : integer := 8;      -- the 3 media attacks, in the order of
+  constant A_OIIA    : integer := 9;      -- the attack items in the media file
+  constant A_JEVIL   : integer := 10;
+  constant A_MEDIA   : integer := 8;      -- ids >= this are media attacks
 
   constant B_FREEZE  : integer := 0;
   constant B_SINK    : integer := 1;
@@ -86,8 +86,8 @@ package chaos_pkg is
 
   -- how long a timed effect lasts, in frames (60 = 1 second): low .. high
   type frames_t is array (natural range <>) of integer range 0 to 1023;
-  constant ATTACK_LO : frames_t(0 to N_ATTACKS - 1) := (480, 360, 300, 480, 360, 0, 0, 480, 0, 0, 0, 0);
-  constant ATTACK_HI : frames_t(0 to N_ATTACKS - 1) := (720, 600, 480, 720, 600, 0, 0, 720, 0, 0, 0, 0);
+  constant ATTACK_LO : frames_t(0 to N_ATTACKS - 1) := (480, 360, 300, 480, 0, 0, 480, 0, 0, 0, 0);
+  constant ATTACK_HI : frames_t(0 to N_ATTACKS - 1) := (720, 600, 480, 720, 0, 0, 720, 0, 0, 0, 0);
 
   -- media attacks: how long the sender waits before it may send another
   -- one = the item's length (tools\media_plan.py) + 10 s, in frames
@@ -106,36 +106,29 @@ package chaos_pkg is
 
   -- ------------------------------------------------------------- banners
   -- The banner under the field: 20 characters, chosen by number.
-  --   0..11  INCOMING: <attack>   (the rival hit me)
-  --   12..23 SENT: <attack>       (I hit the rival)
-  --   24..26 BONUS: <bonus>
-  --   27     TASK FAILED
-  constant BAN_SENT  : integer := 12;
-  constant BAN_BONUS : integer := 24;
-  constant BAN_FAIL  : integer := 27;
+  --   0..10  INCOMING: <attack>   (the rival hit me)
+  --   11..21 SENT: <attack>       (I hit the rival)
+  --   22..24 BONUS: <bonus>
+  --   25     TASK FAILED
+  constant BAN_SENT  : integer := 11;
+  constant BAN_BONUS : integer := 22;
+  constant BAN_FAIL  : integer := 25;
   constant BANNER_LEN : integer := 20;
   subtype banner_t is std_logic_vector(6 * BANNER_LEN - 1 downto 0);
   function banner_codes(n : integer range 0 to 31) return banner_t;
 
-  -- ------------------------------------------------------------- the cat
-  -- 16 x 16 pixels, 3 bits each: 0 = see-through, 1 = black, 2 = grey fur,
-  -- 3 = white, 4 = pink. Row r, column c = bits 3c+2..3c of CAT(r).
-  subtype cat_row_t is std_logic_vector(47 downto 0);
-  type cat_t is array (0 to 15) of cat_row_t;
-  function cat_pixel(r, c : integer range 0 to 15) return integer;
 
 end package chaos_pkg;
 
 
 package body chaos_pkg is
 
-  type banner_table_t is array (0 to 27) of banner_t;
+  type banner_table_t is array (0 to 25) of banner_t;
   constant BANNERS : banner_table_t := (
     to_codes(" INCOMING: MIRROR!  "),
     to_codes(" INCOMING: FLIPPED! "),
     to_codes(" INCOMING: BLIND!   "),
     to_codes(" INCOMING: BOUNCERS "),
-    to_codes("  INCOMING: OIIA!   "),
     to_codes(" INCOMING: GARBAGE! "),
     to_codes(" INCOMING: CURSED!  "),
     to_codes(" INCOMING: SPEED UP "),
@@ -147,7 +140,6 @@ package body chaos_pkg is
     to_codes("   SENT: FLIP!      "),
     to_codes("   SENT: BLIND!     "),
     to_codes("   SENT: BOUNCERS!  "),
-    to_codes("   SENT: OIIA CAT!  "),
     to_codes("   SENT: GARBAGE!   "),
     to_codes("   SENT: CURSE!     "),
     to_codes("   SENT: SPEED UP!  "),
@@ -168,54 +160,11 @@ package body chaos_pkg is
 
   function banner_codes(n : integer range 0 to 31) return banner_t is
   begin
-    if n <= 27 then
+    if n <= 25 then
       return BANNERS(n);
     end if;
     return to_codes("                    ");
   end function;
 
-  -- '.' see-through, 'K' black, 'G' grey, 'W' white, 'P' pink
-  function crow(s : string) return cat_row_t is
-    variable r : cat_row_t := (others => '0');
-    variable v : integer range 0 to 7;
-  begin
-    for c in 0 to 15 loop
-      case s(s'low + c) is
-        when 'K'    => v := 1;
-        when 'G'    => v := 2;
-        when 'W'    => v := 3;
-        when 'P'    => v := 4;
-        when others => v := 0;
-      end case;
-      r(3*c + 2 downto 3*c) := std_logic_vector(to_unsigned(v, 3));
-    end loop;
-    return r;
-  end function;
-
-  constant CAT : cat_t := (
-    crow("..K..........K.."),
-    crow(".KGK........KGK."),
-    crow(".KGGK......KGGK."),
-    crow(".KGPGKKKKKKGPGK."),
-    crow(".KGGGGGGGGGGGGK."),
-    crow("KGGGGGGGGGGGGGGK"),
-    crow("KGGKKGGGGGGKKGGK"),
-    crow("KGGKWGGGGGGKWGGK"),
-    crow("KGGGGGGPPGGGGGGK"),
-    crow("KGGGWWGKKGWWGGGK"),
-    crow("KGGWWWWGGWWWWGGK"),
-    crow(".KGGWWWWWWWWGGK."),
-    crow(".KGGGWWWWWWGGGK."),
-    crow("..KGGGGGGGGGGK.."),
-    crow("...KKGGGGGGKK..."),
-    crow(".....KKKKKK.....")
-  );
-
-  function cat_pixel(r, c : integer range 0 to 15) return integer is
-    variable row : cat_row_t;
-  begin
-    row := CAT(r);
-    return to_integer(unsigned(row(3*c + 2 downto 3*c)));
-  end function;
 
 end package body chaos_pkg;

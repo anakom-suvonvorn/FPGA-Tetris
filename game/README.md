@@ -42,7 +42,7 @@ halfway they read as off.
 | Slide switch | Up (on) means |
 |---|---|
 | SW2 | pause |
-| SW4 | music (Tetris theme) |
+| SW4 | music and media sound (from the flash) |
 | SW5 | sound effects |
 | SW7 | link to the PC over USB instead of the J5 cable |
 | SW6 | **CHAOS** on (tasks + attacks) |
@@ -97,10 +97,12 @@ leftmost ... SW11) while you keep playing. Every time is random within a range.
 
 Done in time → with a rival connected, usually an **attack** on the rival:
 MIRROR (left/right swapped), FLIP (field upside down), BLIND (locked blocks
-invisible), 5–10 BOUNCERS, the spinning **OIIA cat**, +3 GARBAGE, CURSED
-next piece (S or Z), SPEED, or **LOCK** (all the rival's buttons locked until
+invisible), 5–10 BOUNCERS (with friends' faces), +3 GARBAGE, CURSED
+next piece (S or Z), SPEED, **LOCK** (all the rival's buttons locked until
 they finish a task, which starts for them at once; the panel frame turns
-red). Otherwise a **bonus**: FREEZE gravity (3–5 s), SINK 2 rows right away
+red), or a **media attack**: Bad Apple, OIIA OIIA or Jevil plays behind the
+rival's game with its sound (40–84 s; the sender can't send another media
+attack until it's over + 10 s). Otherwise a **bonus**: FREEZE gravity (3–5 s), SINK 2 rows right away
 (+ cancel waiting garbage), or an I PIECE next. The banner under the field
 says what happened. At most 3–5 garbage rows come in per piece.
 
@@ -129,14 +131,29 @@ SW7 down (off) on both boards. Within half a second both show **LINKED**.
    * `h 15` set the PC's stack height (RIVAL bar turns red);
    * `l` the PC loses → the board shows **WIN!**;
    * `a` auto mode: the PC's stack grows and it sends random garbage;
-   * `x 4` attack the board with the OIIA cat (`x 0`..`x 8`: all 9 attacks,
-     `x 8` = LOCK; needs SW6 up on the board);
+   * `x 3` attack the board with BOUNCERS (`x 0`..`x 10`: all 11 attacks,
+     `x 7` = LOCK, `x 8`..`x 10` = the media attacks; needs SW6 up);
    * clear 2+ lines on the board → the PC prints "board sends n garbage".
 
 ## Sound
 
-Audio jack (headphones or powered speakers): music + effects, mixed. The
-buzzer (jumper J6 on Enable) plays effects only. SW4 / SW5 switch them.
+Audio jack (headphones or powered speakers): the music and video sound
+from the flash + the effects, mixed. The buzzer (jumper J6 on Enable) plays
+effects only. SW4 / SW5 switch them.
+
+## Media (pictures, videos, music from the flash)
+
+Once, on each board (close FPGA Builder first; writing takes a few minutes):
+
+```
+python tools\make_game_media.py
+tools\flash_media.bat media\game_media.bin
+```
+
+Then load the game as usual. What it adds: the music, the media attacks,
+a random clip or picture when you win or lose, Jevil and the faces. Without
+the file in the flash the game works the same, just without them. The list
+of media is `tools\media_plan.py`; details in `docs\learn\09_media_walkthrough.md`.
 
 ## Checked in simulation
 
@@ -150,8 +167,11 @@ buzzer (jumper J6 on Enable) plays effects only. SW4 / SW5 switch them.
 * `tools\sim.bat tb_chaos`: a robot solves the tasks; attacks go over the link
   and switch on the effects of the other board. PASSED.
 * `tools\sim.bat tb_chaos_core`: freeze, speed, cursed / I next, sink. PASSED.
-* `tools\sim.bat tb_chaos_frame`: screenshots with a task panel, the cat,
+* `tools\sim.bat tb_chaos_frame`: screenshots with a task panel + BLIND,
   flip + bouncers (`screenshot_chaos_task.png`, `screenshot_chaos_flip.png`).
+* `tools\sim.bat tb_media_engine`, `tb_media_ctrl`: the media player against
+  a pretend flash chip (sound, pictures, panel, sprites; what plays when).
+  PASSED.
 
 ## How it's built (top-down)
 
@@ -163,9 +183,12 @@ top_tetris
  ├─ versus_link     1-byte messages over uart_tx / uart_rx       src\game
  ├─ chaos_task      slide-switch tasks                           src\game
  ├─ chaos_fx        attacks / bonuses on me, banner              src\game
- ├─ chaos_render    task panel, banner, bouncers, cat (overlay)  src\game
- ├─ tetris_render   (x, y) + state → colour, 9 x text_layer      src\game
- ├─ tetris_sound    music + effects → audio jack / buzzer        src\game
+ ├─ chaos_render    task panel, banner, bouncers (overlay)       src\game
+ ├─ tetris_render   (x, y) + state → colour, text_multi          src\game
+ ├─ media_engine    flash → pictures, sound, sprites             src\media
+ ├─ media_ctrl      what plays when (music, attacks, win/lose)   src\media
+ ├─ media_mix       media over / behind the game → VGA pins      src\media
+ ├─ tetris_sound    media sound + effects → audio jack / buzzer  src\game
  └─ seg7_scan       lines on the 7-segment display               src\common
 ```
 

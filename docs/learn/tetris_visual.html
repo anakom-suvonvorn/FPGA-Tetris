@@ -403,7 +403,8 @@ canvas { display: block; max-width: 100%; height: auto; border-radius: 4px; imag
 <!-- ================================================================ 13 -->
 <section id="cat">
   <h2><span class="tag">chaos_pkg · chaos_render</span>How the cat spins with only one picture</h2>
-  <p>The OIIA cat is one 16 × 16 picture in a ROM (3 bits per pixel: see-through, black, grey, white, pink), drawn 4× bigger (64 × 64). A real 3D spin would need many pictures. Instead <code>chaos_render</code> cycles through 4 ways of <b>reading the same picture</b>, 8 frames each. Normal → squeezed → mirrored → squeezed looks like a card turning around. All four are just different formulas for <code>sx</code>, the picture column to read for screen column <code>dx</code> (0..63):</p>
+  <p class="note">History: this cat was the OIIA attack until the media layer (Part 9) replaced it with the real OIIA video and removed the ROM to make room in the chip. The trick is still worth seeing.</p>
+  <p>The OIIA cat was one 16 × 16 picture in a ROM (3 bits per pixel: see-through, black, grey, white, pink), drawn 4× bigger (64 × 64). A real 3D spin would need many pictures. Instead <code>chaos_render</code> cycles through 4 ways of <b>reading the same picture</b>, 8 frames each. Normal → squeezed → mirrored → squeezed looks like a card turning around. All four are just different formulas for <code>sx</code>, the picture column to read for screen column <code>dx</code> (0..63):</p>
   <div class="stage">
     <div class="scroll"><canvas id="catCanvas" width="760" height="230" style="width:760px;max-width:100%" aria-label="The four cat pictures"></canvas></div>
     <div class="controls">

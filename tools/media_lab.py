@@ -156,9 +156,11 @@ def rle_bytes(cur, prev, bpp):
 
 
 # ============================================================== pictures
-def read_video(path, fps, start, seconds, pad='black'):
-    """like make_media.read_video, with a choice of colour for the bars around"""
-    vf = (f'fps={fps},scale={W}:{H}:force_original_aspect_ratio=decrease,'
+def read_video(path, fps, start, seconds, pad='black', crop=None):
+    """like make_media.read_video, with a choice of colour for the bars around,
+    and an optional crop = (x, y, w, h) of the source first (the part that matters)"""
+    pre = f'crop={crop[2]}:{crop[3]}:{crop[0]}:{crop[1]},' if crop else ''
+    vf = (f'{pre}fps={fps},scale={W}:{H}:force_original_aspect_ratio=decrease,'
           f'pad={W}:{H}:(ow-iw)/2:(oh-ih)/2:color={pad}')
     cmd = [mm.ffmpeg(), '-v', 'error'] + mm.cut_args(start, seconds) + ['-i', path, '-vf', vf,
                                                                      '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-']
@@ -425,9 +427,9 @@ def do_item(it, bases):
     pad = '0x00FF00' if it.get('key') else 'black'
     if it.get('loop'):
         ls, ld = it['loop']
-        frames = read_video(src, fps, ls, ld, pad)
+        frames = read_video(src, fps, ls, ld, pad, it.get('crop'))
     else:
-        frames = read_video(src, fps, it.get('start', 0), it.get('dur'), pad)
+        frames = read_video(src, fps, it.get('start', 0), it.get('dur'), pad, it.get('crop'))
     pal, idx = quantise(frames, bpp, key=it.get('key'))
     # size: first frame whole, then only changes
     vbytes, prev = 0, None

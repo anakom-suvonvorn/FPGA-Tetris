@@ -33,7 +33,8 @@ Contents:
 [9.9 Changes in the game files](#99-changes-in-the-game-files) ·
 [9.10 Testing it](#910-testing-it) ·
 [9.11 Try it on the board](#911-try-it-on-the-board) ·
-[9.12 How big is it?](#912-how-big-is-it)
+[9.12 How big is it?](#912-how-big-is-it) ·
+[9.13 After the first test on the board](#913-after-the-first-test-on-the-board)
 
 ---
 
@@ -49,7 +50,7 @@ Contents:
 | the attack is over | the game | the music carries on **where it was** |
 | the **BOUNCERS** attack (chaos) | the bouncing squares wear your friends' **faces** (32 × 32) | |
 | you **win** | one of: the yippee cat video (whole screen), or a picture in the right panel (Diabeetus, Miku, Teto) | its sound |
-| you **lose** | one of: 10 rickrolls (whole screen), a Foxy or Puppet **jump scare** over your game, or one of 3 "loss" pictures | its sound (or the scream) |
+| you **lose** | one of: 10 rickrolls (whole screen), a Foxy or Puppet **jump scare** over your game, one of 3 "loss" pictures, or Kaka screaming / disappointed in the right panel (red frame) | its sound (or the scream) |
 
 The result text (WIN! / LOSE) and PRESS START stay on top of the
 full-screen clips. Videos disappear when they end; still pictures stay until
@@ -225,7 +226,7 @@ picture length 0 keeps the picture (music items have no pictures at all).
 **Groups instead of fixed numbers.** The header says "the music is items
 0–1, the lose items are 5–10, ...". So the plan can gain or lose a song or
 a picture without changing the hardware; only the 3 attacks are fixed
-(Bad Apple, OIIA, Jevil, the order of `A_APPLE`, `A_OIIA_V`, `A_JEVIL` in
+(Bad Apple, OIIA, Jevil, the order of `A_APPLE`, `A_OIIA`, `A_JEVIL` in
 `chaos_pkg`); the script stops with an error if the plan doesn't have them
 in that order.
 
@@ -551,14 +552,15 @@ sent to the engine with `j_en`. He's drawn 2× like everything else.
 
 ### `chaos_pkg.vhd`
 
-* `N_ATTACKS` 9 → 12: `A_APPLE` 9, `A_OIIA_V` 10, `A_JEVIL` 11
-  (L73); `A_MEDIA` = 9 = "ids from here on are media
+* The attack list (L69): the old ROM cat (attack 4) is gone (see 9.13),
+  and the three media attacks are new: `A_APPLE` 8, `A_OIIA` 9, `A_JEVIL`
+  10, so `N_ATTACKS` 9 → 11. `A_MEDIA` = 8 = "ids from here on are media
   attacks".
 * `MEDIA_COOL` (L95): the sender's wait per media attack, in
   frames: its length from the plan + 600 (10 s). If you change a length in
   the plan, change it here too.
-* 6 new banners (INCOMING / SENT for each), so `BAN_SENT` 12, `BAN_BONUS`
-  24, `BAN_FAIL` 27 (L113).
+* INCOMING / SENT banners for the media attacks (and none for the cat any
+  more), so `BAN_SENT` 11, `BAN_BONUS` 22, `BAN_FAIL` 25 (L113).
 
 ### `chaos_task.vhd`: the sender's cool-down
 
@@ -570,26 +572,25 @@ normal attack is picked instead. Sending a media attack sets `mcool` to its
 
 ### `chaos_fx.vhd`
 
-An incoming media attack (L126) gives the INCOMING banner and the alarm
+An incoming media attack (L124) gives the INCOMING banner and the alarm
 sound like every attack, and a pulse `media_hit` with `media_id` = 0..2
 for media_ctrl. No timer: the video decides how long.
 
 ### `chaos_render.vhd`: bouncers with faces
 
-The bouncers are 32 × 32 now (`BQ`, L73). The loop that finds
+The bouncers are 32 × 32 now (`BQ`, L69). The loop that finds
 the bouncer under (x, y) also remembers **which** one (`hb`), and then
-(L349):
+(L326):
 
 ```
   face_addr = face × 1024 + (y − by) × 32 + (x − bx)      face = (hb + foff) mod 4
 ```
 
 Everything is a power of 2, so the address is just the bits side by side
-(L352): 2 bits face, 5 bits row, 5 bits column. `foff` is
+(L329): 2 bits face, 5 bits row, 5 bits column. `foff` is
 shuffled at the start of every BOUNCE attack, so the faces move around. The
 coloured squares are still drawn in the overlay underneath (that's what
-you see without the media file); media_mix puts the face over them. Where
-the OIIA cat is, `face_en` is cleared, so the cat stays on top.
+you see without the media file); media_mix puts the face over them.
 
 ### `tetris_render.vhd`
 
@@ -603,7 +604,7 @@ renders.
 ### `tetris_sound.vhd`: real music
 
 The Korobeiniki ROM and its note player are gone. The mixer
-(L239) now has 4,096 levels instead of 16:
+(L225) now has 4,096 levels instead of 16:
 
 ```
   loudness = 1536 + pcm / 32  (+ 1024 while the effect's square wave is high)
@@ -647,7 +648,7 @@ is ever switched on. tetris_render went from 1,172 to 895 LUTs.
 
 **10 bouncers, 10 sets of adders.** Every frame all 10 bouncers moved in
 the same clock: 10 × (x ± speed, compare with the walls, y the same). Now
-a counter `bk` (L90 of chaos_render) moves one bouncer per clock in
+a counter `bk` (L85 of chaos_render) moves one bouncer per clock in
 the 10 clocks after `frame_tick` (the screen is blank then), with one
 shared set. Same positions, same pictures; ~130 LUTs less.
 
@@ -773,12 +774,12 @@ The game with the media layer, built with `tools\build.bat game`
 
 | | before the media (chaos) | now | of the chip |
 |---|---|---|---|
-| LUTs | 6,200 (77.5 %) | **6,972 (87 %)** | 8,000 |
+| LUTs | 6,200 (77.5 %) | **6,797 (85 %)** | 8,000 |
 | flip-flops | 2,064 | 3,079 (19 %) | 16,000 |
-| slices (groups of 4 LUTs + 8 flip-flops) | | 1,992 (99.6 %) | 2,000 |
+| slices (groups of 4 LUTs + 8 flip-flops) | | 1,962 (98 %) | 2,000 |
 | block RAM tiles | 0 | **10 (100 %)** | 10 |
 | DSP blocks | 2 | 3 | 20 |
-| timing (WNS, must be ≥ 0) | +4.6 ns | **+3.7 ns** | |
+| timing (WNS, must be ≥ 0) | +4.6 ns | **+3.4 ns** | |
 
 The new blocks, from a synthesis run that keeps every block separate
 (the normal report mixes some of them into `vga_sync`):
@@ -793,12 +794,27 @@ The new blocks, from a synthesis run that keeps every block separate
 What this means:
 
 * **It fits, but the chip is full.** Nearly every slice has something in
-  it (99.6 %), and all 10 block RAM tiles are used. A new feature now needs
-  something else to get smaller first. Candidates if it ever comes to that:
-  the old 64 × 64 ROM cat (the OIIA video does the same job now), the
-  banner texts (28 × 20 characters of ROM), or `tetris_core` (2,900 LUTs,
-  the biggest block by far).
-* **Timing is comfortable:** the slowest path still has 3.7 ns to spare out
+  it (98 %), and all 10 block RAM tiles are used. A new feature now needs
+  something else to get smaller first. The old ROM cat already went
+  (9.13); next candidates would be the banner texts (26 × 20 characters of
+  ROM) or `tetris_core` (2,900 LUTs, the biggest block by far).
+* **Timing is comfortable:** the slowest path still has 3.4 ns to spare out
   of 20 ns. The extra pipeline stage in media_mix helps here: the media
   colour choice gets a whole clock to itself.
-* **Flash:** the media file is 6.83 MB of the 7 MB free (93 %).
+* **Flash:** the media file is 6.86 MB of the 7 MB free (93.5 %).
+
+---
+
+## 9.13 After the first test on the board
+
+| what you noticed | what changed | where |
+|---|---|---|
+| `flash_media.bat media\game_media.bin` printed nothing and wrote nothing | a message inside an `if ( ... )` block had brackets in it: `(or ...)`. In a batch file the `)` ends the block, so the next line, `exit /b 1`, always ran. Fixed by writing them as `^(` and `^)` | `tools/flash_media.bat` |
+| the Foxy jump scare only covered the middle of the screen | the video is a 4:3 game screen (960 × 720) in the middle of a 16:9 frame (1280 × 720), with green on both sides. Squeezing the whole frame into 160 × 120 made Foxy small. New plan setting `crop = (x, y, w, h)`: cut out just the 4:3 screen first. It was measured from the frames: Foxy never goes past x 160..1119, so nothing of him is cut off, and at the end he fills the whole screen. Puppet's video was 4:3 already | `media_plan.py` (`crop`), `media_lab.read_video` |
+| the two reaction pictures (Kaka screaming / disappointed) were missing | they were in the first plan as **lose** pictures in the right panel; "don't use other friends' pictures" meant "no more than these", not "drop these". Both are back: two more lose items, panel mode, 256 colours (7 KB each). The red frame for a loss was already in media_mix | `media_plan.py` |
+| remove the old spinning cat | attack 4 (the 16 × 16 ROM cat, drawn 64 × 64 with the fake spin) is gone: its ROM and `cat_pixel` (chaos_pkg), its position and drawing (chaos_render), its timer and `oiia_evt` (chaos_fx), its jingle (tetris_sound). The attacks after it moved down by one (GARBAGE 4 ... LOCK 7, media 8..10); both boards run the same design, so they still agree. The real OIIA video attack took its place | chaos_pkg, chaos_fx, chaos_render, tetris_sound, top_tetris, `tools/fake_opponent.py`, `sim/tb_chaos*.vhd` |
+| (the numbers) | 6,972 → 6,797 LUTs (87 % → 85 %), slices 99.6 % → 98 % (see 9.12) | |
+| (tidying) | things nothing used any more: the 6 notes only the old melody played (tetris_sound), the cat's variables, `spin` down to 2 bits (it only shuffles the faces now) | |
+
+The chaos screenshot testbench (`tb_chaos_frame`) used the cat for its
+first picture; it now sends BLIND there.

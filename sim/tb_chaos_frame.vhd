@@ -4,7 +4,7 @@
 -- Like tb_tetris_frame, with chaos switched on (SW6), the first task
 -- forced to BINARY and coming after half a second, and the pretend PC
 -- attacking:
---   screenshot 1 (frame.ppm)  : the BINARY task panel + the OIIA cat attack
+--   screenshot 1 (frame.ppm)  : the BINARY task panel + the BLIND attack
 --   screenshot 2 (frame2.ppm) : FLIP + BOUNCERS attacks
 -- Run with:  tools\sim.bat tb_chaos_frame   (several minutes), then
 --            python tools\ppm2png.py sim\out\frame2.ppm sim\out\frame2.png
@@ -33,7 +33,7 @@ architecture sim of tb_chaos_frame is
   signal pc_start : std_logic := '0';
   signal pc_busy  : std_logic;
   signal pc_line  : std_logic;
-  signal want_cat, want_flip : boolean := false;
+  signal want_blind, want_flip : boolean := false;
 
   -- the robot's moves for each piece: rotations, then sideways steps
   type int_arr is array (natural range <>) of integer;
@@ -75,8 +75,8 @@ begin
   begin
     loop
       send("000" & "01001");                     -- HEARTBEAT, height 9
-      if want_cat and not sent_c then
-        send("100" & "00100");                   -- ATTACK 4: OIIA cat
+      if want_blind and not sent_c then
+        send("100" & "00010");                   -- ATTACK 2: BLIND
         sent_c := true;
       end if;
       if want_flip and not sent_f then
@@ -113,7 +113,7 @@ begin
         wait until falling_edge(vs);
       end if;
     end loop;
-    want_cat <= true;                            -- the rival sends the OIIA cat
+    want_blind <= true;                          -- the rival sends BLIND
     wait for 50 ms;
     report "taking screenshot 1";
     shot <= 1;

@@ -15,9 +15,6 @@
 --       With the media file loaded, each shows a friend's face: this block
 --       says which face pixel (face_en, face_addr = face * 1024 + row * 32 +
 --       column) and media_engine / media_mix draw it on top.
---   * the OIIA CAT: a 64 x 64 cat bouncing over the field, "spinning"
---     (attack). The spin is faked with 4 pictures: normal, squeezed to half
---     width, mirrored, mirrored + squeezed - like a coin turning.
 --
 -- TIMING: same as text_multi. Everything is worked out from (x, y) and put
 -- in r_* registers on the next clock edge; the text_multi pixels arrive at
@@ -39,7 +36,6 @@ entity chaos_render is
     enable     : in  std_logic;                     -- chaos switched on
     bounce     : in  std_logic;
     n_bounce   : in  integer range 5 to 10;         -- how many bouncers
-    cat        : in  std_logic;
     locked     : in  std_logic;                     -- LOCK attack: red frame
     -- task panel
     t_active   : in  std_logic;
@@ -71,7 +67,6 @@ architecture rtl of chaos_render is
   constant FW  : integer := 160;  constant FH  : integer := 320;
   constant PX0 : integer := 432;  constant PY0 : integer := 288;    -- panel inside
   constant BQ  : integer := 32;                                     -- bouncer size
-  constant CS  : integer := 64;                                     -- cat size
 
   -- bouncers: position + direction + speed + colour, 10 of them
   -- (only the first n_bounce are drawn)
@@ -89,11 +84,7 @@ architecture rtl of chaos_render is
   signal bdy : std_logic_vector(NB - 1 downto 0) := "1001011010";  -- '1' = moving down
   signal bk  : integer range 0 to NB := NB;                        -- bouncer being moved (NB = none)
 
-  -- the cat
-  signal cx    : integer range 0 to 639 := 260;
-  signal cy    : integer range 0 to 479 := 120;
-  signal cdx, cdy : std_logic := '1';
-  signal spin  : unsigned(4 downto 0) := (others => '0');     -- picture = bits 4..3
+  signal spin  : unsigned(1 downto 0) := (others => '0');     -- counts frames (shuffles the faces)
 
   -- which face each bouncer wears: (bouncer + foff) mod 4, new foff per attack
   signal foff    : unsigned(1 downto 0) := (others => '0');
@@ -146,7 +137,7 @@ begin
     if rising_edge(clk) then
       bounce_d <= bounce;
       if bounce = '1' and bounce_d = '0' then
-        foff <= spin(1 downto 0);                      -- a new attack: shuffle the faces
+        foff <= spin;                                  -- a new attack: shuffle the faces
       end if;
       -- the bouncers move one after the other, one per clock, in the 10
       -- clocks after frame_tick (the screen is blank then): one set of
@@ -167,16 +158,6 @@ begin
       if frame_tick = '1' then
         spin <= spin + 1;
         bk   <= 0;                                     -- start moving the bouncers
-        if cdx = '1' then
-          if cx + 2 >= FX0 + FW - CS then cdx <= '0'; else cx <= cx + 2; end if;
-        else
-          if cx - 2 <= FX0 then cdx <= '1'; else cx <= cx - 2; end if;
-        end if;
-        if cdy = '1' then
-          if cy + 3 >= FY0 + FH - CS then cdy <= '0'; else cy <= cy + 3; end if;
-        else
-          if cy - 3 <= FY0 then cdy <= '1'; else cy <= cy - 3; end if;
-        end if;
       end if;
     end if;
   end process;
@@ -242,13 +223,9 @@ begin
     variable xi, yi : integer range 0 to 1023;
     variable hit    : std_logic;
     variable c      : rgb_t;
-    variable dx, dy : integer range -1024 to 1023;
-    variable sx, sy : integer range 0 to 15;
-    variable cp     : integer range 0 to 7;
     variable i8     : integer range 0 to 7;
     variable bit_on : std_logic;
     variable px     : integer range 0 to 255;
-    variable ph     : integer range 0 to 3;
     variable hb     : integer range 0 to NB - 1;
     variable fhit   : std_logic;
     variable fdx, fdy : unsigned(9 downto 0);
@@ -351,31 +328,6 @@ begin
       fdy := y - to_unsigned(by(hb), 10);
       r_faddr <= (to_unsigned(hb mod 4, 2) + foff) & fdy(4 downto 0) & fdx(4 downto 0);
 
-      -- ------------------------------------------ the spinning cat
-      if cat = '1' and xi >= cx and xi < cx + CS and yi >= cy and yi < cy + CS then
-        dx := xi - cx;                                 -- 0..63
-        dy := yi - cy;
-        sy := dy / 4;
-        ph := to_integer(spin(4 downto 3));            -- changes every 8 frames
-        cp := 0;
-        if ph = 0 or ph = 2 then                       -- full width
-          sx := dx / 4;
-          if ph = 2 then sx := 15 - sx; end if;        -- mirrored = the back half of the turn
-          cp := cat_pixel(sy, sx);
-        elsif dx >= 16 and dx < 48 then                -- squeezed to half width
-          sx := (dx - 16) / 2;
-          if ph = 3 then sx := 15 - sx; end if;
-          cp := cat_pixel(sy, sx);
-        end if;
-        case cp is
-          when 1      => hit := '1'; c := x"111";
-          when 2      => hit := '1'; c := x"999";
-          when 3      => hit := '1'; c := x"FFF";
-          when 4      => hit := '1'; c := x"F9B";
-          when others => null;                         -- see-through
-        end case;
-        if cp /= 0 then fhit := '0'; end if;           -- the cat stays on top of the faces
-      end if;
 
       r_fen <= fhit;
       r_on  <= hit;

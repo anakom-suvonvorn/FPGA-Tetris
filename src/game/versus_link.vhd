@@ -13,7 +13,7 @@
 --   type 1  GARBAGE    value = number of garbage lines to add (1..31)
 --   type 2  LOST       I topped out (value unused)
 --   type 3  START      I started a new round, start yours too
---   type 4  ATTACK     value = chaos attack number (chaos_pkg), 0..7
+--   type 4  ATTACK     value = chaos attack number (chaos_pkg), 0..10
 --   type 5..7          free
 --
 -- SENDING: requests (send_* pulses) are remembered until the transmitter is

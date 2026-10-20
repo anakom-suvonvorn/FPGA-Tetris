@@ -427,7 +427,7 @@ begin
       end if;
       keep <= s1_banner_res or s1_banner_press;
 
-      -- the chaos overlay (task panel, banner, bouncers, cat) goes on top
+      -- the chaos overlay (task panel, banner, bouncers) goes on top
       if ov_on = '1' then
         c := ov_rgb;
         see_bg <= '0';
