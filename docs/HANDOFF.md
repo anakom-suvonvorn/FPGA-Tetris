@@ -56,8 +56,8 @@ Claude's memory (`...\.claude\projects\D--All-files-Me-university-digital-system
   3.125 MHz (expected). The user collected media in `media\` (git-ignored:
   music/, effects/, lose/, win/, friends' pictures). **Media plan v1**:
   `tools\media_plan.py` (the list) → `python tools\media_lab.py [ids]`
-  (FPGA-accurate renders + sizes into mediaenders\, git-ignored) →
-  `python tools\media_page.py` → open `mediaenders\plan.html` (local only:
+  (FPGA-accurate renders + sizes into media\renders\, git-ignored) →
+  `python tools\media_page.py` → open `media\renders\plan.html` (local only:
   friends' photos + others' videos; don't publish). Proposed: 16 kHz 4-bit IMA
   ADPCM sound, delta+RLE picture codec (SKIP/FILL/COPY ops, see media_lab
   rle_bytes), modes bg (hollow blocks over dimmed video) / full / over
