@@ -1,18 +1,15 @@
 -- ============================================================================
 -- tetris_sound.vhd
--- Background music (the Tetris theme, "Korobeiniki") and sound effects,
--- as chiptune square waves, mixed and sent to the audio jack.
+-- Sound effects (chiptune square waves) mixed with the media sound (the
+-- music and the videos' sound from the flash, media_engine's 'pcm'), sent
+-- to the audio jack.
+-- (Before the media layer this block also played the Tetris theme from a
+-- ROM of notes; the real recordings in the flash replaced it.)
 --
 -- HOW A NOTE IS MADE
 --   A square wave of frequency f flips between 0 and 1 every 25,000,000 / f
 --   clocks (50 MHz clock, two flips per period). So a note is just a counter
 --   that flips an output bit when it reaches the note's "half period".
---   Two such tone generators: one for the music, one for the effects.
---
--- MUSIC: a ROM of 40 (note, length) pairs; length in eighth notes.
---   One eighth = 12 frames (0.2 s) at level 0, a bit faster every level.
---   The last frame of each note is silent so repeated notes are heard
---   separately. Plays only while a game is running and SW4 is on.
 --
 -- EFFECTS: up to 4 (note, frames) steps each, started by game events:
 --   lock, line clear, Tetris, garbage arriving, start, win, lose,
@@ -24,13 +21,15 @@
 --   A pin can only be 0 V or 3.3 V, but mixing two sounds and setting a
 --   volume needs levels in between. Trick: switch the pin on and off much
 --   faster than anyone can hear. The headphones only feel the AVERAGE, so a
---   pin that is on 3 clocks out of 16 sounds like 3/16 of full volume.
---   1. 'loudness' (0..15) = how loud the pin should be right now:
---      +3 while the music square is high, +7 while the effect square is high.
+--   pin that is on 1,024 clocks out of 4,096 sounds like 1/4 of full volume.
+--   1. 'loudness' (0..4095) = how loud the pin should be right now:
+--      1536 + the media sample / 32 (-1024..+1023)
+--      + 1024 while the effect square is high.
 --   2. 'bucket' turns loudness into on/off clocks ("sigma-delta"): every
---      clock pour 'loudness' into a bucket that holds 16; each time it
---      overflows, the pin is on for that clock and 16 is poured away.
---      Over every 16 clocks it overflows exactly 'loudness' times.
+--      clock pour 'loudness' into a bucket that holds 4,096; each time it
+--      overflows, the pin is on for that clock and 4,096 is poured away.
+--      Over every 4,096 clocks it overflows exactly 'loudness' times.
+--      (Before the media layer it was the same idea with 16 levels.)
 -- ============================================================================
 library ieee;
 use ieee.std_logic_1164.all;
@@ -40,10 +39,10 @@ entity tetris_sound is
   port (
     clk        : in  std_logic;
     frame_tick : in  std_logic;
-    music_on   : in  std_logic;
+    music_on   : in  std_logic;                   -- SW4: the media sound on
     sfx_on     : in  std_logic;
     playing    : in  std_logic;
-    level      : in  integer range 0 to 15;
+    pcm        : in  signed(15 downto 0);          -- media sound (media_engine)
     clear_evt  : in  std_logic;                   -- a piece locked...
     clear_n    : in  integer range 0 to 4;        -- ...clearing this many lines
     garb_evt   : in  std_logic;                   -- garbage arrived
@@ -97,27 +96,7 @@ architecture rtl of tetris_sound is
   constant C6 : integer := 15; constant E6 : integer := 16; constant G6 : integer := 17;
   constant C7 : integer := 18;
 
-  -- ---------------------------------------------- the melody (8 bars of 8 eighths)
   type int_arr is array (natural range <>) of integer range 0 to 31;
-  constant MUS_LEN_N : integer := 40;
-  constant MUS_NOTE : int_arr(0 to MUS_LEN_N - 1) := (
-    E5, B4, C5, D5, C5, B4,            -- bar 1
-    A4, A4, C5, E5, D5, C5,            -- bar 2
-    B4, C5, D5, E5,                    -- bar 3
-    C5, A4, A4, R,                     -- bar 4
-    R, D5, F5, A5, G5, F5,             -- bar 5
-    E5, C5, E5, D5, C5,                -- bar 6
-    B4, B4, C5, D5, E5,                -- bar 7
-    C5, A4, A4, R);                    -- bar 8
-  constant MUS_LEN : int_arr(0 to MUS_LEN_N - 1) := (
-    2, 1, 1, 2, 1, 1,
-    2, 1, 1, 2, 1, 1,
-    3, 1, 2, 2,
-    2, 2, 2, 2,
-    1, 2, 1, 2, 1, 1,
-    3, 1, 2, 1, 1,
-    2, 1, 1, 2, 2,
-    2, 2, 2, 2);
 
   -- ---------------------------------------------- effects: 4 steps of (note, frames)
   constant FX_LOCK   : integer := 0;
@@ -164,39 +143,29 @@ architecture rtl of tetris_sound is
     (6,  6,  6,  6),
     (10, 7,  7,  16));
 
-  -- music player
-  signal mus_i     : integer range 0 to MUS_LEN_N - 1 := 0;
-  signal mus_left  : integer range 0 to 63 := 0;          -- frames left in this note
-  signal mus_now  : integer range 0 to 31 := 0;          -- sounding now (0 = silent)
-
   -- effect player
   signal fx_id     : integer range 0 to N_FX - 1 := 0;
   signal fx_step   : integer range 0 to 4 := 4;           -- 4 = not playing
   signal fx_left   : integer range 0 to 63 := 0;
   signal fx_now   : integer range 0 to 31 := 0;
 
-  -- tone generators
-  signal m_cnt, s_cnt : integer range 0 to 300000 := 0;
-  signal m_sq, s_sq   : std_logic := '0';
+  -- tone generator
+  signal s_cnt : integer range 0 to 300000 := 0;
+  signal s_sq  : std_logic := '0';
 
   -- edge detection of the game state
   signal playing_d : std_logic := '0';
   signal result_d  : integer range 0 to 4 := 0;
 
-  signal bucket : unsigned(4 downto 0) := (others => '0');   -- sigma-delta "bucket" (see mixer)
+  signal bucket : unsigned(12 downto 0) := (others => '0');  -- sigma-delta "bucket" (see mixer)
   signal buzz_r : std_logic := '0';
 
-  function eighth_frames(lv : integer range 0 to 15) return integer is
-  begin
-    if lv >= 6 then return 6; else return 12 - lv; end if;
-  end function;
 
 begin
 
   -- ---------------------------------------------------------------- sequencers
   process(clk)
     variable start_fx : integer range -1 to N_FX - 1;
-    variable len      : integer range 0 to 63;
   begin
     if rising_edge(clk) then
       playing_d <= playing;
@@ -243,41 +212,13 @@ begin
         end if;
       end if;
 
-      -- music player: only while a game runs, restarts with every game
-      if playing = '0' then
-        mus_i    <= 0;
-        mus_left <= 0;
-        mus_now <= 0;
-      elsif frame_tick = '1' then
-        if mus_left = 0 then                      -- start the next note
-          len      := MUS_LEN(mus_i) * eighth_frames(level);
-          mus_left <= len - 1;
-          mus_now <= MUS_NOTE(mus_i);
-          if mus_i = MUS_LEN_N - 1 then mus_i <= 0; else mus_i <= mus_i + 1; end if;
-        else
-          mus_left <= mus_left - 1;
-          if mus_left = 1 then
-            mus_now <= 0;                        -- short gap before the next note
-          end if;
-        end if;
-      end if;
     end if;
   end process;
 
-  -- ---------------------------------------------------------------- tone generators
+  -- ---------------------------------------------------------------- tone generator
   process(clk)
   begin
     if rising_edge(clk) then
-      if mus_now = 0 then
-        m_cnt <= 0;
-        m_sq  <= '0';
-      elsif m_cnt >= half_period(mus_now) - 1 then
-        m_cnt <= 0;
-        m_sq  <= not m_sq;
-      else
-        m_cnt <= m_cnt + 1;
-      end if;
-
       if fx_now = 0 then
         s_cnt <= 0;
         s_sq  <= '0';
@@ -292,24 +233,26 @@ begin
 
   -- ---------------------------------------------------------------- mixer + sigma-delta
   process(clk)
-    variable loudness : integer range 0 to 15;
+    variable loudness : integer range 0 to 4095;
   begin
     if rising_edge(clk) then
-      -- 1. how loud should the pin be right now? (0 = silent .. 15 = full)
-      loudness := 0;
-      if m_sq = '1' and music_on = '1' then loudness := loudness + 3; end if;   -- music: quiet
-      if s_sq = '1' and sfx_on = '1'   then loudness := loudness + 7; end if;   -- effects: louder
+      -- 1. how loud should the pin be right now? (0 = silent .. 4095 = full)
+      loudness := 1536;
+      if music_on = '1' then
+        loudness := loudness + to_integer(pcm(15 downto 5));                  -- media: -1024..+1023
+      end if;
+      if s_sq = '1' and sfx_on = '1' then loudness := loudness + 1024; end if;  -- effects
 
-      -- 2. the bucket: bits 3..0 = what's in it (0..15), bit 4 = "it overflowed".
-      --    Keep bits 3..0 (dropping bit 4 = pouring 16 away), add the loudness.
-      --    The new bit 4 is '1' when the sum reached 16 or more: pin on.
-      bucket <= ('0' & bucket(3 downto 0)) + to_unsigned(loudness, 5);
+      -- 2. the bucket: bits 11..0 = what's in it, bit 12 = "it overflowed".
+      --    Keep bits 11..0 (dropping bit 12 = pouring 4,096 away), add the
+      --    loudness. The new bit 12 is '1' when the sum reached 4,096: pin on.
+      bucket <= ('0' & bucket(11 downto 0)) + to_unsigned(loudness, 13);
 
       if s_sq = '1' and sfx_on = '1' then buzz_r <= '1'; else buzz_r <= '0'; end if;
     end if;
   end process;
 
-  audio <= bucket(4);
+  audio <= bucket(12);
   buzz  <= buzz_r;
 
 end architecture;

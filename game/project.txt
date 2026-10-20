@@ -17,8 +17,13 @@ src/game/tetris_core.vhd
 src/game/versus_link.vhd
 src/game/chaos_task.vhd
 src/game/chaos_fx.vhd
-src/game/text_layer.vhd
+src/game/text_multi.vhd
 src/game/chaos_render.vhd
 src/game/tetris_render.vhd
 src/game/tetris_sound.vhd
+src/media/spi_flash.vhd
+src/media/adpcm_dec.vhd
+src/media/media_engine.vhd
+src/media/media_ctrl.vhd
+src/media/media_mix.vhd
 game/top_tetris.vhd

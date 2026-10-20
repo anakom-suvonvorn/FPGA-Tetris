@@ -265,7 +265,7 @@ need to store the right answers anywhere.
 The SPI master. It knows nothing about pictures: give it a command, an
 address and a length, and it delivers the bytes one by one.
 
-### Ports (L44–65)
+### Ports (L46–68)
 
 | port | meaning |
 |---|---|
@@ -279,7 +279,7 @@ address and a length, and it delivers the bytes one by one.
 There is no way for the user to say "wait": bytes come at most once every
 16 clocks and must be taken when `dout_valid` is '1'.
 
-### Registers (L68–81)
+### Registers (L71–84)
 
 `state` (5 states), `sclk_r` and `cs_r` (the pins), `hp` (the speed, frozen
 for the whole transaction), `ph` (clocks spent in the current SCLK half),
@@ -288,7 +288,7 @@ send), `sh_in` (8-bit shift register for incoming bits), `n_in` (bits of
 this byte received), `left` (bytes left), `wake` (counter), `dv`/`dn`
 (the output pulses).
 
-### The half-period timer (L91–92)
+### The half-period timer (L94–95)
 
 ```vhdl
 half_done := (ph = hp - 1);
@@ -299,24 +299,24 @@ if half_done then ph <= 0; else ph <= ph + 1; end if;
 clock of each half. With hp = 1 it is true every clock: SCLK toggles every
 clock = 25 MHz.
 
-### S_WAKE (L97–102)
+### S_WAKE (L100–105)
 
 16 half periods (8 SCLK periods) with CS_N high, slowly (hp = 4), to get
 STARTUPE2's clock path going (8.2). Then S_IDLE.
 
-### S_IDLE (L104–117)
+### S_IDLE (L107–120)
 
 Wait for `start`. Then: CS_N low (the chip listens from now), load
 `sh_out` with the command in the top 8 bits and the address below it,
 `n_out` = 32 bits (or 8 for a command without address), `left` = `len`.
 
-### S_SEND (L119–132)
+### S_SEND (L122–135)
 
 Each half period: if SCLK is low, raise it (the chip reads MOSI now); if
 high, lower it and shift `sh_out` left so the next bit appears on
 `mosi <= sh_out(31)`. After the last bit: S_READ (or S_END if `len` = 0).
 
-### S_READ (L134–152)
+### S_READ (L137–157)
 
 The same toggling. At the end of each high half (just before SCLK falls,
 8.2):
@@ -327,14 +327,18 @@ sh_in <= sh_in(6 downto 0) & miso;   -- the new bit enters on the right
 
 After 8 bits, `dv <= '1'` and `left` goes down by 1. Note the timing: `dv`
 and the 8th bit are written at the same clock edge, so in the next clock
-`dout_valid` is '1' and `dout` (= `sh_in`) holds the whole byte (L168–171).
+`dout_valid` is '1' and `dout` (= `sh_in`) holds the whole byte (L173–176).
 When `left` reaches 0: S_END.
 
-### S_END (L153–157)
+(The first lines of S_READ, L138–139, were added for the game's media
+engine: while the input `hold` is '1', the next byte doesn't start. Test 06
+leaves `hold` at its default '0'. Part 9, section 9.6, explains why.)
+
+### S_END (L158–162)
 
 CS_N high, wait 3 clocks (the chip wants CS_N high for a moment between
 commands), pulse `done`, back to S_IDLE. `wake` is reused as the counter;
-L161–163 loads it with 3 when a transaction starts.
+L166–168 loads it with 3 when a transaction starts.
 
 ---
 

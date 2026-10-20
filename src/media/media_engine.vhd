@@ -116,6 +116,10 @@ architecture rtl of media_engine is
   signal pal    : pal_t := (others => (others => '0'));
   signal ring   : ring_t := (others => (others => '0'));
   signal faces  : bank8_t := (others => (others => '0'));
+  -- all of these MUST be block RAM (Vivado otherwise sometimes moves one
+  -- into LUTs when it guesses wrongly that the block RAM has run out)
+  attribute ram_style : string;
+  attribute ram_style of pal, ring, faces : signal is "block";
 
   signal fb_we, j_we, f_we, pal_we, ring_we : std_logic := '0';
   signal fb_wa  : integer range 0 to FB_SIZE - 1 := 0;
@@ -159,7 +163,7 @@ architecture rtl of media_engine is
   type state_t is (E_HDR, E_HDR_W, E_SPR, E_SPR_W, E_IDLE, E_ENT, E_ENT_W, E_PAL, E_PAL_W,
                    E_START, E_WAIT, E_RH, E_RH_W, E_PIC, E_PIC_W, E_PIC_END, E_SND, E_SND_W, E_NEXT);
   signal state   : state_t := E_HDR;
-  signal bi      : unsigned(23 downto 0) := (others => '0');   -- byte number in this read
+  signal bi      : unsigned(15 downto 0) := (others => '0');   -- byte number in this read (all reads < 64 KB)
 
   signal req_play, req_stop : std_logic := '0';
   signal req_item : integer range 0 to 31 := 0;
@@ -567,6 +571,7 @@ begin
   -- frame buffer: address a = bank a / 4096, place a mod 4096
   g_fb : for i in 0 to 4 generate
     signal mem : bank8_t := (others => (others => '0'));
+    attribute ram_style of mem : signal is "block";
   begin
     process(clk)
     begin
@@ -582,6 +587,7 @@ begin
   -- Jevil, 4 bits a pixel, banked the same way
   g_jev : for i in 0 to 4 generate
     signal mem : bank4_t := (others => (others => '0'));
+    attribute ram_style of mem : signal is "block";
   begin
     process(clk)
     begin

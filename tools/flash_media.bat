@@ -1,9 +1,10 @@
 @echo off
 rem ===========================================================================
-rem  flash_media.bat  -  write a media file (from make_media.py) into the
+rem  flash_media.bat  -  write a media file (make_game_media.py) into the
 rem                      board's SPI flash, 1 MB in (address 0x100000).
 rem
-rem  Usage:   tools\flash_media.bat media\media.bin
+rem  Usage:   tools\flash_media.bat media\game_media.bin   (the game's media)
+rem           tools\flash_media.bat media\media.bin        (test 06's demo file)
 rem           tools\flash_media.bat check media\media.bin
 rem                (reads the first 64 KB back out of the flash and compares)
 rem
@@ -11,7 +12,7 @@ rem  The flash also holds the FPGA's own start-up bitstream at address 0
 rem  (about 0.5 MB, only if you ever used "PROM"/flash programming). This
 rem  writes from 1 MB on, so that stays untouched.
 rem  Writing loads a small helper design ("spiOverJtag") into the FPGA first;
-rem  afterwards load your design again (tools\program.bat 06_flash_read).
+rem  afterwards load your design again (tools\program.bat game, or 06_flash_read).
 rem  Close FPGA Builder first if it is open, they share the USB cable.
 rem ===========================================================================
 setlocal
@@ -25,7 +26,7 @@ if "%~1"=="" (
   exit /b 1
 )
 if not exist "%~f1" (
-  echo No such file: %~1   - make it first: python tools\make_media.py media\media.bin --demo
+  echo No such file: %~1   - make it first: python tools\make_game_media.py   (or tools\make_media.py ... --demo)
   exit /b 1
 )
 echo Writing %~f1 into the flash at 0x100000 ...
@@ -34,7 +35,7 @@ if errorlevel 1 (
   echo FAILED - see the messages above
   exit /b 1
 )
-echo Done. Now load the test: tools\program.bat 06_flash_read
+echo Done. Now load your design again: tools\program.bat game   (or 06_flash_read)
 exit /b 0
 
 :check

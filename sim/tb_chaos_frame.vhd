@@ -45,7 +45,7 @@ begin
 
   dut : entity work.top_tetris
     generic map (DEBOUNCE_CYCLES => 20, CHAOS_FIRST_DELAY => 30, CHAOS_FORCE_TASK => 2,
-                 SW_TICK_CYCLES => 50)
+                 SW_TICK_CYCLES => 50, USE_STARTUP => false)
     port map (clk => clk, btn_left => b_left, btn_rot => b_rot, btn_hard => b_hard,
               btn_soft => b_soft, btn_right => b_right,
               sw_pause => '0', sw_music => '1', sw_sfx => '1', sw_usb => '1',

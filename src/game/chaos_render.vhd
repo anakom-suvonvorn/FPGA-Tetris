@@ -11,13 +11,16 @@
 --       with a green zone (HOLD, TIMING), a progress bar and a time bar.
 --       The frame turns red while my buttons are LOCKED.
 --   * the BANNER under the field       x 176..423, y 444..467
---   * BOUNCERS: 5..10 squares bouncing around the field (attack)
+--   * BOUNCERS: 5..10 squares of 32 x 32 bouncing around the field (attack).
+--       With the media file loaded, each shows a friend's face: this block
+--       says which face pixel (face_en, face_addr = face * 1024 + row * 32 +
+--       column) and media_engine / media_mix draw it on top.
 --   * the OIIA CAT: a 64 x 64 cat bouncing over the field, "spinning"
 --     (attack). The spin is faked with 4 pictures: normal, squeezed to half
 --     width, mirrored, mirrored + squeezed - like a coin turning.
 --
--- TIMING: same as text_layer. Everything is worked out from (x, y) and put
--- in r_* registers on the next clock edge; the text_layer pixels arrive at
+-- TIMING: same as text_multi. Everything is worked out from (x, y) and put
+-- in r_* registers on the next clock edge; the text_multi pixels arrive at
 -- that same edge. So ov_on / ov_rgb are ready exactly when tetris_render's
 -- stage 2 needs them.
 -- ============================================================================
@@ -56,7 +59,10 @@ entity chaos_render is
     banner_id  : in  integer range 0 to 31;
     -- overlay out
     ov_on      : out std_logic;
-    ov_rgb     : out rgb_t
+    ov_rgb     : out rgb_t;
+    -- faces on the bouncers (same timing as ov_on)
+    face_en    : out std_logic;
+    face_addr  : out unsigned(11 downto 0)
   );
 end entity;
 
@@ -64,7 +70,7 @@ architecture rtl of chaos_render is
   constant FX0 : integer := 240;  constant FY0 : integer := 80;
   constant FW  : integer := 160;  constant FH  : integer := 320;
   constant PX0 : integer := 432;  constant PY0 : integer := 288;    -- panel inside
-  constant BQ  : integer := 20;                                     -- bouncer size
+  constant BQ  : integer := 32;                                     -- bouncer size
   constant CS  : integer := 64;                                     -- cat size
 
   -- bouncers: position + direction + speed + colour, 10 of them
@@ -77,16 +83,23 @@ architecture rtl of chaos_render is
   constant SPY : spdn_t := (2, 3, 3, 4, 2, 5, 1, 4, 5, 3);
   constant BCOL : rgbn_t := (x"F2F", x"2FF", x"FF2", x"FFF", x"F80",
                              x"8F2", x"F44", x"48F", x"FAF", x"0F8");
-  signal bx : posn_t := (250, 300, 330, 370, 260, 350, 280, 310, 375, 245);
+  signal bx : posn_t := (250, 300, 330, 360, 260, 350, 280, 310, 365, 245);
   signal by : posn_t := (100, 200, 300, 150, 360, 90, 240, 130, 330, 200);
   signal bdx : std_logic_vector(NB - 1 downto 0) := "0101100110";  -- '1' = moving right
   signal bdy : std_logic_vector(NB - 1 downto 0) := "1001011010";  -- '1' = moving down
+  signal bk  : integer range 0 to NB := NB;                        -- bouncer being moved (NB = none)
 
   -- the cat
   signal cx    : integer range 0 to 639 := 260;
   signal cy    : integer range 0 to 479 := 120;
   signal cdx, cdy : std_logic := '1';
   signal spin  : unsigned(4 downto 0) := (others => '0');     -- picture = bits 4..3
+
+  -- which face each bouncer wears: (bouncer + foff) mod 4, new foff per attack
+  signal foff    : unsigned(1 downto 0) := (others => '0');
+  signal bounce_d : std_logic := '0';
+  signal r_fen   : std_logic := '0';
+  signal r_faddr : unsigned(11 downto 0) := (others => '0');
 
   -- registered overlay (from geometry), plus where text may appear
   signal r_on      : std_logic := '0';
@@ -98,6 +111,8 @@ architecture rtl of chaos_render is
   signal t_l1, t_l2, t_ban : std_logic;
   signal l1_chars, l2_chars : std_logic_vector(95 downto 0);
   signal ban_chars : banner_t;
+  signal txt_chars : std_logic_vector(6 * (32 + BANNER_LEN) - 1 downto 0);
+  signal txt_pix   : std_logic_vector(2 downto 0);
 
   -- put a digit (0..9) into character position i of a 16-character line
   function put_digit(line : std_logic_vector(95 downto 0); i : integer; d : integer) return std_logic_vector is
@@ -129,20 +144,29 @@ begin
   process(clk)
   begin
     if rising_edge(clk) then
+      bounce_d <= bounce;
+      if bounce = '1' and bounce_d = '0' then
+        foff <= spin(1 downto 0);                      -- a new attack: shuffle the faces
+      end if;
+      -- the bouncers move one after the other, one per clock, in the 10
+      -- clocks after frame_tick (the screen is blank then): one set of
+      -- adders and comparators instead of 10
+      if bk < NB then
+        if bdx(bk) = '1' then
+          if bx(bk) + SPX(bk) >= FX0 + FW - BQ then bdx(bk) <= '0'; else bx(bk) <= bx(bk) + SPX(bk); end if;
+        else
+          if bx(bk) - SPX(bk) <= FX0 then bdx(bk) <= '1'; else bx(bk) <= bx(bk) - SPX(bk); end if;
+        end if;
+        if bdy(bk) = '1' then
+          if by(bk) + SPY(bk) >= FY0 + FH - BQ then bdy(bk) <= '0'; else by(bk) <= by(bk) + SPY(bk); end if;
+        else
+          if by(bk) - SPY(bk) <= FY0 then bdy(bk) <= '1'; else by(bk) <= by(bk) - SPY(bk); end if;
+        end if;
+        bk <= bk + 1;
+      end if;
       if frame_tick = '1' then
         spin <= spin + 1;
-        for i in 0 to NB - 1 loop
-          if bdx(i) = '1' then
-            if bx(i) + SPX(i) >= FX0 + FW - BQ then bdx(i) <= '0'; else bx(i) <= bx(i) + SPX(i); end if;
-          else
-            if bx(i) - SPX(i) <= FX0 then bdx(i) <= '1'; else bx(i) <= bx(i) - SPX(i); end if;
-          end if;
-          if bdy(i) = '1' then
-            if by(i) + SPY(i) >= FY0 + FH - BQ then bdy(i) <= '0'; else by(i) <= by(i) + SPY(i); end if;
-          else
-            if by(i) - SPY(i) <= FY0 then bdy(i) <= '1'; else by(i) <= by(i) - SPY(i); end if;
-          end if;
-        end loop;
+        bk   <= 0;                                     -- start moving the bouncers
         if cdx = '1' then
           if cx + 2 >= FX0 + FW - CS then cdx <= '0'; else cx <= cx + 2; end if;
         else
@@ -200,12 +224,18 @@ begin
 
   ban_chars <= banner_codes(banner_id);
 
-  u_l1  : entity work.text_layer generic map (X0 => PX0, Y0 => 292, LEN => 16, SHIFT => 1)
-    port map (clk => clk, x => x, y => y, chars => l1_chars, pix => t_l1);
-  u_l2  : entity work.text_layer generic map (X0 => PX0, Y0 => 312, LEN => 16, SHIFT => 1)
-    port map (clk => clk, x => x, y => y, chars => l2_chars, pix => t_l2);
-  u_ban : entity work.text_layer generic map (X0 => 180, Y0 => 449, LEN => BANNER_LEN, SHIFT => 1)
-    port map (clk => clk, x => x, y => y, chars => ban_chars, pix => t_ban);
+  -- the panel's 2 lines and the banner through ONE font ROM (text_multi)
+  txt_chars <= ban_chars & l2_chars & l1_chars;
+  u_text : entity work.text_multi
+    generic map (N => 3,
+                 X0S    => (PX0, PX0, 180),
+                 Y0S    => (292, 312, 449),
+                 LENS   => (16,  16,  BANNER_LEN),
+                 SHIFTS => (1,   1,   1))
+    port map (clk => clk, x => x, y => y, chars => txt_chars, en => "111", pix => txt_pix);
+  t_l1  <= txt_pix(0);
+  t_l2  <= txt_pix(1);
+  t_ban <= txt_pix(2);
 
   -- ---------------------------------------------------------------- geometry
   process(clk)
@@ -219,6 +249,9 @@ begin
     variable bit_on : std_logic;
     variable px     : integer range 0 to 255;
     variable ph     : integer range 0 to 3;
+    variable hb     : integer range 0 to NB - 1;
+    variable fhit   : std_logic;
+    variable fdx, fdy : unsigned(9 downto 0);
   begin
     if rising_edge(clk) then
       xi := to_integer(x);
@@ -301,14 +334,22 @@ begin
       end if;
 
       -- ------------------------------------------ bouncers
+      fhit := '0';
+      hb   := 0;
       if bounce = '1' then
         for i in 0 to NB - 1 loop
           if i < n_bounce and xi >= bx(i) and xi < bx(i) + BQ and yi >= by(i) and yi < by(i) + BQ then
-            hit := '1';
-            c   := BCOL(i);
+            hit  := '1';
+            fhit := '1';
+            c    := BCOL(i);
+            hb   := i;
           end if;
         end loop;
       end if;
+      -- the face pixel under (x, y): face, row, column (all 0..31)
+      fdx := x - to_unsigned(bx(hb), 10);
+      fdy := y - to_unsigned(by(hb), 10);
+      r_faddr <= (to_unsigned(hb mod 4, 2) + foff) & fdy(4 downto 0) & fdx(4 downto 0);
 
       -- ------------------------------------------ the spinning cat
       if cat = '1' and xi >= cx and xi < cx + CS and yi >= cy and yi < cy + CS then
@@ -333,14 +374,19 @@ begin
           when 4      => hit := '1'; c := x"F9B";
           when others => null;                         -- see-through
         end case;
+        if cp /= 0 then fhit := '0'; end if;           -- the cat stays on top of the faces
       end if;
 
+      r_fen <= fhit;
       r_on  <= hit;
       r_rgb <= c;
     end if;
   end process;
 
   -- text goes on top of the panel / band it belongs to
+  face_en   <= r_fen;
+  face_addr <= r_faddr;
+
   ov_on  <= '1' when (r_panel = '1' and (t_l1 = '1' or t_l2 = '1')) or (r_band = '1' and t_ban = '1') else r_on;
   ov_rgb <= x"C6F"     when r_panel = '1' and t_l1 = '1' and t_active = '0' else
             x"FFF"     when r_panel = '1' and t_l1 = '1' else

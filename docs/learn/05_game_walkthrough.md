@@ -799,12 +799,12 @@ This section explains the playfield, next box and level squares. Versus
 added text, the garbage meter, the rival bar and the result banner to the
 same two stages: see Part 6 §6.4.
 
-### Layout constants (L79–90)
+### Layout constants (L88–99)
 
 ```vhdl
-L79  constant FX0 : integer := 240;  constant FY0 : integer := 80;    -- field
-L81  constant NX0 : integer := 432;  constant NY0 : integer := 80;    -- next piece
-L82  constant LX0 : integer := 432;  constant LY0 : integer := 176;   -- level squares
+L88  constant FX0 : integer := 240;  constant FY0 : integer := 80;    -- field
+L90  constant NX0 : integer := 432;  constant NY0 : integer := 80;    -- next piece
+L91  constant LX0 : integer := 432;  constant LY0 : integer := 176;   -- level squares
 ```
 
 All are **multiples of 16** on purpose: then "pixel position inside its cell"
@@ -831,7 +831,7 @@ the same 2 registers (`s1_hs` → `vga_hs`), so everything is delayed equally
 and the picture lines up perfectly. (The monitor can't tell: the whole image
 is just 2 clocks = 1 pixel "later", and the sync with it.)
 
-### Stage 1 (L164–294): what's under this pixel?
+### Stage 1 (L179–309): what's under this pixel?
 
 ```vhdl
 in_f := xi >= FX0 and xi < FX0 + FW and yi >= FY0 and yi < FY0 + FH;
@@ -877,7 +877,7 @@ is a 4 px border.
 Everything else (`s1_px`, `s1_py`, video_on, sync) is just copied into
 stage-1 registers.
 
-### Stage 2 (L297–415): choose the colour
+### Stage 2 (L312–448): choose the colour
 
 A priority list. The first match wins, like layers in a drawing program:
 
@@ -895,7 +895,7 @@ A priority list. The first match wins, like layers in a drawing program:
  otherwise            → background x"113" (dark blue)
 ```
 
-`bevel(c, px, py)` (L120): top/left pixel of a cell → `lighten(c)`,
+`bevel(c, px, py)` (L131): top/left pixel of a cell → `lighten(c)`,
 bottom/right → `darken(c)`, else `c`. That 1-pixel light/dark edge makes
 flat squares look like raised blocks.
 
@@ -910,14 +910,14 @@ The top is only wiring, plus `switch_filter` for the slide switches.
 (Versus added the link, sound and three switches, Part 6 §6.6; chaos added more
 switches and its three blocks, Part 7.)
 
-* **L54–89, ports:** clock, the 5 buttons, the slide switches, the link and USB
+* **L65–108, ports:** clock, the 5 buttons, the slide switches, the link and USB
   serial pins, audio, VGA, 7-segment. The generics `DEBOUNCE_CYCLES` and
   `LINK_CLKS_PER_BIT` let testbenches use smaller numbers.
-* **L93–166:** one signal per wire between the blocks. The array-type
+* **L112–205:** one signal per wire between the blocks. The array-type
   signals (`occ`, `colf`) carry 800 bits from core to renderer.
-* **L169:** `vga_sync`. `pix_en => open`: the renderer doesn't need it
+* **L208:** `vga_sync`. `pix_en => open`: the renderer doesn't need it
   (the 2-clock pixel just gets computed twice).
-* **L174:**
+* **L213:**
   ```vhdl
   btns <= btn_hard & btn_soft & btn_rot & btn_right & btn_left;
   ```
@@ -925,15 +925,15 @@ switches and its three blocks, Part 7.)
   bit 4 = hard drop; `&` puts the leftmost item at the top bit). This is the
   one line to change if you want different buttons for different actions
   (or change the pins in `pins.xdc`).
-* **L176–187:** the slide switches (5 settings + 8 task switches) go through
+* **L215–226:** the slide switches (5 settings + 8 task switches) go through
   `switch_filter` (Part 2, §2.7: synchroniser + bounce filter) as a 13-bit
   bus, then get names (`pause_s`, `music_s`, ..., `task_sw`).
-* **L189–230:** `tetris_input` and `tetris_core`. Notice how every output of
+* **L228–269:** `tetris_input` and `tetris_core`. Notice how every output of
   the core goes on with the same name: `cur_x => cur_x`. Left of `=>` is the
   block's port, right is the top's signal. Same name on both sides keeps it
   readable.
-* **L232–314:** the link (Part 6), the chaos blocks (Part 7), `tetris_render` (L290) and the sound.
-* **L315–333:** the 7-segment display: lines, or the countdown of a chaos task (Part 7). Each BCD digit (4 bits) goes
+* **L271–413:** the link (Part 6), the chaos blocks (Part 7), `tetris_render` (L329) and the sound.
+* **L414–432:** the 7-segment display: lines, or the countdown of a chaos task (Part 7). Each BCD digit (4 bits) goes
   through `hex7` (Part 2 §2.1), and since a BCD digit is only ever 0..9, the
   hex decoder shows normal decimal digits.
 

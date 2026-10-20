@@ -29,6 +29,13 @@ set_property -dict { PACKAGE_PIN G1   IOSTANDARD LVCMOS33 PULLUP true } [get_por
 set_property -dict { PACKAGE_PIN A13  IOSTANDARD LVCMOS33 } [get_ports {audio_l}]   ;# audio jack left
 set_property -dict { PACKAGE_PIN B13  IOSTANDARD LVCMOS33 } [get_ports {audio_r}]   ;# audio jack right
 set_property -dict { PACKAGE_PIN B14  IOSTANDARD LVCMOS33 } [get_ports {buzzer}]   ;# buzzer (jumper J6 on Enable)
+# the SPI flash (bank 14, the configuration pins; usable after configuration).
+# Its clock pin CCLK (A8) has no port: STARTUPE2 inside top_tetris drives it.
+set_property -dict { PACKAGE_PIN C11  IOSTANDARD LVCMOS33 } [get_ports {flash_cs_n}]   ;# FCS_B  flash chip select
+set_property -dict { PACKAGE_PIN B11  IOSTANDARD LVCMOS33 } [get_ports {flash_mosi}]   ;# D00_MOSI  data to the flash
+set_property -dict { PACKAGE_PIN B12  IOSTANDARD LVCMOS33 PULLUP true } [get_ports {flash_miso}]   ;# D01_DIN  data from the flash
+set_property -dict { PACKAGE_PIN D10  IOSTANDARD LVCMOS33 } [get_ports {flash_wp_n}]   ;# D02  flash WP#, held high
+set_property -dict { PACKAGE_PIN C10  IOSTANDARD LVCMOS33 } [get_ports {flash_hold_n}]   ;# D03  flash HOLD#/RESET#, held high
 # Pin assignments for top_vga_bars on the EDGE Spartan-7 (XC7S15-FTGB196-1).
 set_property -dict { PACKAGE_PIN B6   IOSTANDARD LVCMOS33 } [get_ports {vga_r[0]}]   ;# VGA RED0
 set_property -dict { PACKAGE_PIN D3   IOSTANDARD LVCMOS33 } [get_ports {vga_r[1]}]   ;# VGA RED1

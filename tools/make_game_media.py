@@ -479,12 +479,12 @@ def sim_file(out_base):
     """tiny items for sim/tb_media_engine.vhd + the numbers it must see"""
     rng = np.random.default_rng(5)
     items = []
-    # 0: sound only, 3 records of 64 bytes (a short beep)
-    t = np.arange(3 * 128)
+    # 0: sound only, 6 records of 64 bytes (a short beep)
+    t = np.arange(6 * 128)
     pcm = (8000 * np.sin(2 * np.pi * t / 23)).astype(np.int16)
     s = GItem('snd', aud=64)
-    s.rec_pic = [None] * 3
-    sound_records(s, pcm, 3)
+    s.rec_pic = [None] * 6
+    sound_records(s, pcm, 6)
     items.append(s)
     # 1: picture + sound, 4 bpp, 3 records, frames that change a little
     av = GItem('av', bpp=4, mode=0, aud=64)

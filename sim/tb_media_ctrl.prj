@@ -1,0 +1,6 @@
+vhdl work "../src/media/spi_flash.vhd"
+vhdl work "../src/media/adpcm_dec.vhd"
+vhdl work "../src/media/media_engine.vhd"
+vhdl work "../src/media/media_ctrl.vhd"
+vhdl work "flash_model.vhd"
+vhdl work "tb_media_ctrl.vhd"

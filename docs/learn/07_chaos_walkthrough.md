@@ -105,12 +105,12 @@ cost about 760 LUTs); timing still fine (WNS +4.2 ns).
 
 Like `tetris_pkg`: no hardware of its own, just shared names.
 
-* **L48–70:** task, attack and bonus numbers as named constants
+* **L54–80:** task, attack and bonus numbers as named constants
   (`T_FLIP` = 0 ... `T_HEX` = 6, `A_MIRROR` = 0 ... `A_LOCK` = 8,
   `B_FREEZE` = 0 ...). The rest of the code uses the names, so the numbers
   only live here. The attack number is also the value of the ATTACK message
   on the cable (5 bits, so up to 31 would fit).
-* **L75, L143–146: `rand_range(lo, hi, r)`** turns a random byte `r`
+* **L85, L164–167: `rand_range(lo, hi, r)`** turns a random byte `r`
   (0..255) into a number from `lo` to `hi`:
 
   ```vhdl
@@ -121,17 +121,17 @@ Like `tetris_pkg`: no hardware of its own, just shared names.
   plus the low end. Example: `rand_range(5, 10, 200)` = 5 + 200·6/256 =
   5 + 4 = 9. Dividing by 256 is free in hardware (drop 8 bits); the
   multiplication costs some LUTs.
-* **L77–90: the ranges**, in frames (60 = 1 s), as pairs of constant arrays
+* **L87–105: the ranges**, in frames (60 = 1 s), as pairs of constant arrays
   indexed by the number: `ATTACK_LO(A_FLIP)` = 360, `ATTACK_HI(A_FLIP)` = 600
   = 6..10 s. 0 means "instant". `TASK_LO/HI` = time allowed per task,
   `GAP_LO/HI` = 600..1020 = 10..17 s between tasks, `FREEZE_LO/HI` = 3..5 s.
-* **L92–103, L117–154: banners.** A table of 22 fixed 20-character texts,
+* **L107–118, L132–175: banners.** A table of 22 fixed 20-character texts,
   numbered so the banner number says both *what* and *which*:
   0..8 = `INCOMING: <attack n>` (8 = `LOCKED! DO THE TASK`),
   9..17 = `SENT: <attack n − 9>`, 18..20 = `BONUS: ...`, 21 = `TASK FAILED`.
   The named starts `BAN_SENT` = 9, `BAN_BONUS` = 18, `BAN_FAIL` = 21 let
   chaos_fx pick a banner with simple arithmetic: `BAN_SENT + sent_id`.
-* **L108–110, L157–198: the cat.** 16 × 16 pixels, drawn as text like the
+* **L123–125, L178–219: the cat.** 16 × 16 pixels, drawn as text like the
   font: `.` see-through, `K` black, `G` grey, `W` white, `P` pink. `crow`
   turns one text row into 48 bits (3 bits per pixel), `cat_pixel(r, c)`
   reads one pixel back. In hardware: a 16 × 48-bit ROM.
@@ -140,7 +140,7 @@ Like `tetris_pkg`: no hardware of its own, just shared names.
 
 ## 7.2 `chaos_task.vhd`: the tasks
 
-### Ports (L36–71)
+### Ports (L41–77)
 
 In: clock, frame tick, `enable` (chaos on and a game running), `paused`,
 `versus` (a rival is connected), `hurry` (I am under the LOCK attack),
@@ -154,7 +154,7 @@ result pulses (`task_start`, `task_ok`, `task_fail`, `send_attack` +
 Generics `FIRST_DELAY` and `FORCE_TASK` let a testbench make the first task
 come quickly and always be the same one.
 
-### Random lengths for HANDS and HOLD (L100–107)
+### Random lengths for HANDS and HOLD (L107–114)
 
 How long you must keep your hands off (HANDS) or keep the bar green (HOLD)
 is one of 4 values, picked by 2 random bits `g`: `HANDS_GOAL` =
@@ -163,17 +163,17 @@ Next to each goal is a **scale** = 256 × 180 / goal, used by the progress bar
 so it is full exactly when the goal is reached (see below). A table of 4
 instead of `rand_range` because the scale would otherwise need a division.
 
-### Two states: WAIT and RUN (L119–272)
+### Two states: WAIT and RUN (L126–292)
 
 The state is just one bit, `running`. `frames` counts down in both: in
 WAIT the frames until the next task, in RUN the frames left for this task.
 Each clock two random bytes are taken from the task's own LFSR: `rnd` (bits
 7..0) and `rnd2` (bits 15..8).
 
-**`enable = '0'`** (L138): no game or chaos off: drop any task and reset the
-first wait. **Paused** (L142): nothing changes.
+**`enable = '0'`** (L150): no game or chaos off: drop any task and reset the
+first wait. **Paused** (L155): nothing changes.
 
-**WAIT** (L145–190): if `hurry` is on (LOCK attack, L146), the wait is cut
+**WAIT** (L158–203): if `hurry` is on (LOCK attack, L159), the wait is cut
 to 0 at once. Otherwise count down once per frame. At 0, pick a task:
 `t := rnd mod 8` from the LFSR. If it is 7 (no such task) or the same as
 last time, nothing happens and the next frame tries again (the same retry
@@ -188,7 +188,7 @@ trick as the 7-bag in S_PICK). Then set the task up:
 * the green zone: TIMING 28..44 px wide, HOLD 40..60 px, at a random place
   that still fits in the 192 px meter (`zlo` ≤ 191 − width)
 
-**RUN** (L192–270): first
+**RUN** (L205–290): first
 
 ```vhdl
 flipped := sw(sel_r) xor sw_d(sel_r);
@@ -198,25 +198,25 @@ flipped := sw(sel_r) xor sw_d(sel_r);
 task switch changed: an **edge detector**, like the button press pulse.
 Then one `case` per task:
 
-* **FLIP** (L196): count edges; the 10th is a success.
-* **MATCH / BINARY / HEX** (L201): success when `sw = target`. They are the
+* **FLIP** (L209): count edges; the 10th is a success.
+* **MATCH / BINARY / HEX** (L214): success when `sw = target`. They are the
   same check: MATCH shows the target as lights, BINARY as a decimal number,
   HEX as two hex digits. You convert it in your head (173 = 1010 1101,
   `AD` = 1010 1101), or just watch the progress bar go up and down as you
   flip switches.
-* **HANDS** (L203): `good` counts frames; any `touch` sets it back to 0;
+* **HANDS** (L216): `good` counts frames; any `touch` sets it back to 0;
   `goal` frames in a row is a success.
-* **HOLD** (L210): a tiny physics simulation, once per frame. The switch
+* **HOLD** (L223): a tiny physics simulation, once per frame. The switch
   on = the velocity goes up by 1, off = down by 1 (gravity), limited to ±4.
   The position moves by the velocity and stops at the ends. `good` counts
   frames spent inside the green zone (not necessarily in a row); `goal`
   frames = success.
-* **TIMING** (L227): the marker sweeps `step` px per frame, bouncing at the
+* **TIMING** (L240): the marker sweeps `step` px per frame, bouncing at the
   ends. On a switch edge: inside the zone → hit (count + 1, and a new zone:
   new width **and** new place); outside → count back to 0. 3 hits in a row
   = success.
 
-**Success** (L248): stop, schedule the next task (`rand_range(GAP_LO,
+**Success** (L261): stop, schedule the next task (`rand_range(GAP_LO,
 GAP_HI)` = 10..17 s), and choose the reward from LFSR bits:
 
 ```vhdl
@@ -226,10 +226,10 @@ else
   bon_p  <= '1';  ... bonus 0..2
 ```
 
-**Time out** (L261): `frames` reaches 0 → `task_fail` pulse, and a new
+**Time out** (L281): `frames` reaches 0 → `task_fail` pulse, and a new
 random wait.
 
-### Progress bar (L274–292)
+### Progress bar (L294–312)
 
 A combinational process turns each task's state into a 0..191 bar
 (the panel is 192 px wide): FLIP `count × 19`, MATCH/BINARY/HEX `right
@@ -248,37 +248,37 @@ dropping 8 bits replaces a real division, which would be expensive.
 
 ## 7.3 `chaos_fx.vhd`: effects on my board
 
-**Timers** (L68–70): `t` is an array of 8 frame counters, one per timed
+**Timers** (L73–75): `t` is an array of 8 frame counters, one per timed
 attack number, and `t_frz` for the FREEZE bonus. An effect is "on" while
-its counter is above 0 (L151–158):
+its counter is above 0 (L160–167):
 
 ```vhdl
 mirror <= '1' when t(A_MIRROR) > 0 else '0';
 ```
 
-Once per frame every counter goes down by 1 (L93–100; a `for` loop = 8
+Once per frame every counter goes down by 1 (L99–106; a `for` loop = 8
 copies of a down-counter). Getting the same attack again restarts it.
 
-**LOCK** (L71, L102–109): not a timer but a flag, `lock_r`. While it is on,
+**LOCK** (L76, L108–115): not a timer but a flag, `lock_r`. While it is on,
 the banner is kept at `LOCKED! DO THE TASK` (number 8) whenever no other
 banner is showing, and the flag goes off with the next `task_ok`. The top
 level uses `locked` to block the buttons and feeds it to chaos_task as
 `hurry`.
 
-**An attack arrives** (L111–127): `got_attack` + `got_id` from versus_link.
+**An attack arrives** (L117–136): `got_attack` + `got_id` from versus_link.
 Banner `got_id` (INCOMING), then: GARBAGE and CURSED are one-clock pulses
 to the core, LOCK sets `lock_r`; all others start their timer with a random
 length, `rand_range(ATTACK_LO(id), ATTACK_HI(id), rnd)`. BOUNCE also picks
 how many squares (5..10, `n_bounce`); OIIA pulses `oiia_evt` for the sound.
 
-**My own results** (L129–146): `SENT` banner (`BAN_SENT + id`); a bonus
+**My own results** (L138–155): `SENT` banner (`BAN_SENT + id`); a bonus
 starts FREEZE's timer (3..5 s) or pulses `sink` / `next_i`; a failed task
 shows `BAN_FAIL`.
 
-**Banner** (L73–74, L166–167): a 150-frame (2.5 s) counter + the banner
+**Banner** (L78–79, L177–178): a 150-frame (2.5 s) counter + the banner
 number.
 
-When chaos is off or no game runs (`enable = '0'`, L87), everything is
+When chaos is off or no game runs (`enable = '0'`, L93), everything is
 reset, including the lock.
 
 ---
@@ -290,42 +290,48 @@ and `ov_rgb` (which colour). `tetris_render` draws it on top of its own
 picture as the very last step. Same timing as `text_layer`: all from (x, y),
 registered once, ready for tetris_render's stage 2.
 
-### Moving things (L128–158)
+### Moving things (L143–182)
 
-Once per frame: the 10 **bouncers** (L70–83: positions, per-square speeds
+Once per frame: the 10 **bouncers** (L76–89: positions, per-square speeds
 `SPX`/`SPY`, colours `BCOL`, direction bits) move and bounce off the field
 edges, like the bouncing square of test 01 times ten. All 10 always move;
-only the first `n_bounce` are drawn. The **cat** (L85–89) does the same,
-and `spin` counts frames.
+only the first `n_bounce` are drawn. The **cat** (L92–96) does the same,
+and `spin` counts frames. (Since Part 9 the bouncers don't all move in the
+same clock: `bk` (L90) walks through them one per clock in the 10 clocks
+after `frame_tick`, while the screen is blank, so one set of adders does
+all ten. The picture is exactly the same; it saves ~130 LUTs.)
 
-### Text (L160–208)
+### Text (L184–238)
 
-Two 16-character panel lines and the banner, three `text_layer`s. Each line
+Two 16-character panel lines and the banner: three lines of text (since
+Part 9 through one `text_multi` with one font ROM, L227–238; before, three
+`text_layer`s). Each line
 starts from a fixed template (`L1_TXT`, `L2_TXT`, one per task + one for
 "no task") and `put_digit` writes numbers into it: the switch number
 (`SW_NUM(sel)`, a table of the 8 board labels: the board skips the
 numbers 14, 16, 18, 20 used by the buttons, so it can't be a formula), the BINARY number (hundreds/tens/ones by dividing by
-100 and 10), the HEX digits (L187: a hex digit 0..15 *is* its character
+100 and 10), the HEX digits (L211: a hex digit 0..15 *is* its character
 code, `0`..`9` then `A`..`F`, so no conversion at all), the HANDS seconds
-(L191), the TIMING hit count. With no task (L167) line 1 is
+(L215), the TIMING hit count. With no task (L191) line 1 is
 `CHAOS MODE ON` and line 2 is empty.
 
-### Geometry (L210–341)
+### Geometry (L240–384)
 
-* **The panel** (L229–286): with no task (L231) only the first text line's
+* **The panel** (L262–319): with no task (L264) only the first text line's
   area is marked (no box, nothing else), so just the words show. During a
-  task: a purple frame, **red while my buttons are LOCKED** (L240), and dark
+  task: a purple frame, **red while my buttons are LOCKED** (L273), and dark
   inside. Below the text: the MATCH target lamps; **8 switch pictures** (a
   slot with a knob at the top = on or bottom = off, SW22 on the left like on the board; the
   switch the task wants is shown in orange); the **meter** (dark, green
   zone, white marker) for HOLD / TIMING; the **progress bar**; the **time
-  bar** (L277: 11 px per second, red in the last 3 seconds). The switch
+  bar** (L310: 11 px per second, red in the last 3 seconds). The switch
   under a pixel is `7 − px / 24` (8 columns of 24 px).
-* **Banner** (L288–301): a black band, text colour by banner number (red
+* **Banner** (L321–334): a black band, text colour by banner number (red
   incoming / failed, gold sent, green bonus).
-* **Bouncers** (L303–311): `if i < n_bounce and (inside square i)`, colour
-  `BCOL(i)`.
-* **The cat** (L313–336): 64 × 64 px = the 16 × 16 picture at 4× (`dy / 4`,
+* **Bouncers** (L336–348): `if i < n_bounce and (inside square i)`, colour
+  `BCOL(i)`. Since Part 9 they are 32 × 32 and the loop also remembers
+  which one was hit (`hb`) for the friends' faces (L349–352, see Part 9).
+* **The cat** (L354–378): 64 × 64 px = the 16 × 16 picture at 4× (`dy / 4`,
   `dx / 4`: free shifts). The **spin** is faked with 4 pictures, chosen by
   `spin(4 downto 3)` (each lasts 8 frames):
 
@@ -340,7 +346,7 @@ code, `0`..`9` then `A`..`F`, so no conversion at all), the HANDS seconds
   its vertical axis. Pixel value 0 is see-through: `ov_on` stays '0' there,
   so the field shows between the cat's ears.
 
-### Output (L343–349)
+### Output (L386–395)
 
 The text pixels arrive at the same edge as the `r_*` registers, so they are
 merged combinationally: text on top of the panel / band it belongs to
@@ -393,40 +399,40 @@ LOST > **ATTACK** > GARBAGE > HEARTBEAT (L141–144). Received ones become
 
 ### `tetris_render.vhd`
 
-* **FLIP** (L185, L285): the row read from the field is `19 − row`, and the
+* **FLIP** (L200, L300): the row read from the field is `19 − row`, and the
   in-cell `py` is `15 − py` (`not y(3 downto 0)`), so even the bevel flips.
   The piece and ghost use the same row, so the whole field turns over.
-* **BLIND** (L312): `elsif s1_occ_bit = '1' and fx_blind = '0'`: with BLIND
+* **BLIND** (L330): `elsif s1_occ_bit = '1' and fx_blind = '0'`: with BLIND
   on, a locked cell skips the "draw a block" branch completely and is drawn
   exactly like an empty cell (field background + grid lines), so there is
   nothing at all to see. The falling piece and its ghost stay visible.
-* **Overlay** (L399–401): `if ov_on = '1' then c := ov_rgb;` as the last
+* **Overlay** (L431–434): `if ov_on = '1' then c := ov_rgb;` as the last
   step before the output registers.
 
 ### `tetris_sound.vhd`
 
-Six new effects (L130–136): task pops up (double blip), task done (rising),
+Six new effects (L109–115): task pops up (double blip), task done (rising),
 task failed (low buzz), attack sent (falling "zap"), attack hit (alarm),
 and the OIIA jingle (low, high, high, middle: "o-i-i-a"). Started by new
-event inputs (L215–220).
+event inputs (L184–189).
 
 ### `top_tetris.vhd`
 
 * SW6 = chaos on, the 8 leftmost switches = `task_sw` (bit 7 = SW22 the
   leftmost ... bit 0 = SW11); all 13 go through `switch_filter` (bounce
   removed, see Part 2.7). Settings are all at the right end.
-* **MIRROR** (L196–197): `c_left <= a_right when fx_mirror = '1' else a_left;`
+* **MIRROR** (L235–236): `c_left <= a_right when fx_mirror = '1' else a_left;`
   and the same the other way. The swap happens *before* the core, which never
   knows.
-* **LOCK** (L199–203): every button action is ANDed with `not fx_locked`
+* **LOCK** (L238–242): every button action is ANDed with `not fx_locked`
   (`g_left <= c_left and not fx_locked;` ...), so while locked the core
-  gets no actions at all. `touch` (L205) is taken *before* the lock, so the
+  gets no actions at all. `touch` (L244) is taken *before* the lock, so the
   HANDS task still notices presses.
-* **Garbage** (L208–209): from the rival's GARBAGE message *or* the GARBAGE
+* **Garbage** (L247–248): from the rival's GARBAGE message *or* the GARBAGE
   attack (+3), merged into one input.
-* `chaos_en <= chaos_s and playing` (L250) enables task and fx;
-  `hurry => fx_locked` (L256) connects the lock to chaos_task.
-* The 7-segment display (L315–329) shows `--ss` (seconds left) during a task.
+* `chaos_en <= chaos_s and playing` (L289) enables task and fx;
+  `hurry => fx_locked` (L295) connects the lock to chaos_task.
+* The 7-segment display (L414–428) shows `--ss` (seconds left) during a task.
 
 ### `tools/fake_opponent.py`
 
@@ -498,14 +504,14 @@ From playing round 1 on the board:
 
 | Feedback | Change | Where |
 |---|---|---|
-| The panel and the "next task in" timer spoil the surprise | panel only during a task, otherwise just `CHAOS MODE ON`; no countdown | chaos_render L167, L231 |
-| BINARY is fine (watch the progress bar), but add a hex version | new task HEX: two hex digits | chaos_pkg, chaos_task L201, chaos_render L187 |
-| Green zones always the same width | HOLD 40..60 px per task; TIMING 28..44 px, new width after each hit | chaos_task L182–188, L240 |
-| Everything with a time should be a random range | tasks, gaps, attacks, freeze, HANDS / HOLD goals, TIMING speed | chaos_pkg L77–90, `rand_range` |
-| You could ignore tasks and just play Tetris | new attack LOCK: buttons locked until you finish a task | chaos_fx, chaos_task `hurry`, top_tetris L199 |
+| The panel and the "next task in" timer spoil the surprise | panel only during a task, otherwise just `CHAOS MODE ON`; no countdown | chaos_render L191, L264 |
+| BINARY is fine (watch the progress bar), but add a hex version | new task HEX: two hex digits | chaos_pkg, chaos_task L214, chaos_render L211 |
+| Green zones always the same width | HOLD 40..60 px per task; TIMING 28..44 px, new width after each hit | chaos_task L195–201, L253 |
+| Everything with a time should be a random range | tasks, gaps, attacks, freeze, HANDS / HOLD goals, TIMING speed | chaos_pkg L87–105, `rand_range` |
+| You could ignore tasks and just play Tetris | new attack LOCK: buttons locked until you finish a task | chaos_fx, chaos_task `hurry`, top_tetris L238 |
 | SINK only happened at the next lock | SINK right away, from S_PLAY | tetris_core L398, S_SINK_CHK |
 | FREEZE too long (10 s) | 3..5 s | chaos_pkg FREEZE_LO/HI |
 | Too few bouncers | 5..10 | chaos_fx, chaos_render |
-| BLIND still showed grey blocks | locked blocks not drawn at all | tetris_render L312 |
+| BLIND still showed grey blocks | locked blocks not drawn at all | tetris_render L330 |
 | 8 garbage rows at once is too much | at most 3..5 per lock | tetris_core L627 |
 | The OIIA cat isn't the real one | later, with the media layer (real picture + sound from flash) | |

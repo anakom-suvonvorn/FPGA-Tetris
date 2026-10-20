@@ -25,6 +25,11 @@
 --   hurry = '1' (I am under the LOCK attack): don't wait, start a task now,
 --   and after a failed task start the next one right away too.
 --
+--   MEDIA attacks (Bad Apple, OIIA, Jevil) are long, so after sending one
+--   'mcool' counts down its length + 10 s (MEDIA_COOL); until then (or when
+--   there is no media file, media_ok = '0') the attack is picked again
+--   from the normal ones.
+--
 --   Switch flips are found by comparing sw with its value one clock ago
 --   (edge detection); everything else is updated once per frame.
 -- ============================================================================
@@ -45,6 +50,7 @@ entity chaos_task is
     paused      : in  std_logic;
     versus      : in  std_logic;                      -- a rival is connected
     hurry       : in  std_logic;                      -- LOCK attack: a task now, please
+    media_ok    : in  std_logic := '0';               -- the media file is there (media attacks allowed)
     sw          : in  std_logic_vector(7 downto 0);   -- SW22..SW11, debounced
     touch       : in  std_logic;                      -- any button action (pulse)
     -- for the panel
@@ -95,6 +101,7 @@ architecture rtl of chaos_task is
 
   signal start_p, ok_p, fail_p, atk_p, bon_p : std_logic := '0';
   signal atk_id    : integer range 0 to N_ATTACKS - 1 := 0;
+  signal mcool     : integer range 0 to 8191 := 0;     -- frames until a media attack is allowed
   signal bon_id    : integer range 0 to 2 := 0;
   signal prog      : integer range 0 to 191 := 0;
 
@@ -125,6 +132,7 @@ begin
     variable success : boolean;
     variable p       : integer range -8 to 200;
     variable b       : integer range 0 to 3;
+    variable a       : integer range 0 to N_ATTACKS - 1;
   begin
     if rising_edge(clk) then
       lfsr <= lfsr(14 downto 0) & (lfsr(15) xor lfsr(13) xor lfsr(12) xor lfsr(10));
@@ -135,10 +143,15 @@ begin
       start_p <= '0'; ok_p <= '0'; fail_p <= '0'; atk_p <= '0'; bon_p <= '0';
       success := false;
 
+      if frame_tick = '1' and mcool > 0 then
+        mcool <= mcool - 1;
+      end if;
+
       if enable = '0' then
         -- no game (or chaos off): forget any task, restart the first wait
         running <= '0';
         frames  <= FIRST_DELAY;
+        mcool   <= 0;
       elsif paused = '1' then
         null;                                          -- everything waits
       elsif running = '0' then
@@ -251,7 +264,14 @@ begin
           frames  <= rand_range(GAP_LO, GAP_HI, rnd);  -- next task in 10..17 s
           if versus = '1' and to_integer(unsigned(lfsr(10 downto 8))) < 5 then
             atk_p  <= '1';
-            atk_id <= rand_range(0, N_ATTACKS - 1, rnd2);
+            a := rand_range(0, N_ATTACKS - 1, rnd2);
+            if a >= A_MEDIA and (mcool > 0 or media_ok = '0') then
+              a := rand_range(0, A_MEDIA - 1, rnd2);   -- a normal one instead
+            end if;
+            if a >= A_MEDIA then
+              mcool <= MEDIA_COOL(a - A_MEDIA);
+            end if;
+            atk_id <= a;
           else
             bon_p <= '1';
             b := to_integer(unsigned(lfsr(12 downto 11)));

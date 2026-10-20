@@ -1,7 +1,7 @@
 # HANDOFF: project state for Claude (read this first after a context reset)
 
-Last updated: **2026-10-20**, right before a context compaction (media plan
-approved, game integration NOT started). Keep this file current whenever
+Last updated: **2026-10-20** (late): media built into the game on branch
+`media`, waiting for the user's hardware test. Keep this file current whenever
 something important changes. Durable facts also live in Claude's memory
 (`...\.claude\projects\D--All-files-Me-university-digital-system-assignment\memory\`:
 `digital-system-final-project.md`, `git-workflow.md`).
@@ -18,10 +18,8 @@ something important changes. Durable facts also live in Claude's memory
   3. **media**: branch **`media`** (checked out) = chaos + test 06 + media
      plan tools. **Test 06 PASSED on hardware 2026-10-20** (ID 016017, media
      file found, VERIFY 0 bad in 83 ms, no sound underruns, A/V sync; tearing
-     only at 3.125 MHz). **Media plan approved by the user (v3, 2026-10-20).
-     NEXT: build it into the game** (see "Build order" below). The user said
-     "before we continue with doing the game ... prepare for a compact" -> after
-     the compaction, start building (they already agreed to the order).
+     only at 3.125 MHz). Media plan approved (v3) and **built into the game**
+     (see "Media in the game" below); waiting for the hardware test.
   4. extra mini-games: probably no time.
 * Fixes on ALL branches (made on `main`, merged main -> chaos -> media):
   1.5 s start cool-down after a game (tetris_core `cool`, output `can_start`),
@@ -86,24 +84,47 @@ length (40-84 s); their sound replaces the rival's music meanwhile.
 * Attack items = a long sound track + optional short video loop (two streams
   read in turns) - only Jevil uses the loop now; OIIA/Bad Apple are full A/V.
 
-### Build order (agreed), measure LUTs after each step
-1. **Music from flash**: integrate media_player into top_tetris (STARTUPE2,
-   flash pins C11 B11 B12 D10 C10 as in tests/06 pins.xdc), ADPCM decoder,
-   playlist (teto -> original -> ...), replaces the Korobeiniki ROM music;
-   SFX synth stays and mixes in. Make make_media.py build the game file from
-   media_plan.py (ADPCM + RLE + directory > 16 items).
-2. **Win / lose media**: random pick on game end; full / over / panel modes.
-3. **Media attacks** (3 new attack ids over the link; chaos_task sender
-   cool-down; bg mode + dim; their sound replaces the music, music resumes).
-4. **Sprites**: Jevil floating (sprite RAM loaded from flash), faces on the
-   bouncers.
-LUT risk: ~+1,500 on 6,200 -> ~95 %. If tight: drop sprites first, remove the
-ROM cat, the Korobeiniki ROM, some text layers. BRAM: player 6 tiles, sprites
-~2-3 more (of 10).
-
-### Docs still owed for the media layer
-Part 9 walkthrough (media in the game) + visual guide sections, once built.
-Part 8 covers test 06 (spi_flash, media_player, make_media).
+### Media in the game: BUILT (2026-10-20, branch `media`), not yet on hardware
+All 4 steps done in one go (music, win/lose, media attacks + sender cool-down,
+Jevil + faces). Bad Apple changed by the user to 0-84.2 s, fade 0.4 s.
+* `tools/make_game_media.py` -> `media/game_media.bin` (6.83 MB, git-ignored),
+  format "TDM2" (byte list at the top of the script): header with groups
+  (music/attack/lose/win first+count, sprite block address), 16-byte
+  directory entries, records = 8-byte header (picture address+length, ADPCM
+  pred+idx) + aud sound bytes; pictures stored once (delta+RLE, keyframe
+  first; Jevil loop = records point at 34 deltas); sprite block = 256-colour
+  palette (Jevil 1..15, faces 16..255) + Jevil 8 poses 48x50 4bpp + 4 faces
+  32x32 8bpp. It decodes everything back to check. `--sim` -> sim/game_sim.hex.
+  Flash it: `tools\flash_media.bat media\game_media.bin` (both boards).
+* `src/media/`: `adpcm_dec` (IMA, 3 clocks), `media_engine` (replaces
+  media_player in the game; RLE decoder with spi_flash `hold`; panel mode
+  96x88 at 2x; sprite RAMs; 19 of 20 BRAM halves; `ram_style block`
+  attributes are REQUIRED), `media_ctrl` (C_IDLE/C_MUSIC/C_ATTACK/C_END,
+  music resume at rec_pos-2), `media_mix` (stage A/B after tetris_render:
+  game 2 clocks + 1, media 3 clocks; Jevil Lissajous with quarter sine
+  table + 1 DSP).
+* Game changes: chaos_pkg N_ATTACKS 12 (A_APPLE 9, A_OIIA_V 10, A_JEVIL 11,
+  MEDIA_COOL, banners 0..27), chaos_task `mcool` + `media_ok`, chaos_fx
+  `media_hit/media_id`, chaos_render bouncers 32 px + face_en/face_addr +
+  bouncers moved one per clock (`bk`), tetris_render `see_bg`/`keep` outputs,
+  tetris_sound ROM music removed + 12-bit sigma-delta with pcm, top_tetris
+  STARTUPE2 (generic USE_STARTUP, testbenches false: its sim model never
+  stops) + flash pins in pins.xdc. SW4 = all media sound.
+* LUTs: first full build did NOT place (7,566 = 95 %). Fixed by
+  `text_multi.vhd` (all text lines of a renderer share ONE font ROM;
+  replaces text_layer in the game; text_layer still used by tests) and
+  the bouncer sequencer: final build 6,972 LUTs (87 %), slices 99.6 %, BRAM 10/10, WNS +3.7 ns.
+* Tests: tb_media_engine PASS, tb_media_ctrl PASS, tb_chaos PASS,
+  tb_flash_read PASS; frame testbenches compared pixel-exact with the
+  pre-refactor screenshots. Synth-only per-block report: scratchpad tcl with
+  `-flatten_hierarchy none` (the normal report lumps text logic into vga_sync).
+* Docs: Part 9 `docs/learn/09_media_walkthrough.md` (written with
+  {{file:text}} markers resolved by a scratchpad script; if any marker is
+  left, resolve it), visual guide section 16 (ADPCM, RLE, Jevil path,
+  pipeline table). Parts 5-8 line refs remapped; 6.5 notes the sound file
+  changed (refs = chaos branch version).
+* NEXT: user tests on hardware with the checklist in docs 9.11; then merge
+  chaos -> main when confirmed.
 
 ## 1. The assignment (short)
 

@@ -262,7 +262,7 @@ That's a *priority encoder* built from a loop. It feeds the heartbeat.
 
 ## 6.3 `text_pkg.vhd` + `text_layer.vhd`: writing on the screen
 
-### The font (text_pkg L45–102)
+### The font (text_pkg L48–105)
 
 Each character is a 5×7 picture written as text, the same idea as the
 piece shapes (Part 5 §5.1):
@@ -276,7 +276,7 @@ piece shapes (Part 5 §5.1):
 
 **Character codes** (L5–10): digits are 0..9 (so a BCD digit *is* its
 character code, no conversion), letters 10..35, then a few symbols.
-`to_codes("WIN!")` (L128) turns a whole string into codes, 6 bits each,
+`to_codes("WIN!")` (L131) turns a whole string into codes, 6 bits each,
 character 1 in the lowest bits. It only runs while compiling, for fixed
 text.
 
@@ -305,30 +305,36 @@ registers).
 Size example: "WIN!" with SHIFT = 2: each font pixel = 4×4 screen pixels,
 each character 24 × 32, 4 characters = 96 px wide.
 
+(Later, in Part 9, the game ran short of LUTs and the separate text layers
+were merged into one `text_multi.vhd`: the same arithmetic for every line,
+but one shared font ROM instead of one per line. `text_layer.vhd` is still
+there and still used by the hardware tests.)
+
 ---
 
 ## 6.4 `tetris_render.vhd`: what changed
 
 New inputs: `lines_bcd`, `result`, `pending`, `opp_height`, `link_ok`.
 
-**Nine text layers** (L144–161), each a separate copy of `text_layer`
-placed at a fixed spot: NEXT, LEVEL, LINES, the line number, RIVAL, the link
-status, PRESS START, the result word, GAME OVER. Fixed text comes from
+**Nine lines of text** (L155–176), each at a fixed spot: NEXT, LEVEL,
+LINES, the line number, RIVAL, the link status, PRESS START, the result
+word, GAME OVER. (In this part they were nine copies of `text_layer`; Part
+9 put them into one `text_multi` with a single font ROM, see 9.9.) Fixed text comes from
 constants (`TXT_NEXT`...), because VHDL-93 doesn't allow a function call in
 a port map (our rule from Part 1). Changing text is chosen by signals:
 
-* `num_chars` (L135): the 4 BCD digits, with "00" added to make 6-bit codes.
-* `link_chars` (L137): " LINKED" or "NO LINK".
-* `res_chars` (L138): "WIN!" / "LOSE" / "DRAW" chosen with `with result select`.
+* `num_chars` (L146): the 4 BCD digits, with "00" added to make 6-bit codes.
+* `link_chars` (L148): " LINKED" or "NO LINK".
+* `res_chars` (L149): "WIN!" / "LOSE" / "DRAW" chosen with `with result select`.
 
 **Stage 1 additions:**
-* garbage meter (L248): the 8 px column left of the field, filled
+* garbage meter (L263): the 8 px column left of the field, filled
   if `y ≥ 400 − 16 × pending`, so it grows upwards, 16 px per waiting line;
-* rival bar (L261): same idea with `opp_height`;
-* dark bands (L274): rows behind the result text and PRESS START, so the
+* rival bar (L276): same idea with `opp_height`;
+* dark bands (L289): rows behind the result text and PRESS START, so the
   text is readable over blocks.
 
-**Stage 2 additions** (L330 on): inside the field, the banner is drawn
+**Stage 2 additions** (L350 on): inside the field, the banner is drawn
 *last*, so it covers blocks. Result colours: gold WIN!, red LOSE / GAME
 OVER, white DRAW. The field frame turns gold when you win. Outside the
 field, new layers: the meter (red on dark red), the rival bar (grey, red
@@ -338,6 +344,12 @@ the labels.
 ---
 
 ## 6.5 `tetris_sound.vhd`: music and effects
+
+> **Changed later (Part 9):** the music part of this block (the Korobeiniki
+> ROM and its note player) is gone; the real recordings from the flash play
+> instead, and the mixer below now has 4,096 levels instead of 16. The
+> effects work as described here. The line numbers in this section are for
+> the file as it was before Part 9: `git show chaos:src/game/tetris_sound.vhd`.
 
 ### A note is a counter (L66–89, L268–291)
 
@@ -457,11 +469,11 @@ output keeps correcting itself and never drifts from the right average.
 ## 6.6 `top_tetris.vhd`
 
 * **Generic `LINK_CLKS_PER_BIT`**: 434 normally (115200 baud).
-* **The settings switches** go through `switch_filter` (L176–181): pause
+* **The settings switches** go through `switch_filter` (L215–220): pause
   (SW2), music (SW4), sound effects (SW5), and SW7 = "use USB". All settings
   sit at the right end of the row of slide switches (SW7 was SW22 before the
   switch re-layout).
-* **Link source** (L232): `rx_line <= usb_rx when usb_s = '1' else link_rx;`.
+* **Link source** (L271): `rx_line <= usb_rx when usb_s = '1' else link_rx;`.
   A 2-to-1 mux picks which wire the link listens to. It *sends* on both
   wires always: the J5 pin and the USB line. Nobody listening is harmless.
 * **Pull-ups** in `pins.xdc` on both receive pins: an unplugged J5 pin then

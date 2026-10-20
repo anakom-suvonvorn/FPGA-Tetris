@@ -22,10 +22,17 @@
 -- PIPELINE (2 clocks)
 --   stage 1: from (x, y) find the cell, read that field row, check whether
 --            the piece / ghost / next piece covers this cell.  -> s1_* registers
---            (the text_layer blocks do their own stage 1 and give t_* bits)
+--            (text_multi does its own stage 1 and gives the t_* bits)
 --   stage 2: choose the colour.                                -> output pins
 -- hsync / vsync / video_on go through the same 2 registers, so they stay
 -- lined up with the colour.
+--
+-- FOR THE MEDIA LAYER (media_mix, after this block) two more bits per pixel:
+--   see_bg  the pixel is screen background or an empty field cell: a
+--           background video may show through here (blocks, ghost, frames,
+--           text and the chaos overlay stay solid)
+--   keep    the pixel is on the result / PRESS START band: stays on top of a
+--           full-screen picture
 -- ============================================================================
 library ieee;
 use ieee.std_logic_1164.all;
@@ -71,7 +78,9 @@ entity tetris_render is
     vga_g      : out std_logic_vector(3 downto 0);
     vga_b      : out std_logic_vector(3 downto 0);
     vga_hs     : out std_logic;
-    vga_vs     : out std_logic
+    vga_vs     : out std_logic;
+    see_bg     : out std_logic;
+    keep       : out std_logic
   );
 end entity;
 
@@ -102,9 +111,11 @@ architecture rtl of tetris_render is
   signal s1_rival_frame, s1_rival_in, s1_rival_fill : std_logic := '0';
   signal s1_banner_res, s1_banner_press : std_logic := '0';
 
-  -- text (each text_layer has its own stage-1 register inside)
+  -- text (text_multi has its own stage-1 register inside)
   signal t_next, t_level, t_lines, t_num, t_rival, t_link : std_logic;
   signal t_press, t_res, t_over : std_logic;
+  signal all_chars  : std_logic_vector(6 * 54 - 1 downto 0);   -- the 9 lines' codes
+  signal t_en, t_pix : std_logic_vector(8 downto 0);
   signal num_chars  : std_logic_vector(23 downto 0);
   signal link_chars : std_logic_vector(41 downto 0);
   signal res_chars  : std_logic_vector(23 downto 0);
@@ -141,24 +152,28 @@ begin
     to_codes("DRAW") when 3,
     to_codes("    ") when others;
 
-  u_t_next  : entity work.text_layer generic map (X0 => NX0, Y0 => 52,  LEN => 4,  SHIFT => 1)
-    port map (clk => clk, x => x, y => y, chars => TXT_NEXT,   pix => t_next);
-  u_t_level : entity work.text_layer generic map (X0 => LX0, Y0 => 156, LEN => 5,  SHIFT => 1)
-    port map (clk => clk, x => x, y => y, chars => TXT_LEVEL, pix => t_level);
-  u_t_lines : entity work.text_layer generic map (X0 => LX0, Y0 => 224, LEN => 5,  SHIFT => 1)
-    port map (clk => clk, x => x, y => y, chars => TXT_LINES, pix => t_lines);
-  u_t_num   : entity work.text_layer generic map (X0 => LX0, Y0 => 244, LEN => 4,  SHIFT => 2)
-    port map (clk => clk, x => x, y => y, chars => num_chars,          pix => t_num);
-  u_t_rival : entity work.text_layer generic map (X0 => 90,  Y0 => 52,  LEN => 5,  SHIFT => 1)
-    port map (clk => clk, x => x, y => y, chars => TXT_RIVAL, pix => t_rival);
-  u_t_link  : entity work.text_layer generic map (X0 => 78,  Y0 => 412, LEN => 7,  SHIFT => 1)
-    port map (clk => clk, x => x, y => y, chars => link_chars,         pix => t_link);
-  u_t_press : entity work.text_layer generic map (X0 => 254, Y0 => 264, LEN => 11, SHIFT => 1)
-    port map (clk => clk, x => x, y => y, chars => TXT_PRESS, pix => t_press);
-  u_t_res   : entity work.text_layer generic map (X0 => 272, Y0 => 202, LEN => 4,  SHIFT => 2)
-    port map (clk => clk, x => x, y => y, chars => res_chars,          pix => t_res);
-  u_t_over  : entity work.text_layer generic map (X0 => 266, Y0 => 210, LEN => 9,  SHIFT => 1)
-    port map (clk => clk, x => x, y => y, chars => TXT_OVER, pix => t_over);
+  -- all 9 lines of text through ONE font ROM (text_multi): line k = bit k
+  --          0 NEXT   1 LEVEL  2 LINES  3 number 4 RIVAL  5 link   6 PRESS  7 result 8 GAME OVER
+  all_chars <= TXT_OVER & res_chars & TXT_PRESS & link_chars & TXT_RIVAL & num_chars &
+               TXT_LINES & TXT_LEVEL & TXT_NEXT;
+  -- WIN!/LOSE/DRAW and GAME OVER overlap: only one of them is enabled
+  t_en <= '1' & "11111111" when result = 4 else '0' & "11111111";
+  u_text : entity work.text_multi
+    generic map (N => 9,
+                 X0S    => (NX0, LX0, LX0, LX0, 90, 78,  254, 272, 266),
+                 Y0S    => (52,  156, 224, 244, 52, 412, 264, 202, 210),
+                 LENS   => (4,   5,   5,   4,   5,  7,   11,  4,   9),
+                 SHIFTS => (1,   1,   1,   2,   1,  1,   1,   2,   1))
+    port map (clk => clk, x => x, y => y, chars => all_chars, en => t_en, pix => t_pix);
+  t_next  <= t_pix(0);
+  t_level <= t_pix(1);
+  t_lines <= t_pix(2);
+  t_num   <= t_pix(3);
+  t_rival <= t_pix(4);
+  t_link  <= t_pix(5);
+  t_press <= t_pix(6);
+  t_res   <= t_pix(7);
+  t_over  <= t_pix(8);
 
   -- -------------------------------------------------------- stage 1
   stage1 : process(clk)
@@ -297,9 +312,11 @@ begin
   stage2 : process(clk)
     variable c    : rgb_t;
     variable cell : rgb_t;
+    variable empty : boolean;                     -- an empty field cell (see_bg)
   begin
     if rising_edge(clk) then
       c := BG;
+      empty := true;
 
       if s1_in_field = '1' then
         if s1_px = 0 or s1_py = 0 then
@@ -309,7 +326,9 @@ begin
         end if;
         if s1_piece = '1' then
           c := bevel(piece_rgb(cur_color), s1_px, s1_py);
+          empty := false;
         elsif s1_occ_bit = '1' and fx_blind = '0' then
+          empty := false;
           -- (chaos BLIND: locked blocks are skipped completely, so the cell
           --  is drawn exactly like an empty one - background and grid)
           if game_over = '1' then
@@ -322,6 +341,7 @@ begin
           -- outline only, in a dark version of the piece colour
           if s1_px = 0 or s1_py = 0 or s1_px = 15 or s1_py = 15 then
             c := darken(piece_rgb(cur_color));
+            empty := false;
           end if;
         end if;
         if paused = '1' then
@@ -330,6 +350,7 @@ begin
         -- text over the field, on a dark band
         if s1_banner_res = '1' then
           c := x"111";
+          empty := false;
           if t_res = '1' then
             case result is
               when 1      => c := x"FD3";         -- WIN!  gold
@@ -343,6 +364,7 @@ begin
         end if;
         if s1_banner_press = '1' then
           c := x"111";
+          empty := false;
           if t_press = '1' then
             c := x"FFF";
           end if;
@@ -395,9 +417,20 @@ begin
         c := x"FFF";
       end if;
 
+      -- may a background video show here?
+      if s1_in_field = '1' then
+        if empty then see_bg <= '1'; else see_bg <= '0'; end if;
+      elsif c = BG then
+        see_bg <= '1';
+      else
+        see_bg <= '0';
+      end if;
+      keep <= s1_banner_res or s1_banner_press;
+
       -- the chaos overlay (task panel, banner, bouncers, cat) goes on top
       if ov_on = '1' then
         c := ov_rgb;
+        see_bg <= '0';
       end if;
 
       if s1_vid = '1' then

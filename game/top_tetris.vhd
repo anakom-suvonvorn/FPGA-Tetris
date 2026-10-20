@@ -21,7 +21,7 @@
 --   SW7  link to the PC over USB instead of the J5 cable (test with
 --        tools\fake_opponent.py, the PC plays the other board)
 --   SW6  CHAOS on (tasks + attacks)
---   SW5  sound effects on    SW4  music on    SW2  pause (rightmost)
+--   SW5  sound effects on    SW4  music / media sound on    SW2  pause (rightmost)
 --   All slide switches go through switch_filter (bounce removed).
 --
 -- Versus rules: clearing 2 / 3 / 4 lines sends 1 / 2 / 4 garbage lines.
@@ -30,6 +30,11 @@
 -- CHAOS: every 10-17 s (random, no warning) a task pops up on the right; do
 -- it with the task switches before the time runs out -> attack the rival or
 -- get a bonus. The LOCK attack locks all buttons until you finish a task.
+-- MEDIA (from the SPI flash, written there with tools\flash_media.bat
+-- media\game_media.bin): the music, the media attacks (Bad Apple, OIIA,
+-- Jevil play behind the rival's game), a random clip / picture when you win
+-- or lose, Jevil and the friends' faces as sprites. Without the media file
+-- the game works the same, just without them.
 --
 -- Structure (top-down design):
 --   top_tetris
@@ -40,13 +45,19 @@
 --     +-- chaos_task     the slide-switch tasks
 --     +-- chaos_fx       attacks / bonuses acting on me, banner
 --     +-- chaos_render   task panel, banner, bouncers, cat (an overlay)
---     +-- tetris_render  game state -> pixel colours (text_layer, + overlay)
---     +-- tetris_sound   music + effects -> audio jack, buzzer
+--     +-- tetris_render  game state -> pixel colours (text_multi, + overlay)
+--     +-- media_engine   reads the flash: pictures, sound (adpcm_dec), sprites
+--     |                  (spi_flash; its clock goes out through STARTUPE2)
+--     +-- media_ctrl     what plays when: music, attacks, win / lose
+--     +-- media_mix      media on top of / behind the game -> VGA pins
+--     +-- tetris_sound   media sound + effects -> audio jack, buzzer
 --     +-- seg7_scan      lines, or the task countdown, on the 7-segment display
 -- ============================================================================
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
+library unisim;
+use unisim.vcomponents.all;                      -- STARTUPE2
 use work.common_pkg.all;
 use work.tetris_pkg.all;
 use work.chaos_pkg.all;
@@ -57,7 +68,9 @@ entity top_tetris is
     LINK_CLKS_PER_BIT : integer := CLKS_PER_BIT;  -- 115200 baud
     CHAOS_FIRST_DELAY : integer := 600;           -- frames until the first task
     CHAOS_FORCE_TASK  : integer := -1;            -- testbenches: always this task
-    SW_TICK_CYCLES    : integer := 50_000         -- switch_filter sample: 1 ms
+    SW_TICK_CYCLES    : integer := 50_000;        -- switch_filter sample: 1 ms
+    USE_STARTUP       : boolean := true           -- testbenches: false (STARTUPE2's simulation
+                                                  -- model has a clock that never stops)
   );
   port (
     clk       : in  std_logic;                       -- H11
@@ -79,6 +92,12 @@ entity top_tetris is
     audio_l   : out std_logic;                       -- A13
     audio_r   : out std_logic;                       -- B13
     buzzer    : out std_logic;                       -- B14 (needs jumper J6)
+    -- the flash chip (its clock goes through STARTUPE2, see below)
+    flash_cs_n  : out std_logic;                     -- C11 FCS_B
+    flash_mosi  : out std_logic;                     -- B11 D00
+    flash_miso  : in  std_logic := '1';              -- B12 D01
+    flash_wp_n  : out std_logic;                     -- D10 D02, keep high
+    flash_hold_n: out std_logic;                     -- C10 D03, keep high
     vga_r     : out std_logic_vector(3 downto 0);
     vga_g     : out std_logic_vector(3 downto 0);
     vga_b     : out std_logic_vector(3 downto 0);
@@ -161,6 +180,26 @@ architecture rtl of top_tetris is
   signal ban_id      : integer range 0 to 31;
   signal ov_on       : std_logic;
   signal ov_rgb      : rgb_t;
+  signal face_en     : std_logic;
+  signal face_addr   : unsigned(11 downto 0);
+
+  -- media
+  signal media_hit   : std_logic;
+  signal media_id    : integer range 0 to 2;
+  signal m_play, m_stop, m_ready, m_spr, m_busy, m_snd, m_picok, m_dimh : std_logic;
+  signal m_item      : integer range 0 to 31;
+  signal m_from, m_pos : unsigned(15 downto 0);
+  signal m_mode, m_zone : integer range 0 to 3;
+  signal m_musf, m_musn, m_atkf, m_losef, m_losen, m_winf, m_winn : integer range 0 to 31;
+  signal m_rgb, s_rgb : std_logic_vector(11 downto 0);
+  signal m_see, s_on : std_logic;
+  signal j_en, f_en  : std_logic;
+  signal j_addr      : unsigned(14 downto 0);
+  signal pcm         : signed(15 downto 0);
+  signal c_show, c_jev, c_won, show, jev : std_logic;
+  signal sclk        : std_logic;
+  signal r_r, r_g, r_b : std_logic_vector(3 downto 0);   -- tetris_render's picture
+  signal r_hs, r_vs, see_bg, keep : std_logic;
 
   signal audio       : std_logic;
   signal g3, g2, g1, g0 : glyph_t;
@@ -253,7 +292,7 @@ begin
     generic map (FIRST_DELAY => CHAOS_FIRST_DELAY, FORCE_TASK => CHAOS_FORCE_TASK)
     port map (
       clk => clk, frame_tick => frame_tick, enable => chaos_en, paused => pause_s,
-      versus => link_ok, hurry => fx_locked, sw => task_sw, touch => touch,
+      versus => link_ok, hurry => fx_locked, media_ok => m_ready, sw => task_sw, touch => touch,
       active => t_active, task => t_task, sel => t_sel, target => t_target,
       count => t_count, meter_pos => t_meter, zone_lo => t_zlo, zone_hi => t_zhi,
       progress => t_prog, secs => t_secs, hands_secs => t_offsecs,
@@ -271,7 +310,7 @@ begin
       n_bounce => fx_nbounce, cat => fx_cat, speed => fx_speed, freeze => fx_freeze,
       locked => fx_locked,
       garbage => fx_garb, next_bad => fx_next_bad, next_i => fx_next_i, sink => fx_sink,
-      hit_evt => fx_hit, oiia_evt => fx_oiia,
+      hit_evt => fx_hit, oiia_evt => fx_oiia, media_hit => media_hit, media_id => media_id,
       banner_on => ban_on, banner_id => ban_id
     );
 
@@ -283,7 +322,7 @@ begin
       t_sw => task_sw, t_count => t_count, t_meter => t_meter, t_zone_lo => t_zlo,
       t_zone_hi => t_zhi, t_progress => t_prog, t_secs => t_secs, t_offsecs => t_offsecs,
       banner_on => ban_on, banner_id => ban_id,
-      ov_on => ov_on, ov_rgb => ov_rgb
+      ov_on => ov_on, ov_rgb => ov_rgb, face_en => face_en, face_addr => face_addr
     );
 
   -- ------------------------------------------------------------ picture + sound
@@ -297,13 +336,73 @@ begin
       lines_bcd => lines_bcd, result => result, pending => pending,
       opp_height => opp_height, link_ok => link_ok,
       fx_flip => fx_flip, fx_blind => fx_blind, ov_on => ov_on, ov_rgb => ov_rgb,
+      vga_r => r_r, vga_g => r_g, vga_b => r_b, vga_hs => r_hs, vga_vs => r_vs,
+      see_bg => see_bg, keep => keep
+    );
+
+  -- ------------------------------------------------------------ media
+  u_media : entity work.media_engine
+    port map (
+      clk => clk, frame_tick => frame_tick,
+      play => m_play, item => m_item, from_rec => m_from, stop => m_stop,
+      ready => m_ready, spr_ok => m_spr,
+      mus_first => m_musf, mus_n => m_musn, atk_first => m_atkf,
+      lose_first => m_losef, lose_n => m_losen, win_first => m_winf, win_n => m_winn,
+      busy => m_busy, has_snd => m_snd, pic_ok => m_picok, mode => m_mode, dim_half => m_dimh,
+      rec_pos => m_pos,
+      sclk => sclk, cs_n => flash_cs_n, mosi => flash_mosi, miso => flash_miso,
+      x => x, y => y, rgb => m_rgb, see => m_see, zone => m_zone,
+      j_en => j_en, j_addr => j_addr, f_en => f_en, f_addr => face_addr,
+      spr_on => s_on, spr_rgb => s_rgb, pcm => pcm
+    );
+  f_en <= face_en and m_spr;                     -- faces only once they are loaded
+  flash_wp_n   <= '1';
+  flash_hold_n <= '1';
+
+  -- The flash clock pin is the FPGA's own configuration clock pin (CCLK).
+  -- After configuration, user logic can only reach it through STARTUPE2:
+  -- whatever goes into USRCCLKO comes out on CCLK (see docs\learn\08).
+  g_startup : if USE_STARTUP generate
+  u_startup : STARTUPE2
+    generic map (PROG_USR => "FALSE", SIM_CCLK_FREQ => 0.0)
+    port map (
+      CFGCLK => open, CFGMCLK => open, EOS => open, PREQ => open,
+      CLK => '0', GSR => '0', GTS => '0', KEYCLEARB => '1', PACK => '0',
+      USRCCLKO  => sclk,                         -- our SPI clock -> CCLK pin
+      USRCCLKTS => '0',                          -- '0' = drive the pin
+      USRDONEO  => '1',                          -- keep the DONE LED on
+      USRDONETS => '0'
+    );
+  end generate;
+
+  u_mctrl : entity work.media_ctrl
+    port map (
+      clk => clk, playing => playing, result => result,
+      media_hit => media_hit, media_id => media_id,
+      ready => m_ready, mus_first => m_musf, mus_n => m_musn, atk_first => m_atkf,
+      lose_first => m_losef, lose_n => m_losen, win_first => m_winf, win_n => m_winn,
+      busy => m_busy, has_snd => m_snd, rec_pos => m_pos,
+      play => m_play, item => m_item, from_rec => m_from, stop => m_stop,
+      show => c_show, jevil => c_jev, won => c_won
+    );
+  show <= c_show and m_picok;
+  jev  <= c_jev and m_picok and m_spr;
+
+  u_mix : entity work.media_mix
+    port map (
+      clk => clk, frame_tick => frame_tick, x => x, y => y,
+      g_r => r_r, g_g => r_g, g_b => r_b, g_hs => r_hs, g_vs => r_vs,
+      see_bg => see_bg, keep => keep,
+      show => show, mode => m_mode, dim_half => m_dimh, won => c_won, jevil => jev,
+      m_rgb => m_rgb, m_see => m_see, m_zone => m_zone, s_on => s_on, s_rgb => s_rgb,
+      j_en => j_en, j_addr => j_addr,
       vga_r => vga_r, vga_g => vga_g, vga_b => vga_b, vga_hs => vga_hs, vga_vs => vga_vs
     );
 
   u_sound : entity work.tetris_sound
     port map (
       clk => clk, frame_tick => frame_tick, music_on => music_s, sfx_on => sfx_s,
-      playing => playing, level => level, clear_evt => clear_evt, clear_n => clear_n,
+      playing => playing, pcm => pcm, clear_evt => clear_evt, clear_n => clear_n,
       garb_evt => garb_in, result => result,
       task_start_evt => t_start, task_ok_evt => t_ok, task_fail_evt => t_fail,
       sent_evt => t_send, hit_evt => fx_hit, oiia_evt => fx_oiia,

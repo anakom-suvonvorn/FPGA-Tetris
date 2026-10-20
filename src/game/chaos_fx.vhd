@@ -14,6 +14,8 @@
 -- BOUNCE also picks how many squares come (5..10).
 -- Instant effects (garbage, cursed next, sink, I piece) are one-clock pulses
 -- to tetris_core.
+-- MEDIA attacks (Bad Apple, OIIA, Jevil) are passed on to media_ctrl as a
+-- pulse (media_hit + media_id 0..2); the video itself decides how long.
 -- LOCK is different: 'locked' stays on until I finish a task (task_ok).
 -- While it is on, the banner keeps saying LOCKED, and chaos_task is told to
 -- hurry (give me a task now, and a new one after each failure).
@@ -58,6 +60,9 @@ entity chaos_fx is
     -- for the sound
     hit_evt     : out std_logic;                  -- an attack arrived
     oiia_evt    : out std_logic;                  -- the cat arrived
+    -- media attacks (to media_ctrl)
+    media_hit   : out std_logic;
+    media_id    : out integer range 0 to 2;
     -- banner
     banner_on   : out std_logic;
     banner_id   : out integer range 0 to 31
@@ -72,7 +77,8 @@ architecture rtl of chaos_fx is
   signal nb     : integer range 5 to 10 := 5;
   signal ban_t  : integer range 0 to 255 := 0;
   signal ban_id : integer range 0 to 31 := 0;
-  signal g_p, nb_p, ni_p, sk_p, hit_p, oiia_p : std_logic := '0';
+  signal g_p, nb_p, ni_p, sk_p, hit_p, oiia_p, m_p : std_logic := '0';
+  signal m_id   : integer range 0 to 2 := 0;
   signal lfsr   : std_logic_vector(15 downto 0) := x"9E37";
 begin
 
@@ -82,7 +88,7 @@ begin
     if rising_edge(clk) then
       lfsr <= lfsr(14 downto 0) & (lfsr(15) xor lfsr(13) xor lfsr(12) xor lfsr(10));
       rnd  := to_integer(unsigned(lfsr(7 downto 0)));
-      g_p <= '0'; nb_p <= '0'; ni_p <= '0'; sk_p <= '0'; hit_p <= '0'; oiia_p <= '0';
+      g_p <= '0'; nb_p <= '0'; ni_p <= '0'; sk_p <= '0'; hit_p <= '0'; oiia_p <= '0'; m_p <= '0';
 
       if enable = '0' then
         t      <= (others => 0);
@@ -111,12 +117,15 @@ begin
         -- the rival hit me
         if got_attack = '1' and got_id <= N_ATTACKS - 1 then
           hit_p  <= '1';
-          ban_id <= got_id;                          -- banners 0..8: INCOMING
+          ban_id <= got_id;                          -- banners 0..11: INCOMING
           ban_t  <= 150;
           case got_id is
             when A_GARBAGE => g_p    <= '1';
             when A_CURSED  => nb_p   <= '1';
             when A_LOCK    => lock_r <= '1';
+            when A_APPLE | A_OIIA_V | A_JEVIL =>
+              m_p  <= '1';
+              m_id <= got_id - A_MEDIA;
             when others    =>
               if got_id = A_OIIA   then oiia_p <= '1'; end if;
               if got_id = A_BOUNCE then nb <= rand_range(5, 10, rnd); end if;
@@ -128,11 +137,11 @@ begin
 
         -- banners for my own task results
         if sent_attack = '1' then
-          ban_id <= BAN_SENT + sent_id;              -- banners 9..17: SENT
+          ban_id <= BAN_SENT + sent_id;              -- banners 12..23: SENT
           ban_t  <= 150;
         end if;
         if bonus = '1' then
-          ban_id <= BAN_BONUS + bonus_id;            -- banners 18..20: BONUS
+          ban_id <= BAN_BONUS + bonus_id;            -- banners 24..26: BONUS
           ban_t  <= 150;
           case bonus_id is
             when B_FREEZE => t_frz <= rand_range(FREEZE_LO, FREEZE_HI, rnd);
@@ -163,6 +172,8 @@ begin
   sink      <= sk_p;
   hit_evt   <= hit_p;
   oiia_evt  <= oiia_p;
+  media_hit <= m_p;
+  media_id  <= m_id;
   banner_on <= '1' when ban_t > 0 else '0';
   banner_id <= ban_id;
 

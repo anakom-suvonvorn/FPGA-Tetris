@@ -37,6 +37,9 @@ package text_pkg is
   -- (so text_layer's character 0 is the first, leftmost one)
   function to_codes(s : string) return std_logic_vector;
 
+  -- a list of whole numbers, for text_multi's generics (one per text line)
+  type int_list is array (natural range <>) of integer;
+
 end package text_pkg;
 
 

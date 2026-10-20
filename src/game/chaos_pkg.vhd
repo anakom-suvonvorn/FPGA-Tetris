@@ -34,6 +34,12 @@
 --           7 SPEED    pieces fall much faster                 (8-12 s)
 --           8 LOCK     all buttons locked until the victim finishes a task
 --                      (a task starts for them right away; fail = another one)
+--           9 BAD APPLE   } MEDIA attacks: a video from the flash plays behind
+--          10 OIIA OIIA   } the rival's game, its sound replaces their music
+--          11 JEVIL       } (Jevil also floats over the screen). Full length
+--                         (40-84 s). The SENDER can't send another media
+--                         attack until it is over + 10 s (MEDIA_COOL).
+--                         Needs the media file in the flash (media_engine).
 --   bonuses 0 FREEZE   no gravity                              (3-5 s)
 --           1 SINK     remove the 2 bottom rows now, cancel waiting garbage
 --           2 I PIECE  the next piece becomes an I
@@ -54,7 +60,7 @@ package chaos_pkg is
   constant T_TIMING : integer := 5;
   constant T_HEX    : integer := 6;
 
-  constant N_ATTACKS : integer := 9;
+  constant N_ATTACKS : integer := 12;
   constant A_MIRROR  : integer := 0;
   constant A_FLIP    : integer := 1;
   constant A_BLIND   : integer := 2;
@@ -64,6 +70,10 @@ package chaos_pkg is
   constant A_CURSED  : integer := 6;
   constant A_SPEED   : integer := 7;
   constant A_LOCK    : integer := 8;
+  constant A_APPLE   : integer := 9;      -- the 3 media attacks, in the order of
+  constant A_OIIA_V  : integer := 10;     -- the attack items in the media file
+  constant A_JEVIL   : integer := 11;
+  constant A_MEDIA   : integer := 9;      -- ids >= this are media attacks
 
   constant B_FREEZE  : integer := 0;
   constant B_SINK    : integer := 1;
@@ -76,8 +86,13 @@ package chaos_pkg is
 
   -- how long a timed effect lasts, in frames (60 = 1 second): low .. high
   type frames_t is array (natural range <>) of integer range 0 to 1023;
-  constant ATTACK_LO : frames_t(0 to N_ATTACKS - 1) := (480, 360, 300, 480, 360, 0, 0, 480, 0);
-  constant ATTACK_HI : frames_t(0 to N_ATTACKS - 1) := (720, 600, 480, 720, 600, 0, 0, 720, 0);
+  constant ATTACK_LO : frames_t(0 to N_ATTACKS - 1) := (480, 360, 300, 480, 360, 0, 0, 480, 0, 0, 0, 0);
+  constant ATTACK_HI : frames_t(0 to N_ATTACKS - 1) := (720, 600, 480, 720, 600, 0, 0, 720, 0, 0, 0, 0);
+
+  -- media attacks: how long the sender waits before it may send another
+  -- one = the item's length (tools\media_plan.py) + 10 s, in frames
+  type cool_t is array (0 to 2) of integer range 0 to 8191;
+  constant MEDIA_COOL : cool_t := (5052 + 600, 2625 + 600, 2418 + 600);  -- 84.2 s, 43.75 s, 40.3 s
   constant FREEZE_LO : integer := 180;
   constant FREEZE_HI : integer := 300;
 
@@ -91,13 +106,13 @@ package chaos_pkg is
 
   -- ------------------------------------------------------------- banners
   -- The banner under the field: 20 characters, chosen by number.
-  --   0..8   INCOMING: <attack>   (the rival hit me)
-  --   9..17  SENT: <attack>       (I hit the rival)
-  --   18..20 BONUS: <bonus>
-  --   21     TASK FAILED
-  constant BAN_SENT  : integer := 9;
-  constant BAN_BONUS : integer := 18;
-  constant BAN_FAIL  : integer := 21;
+  --   0..11  INCOMING: <attack>   (the rival hit me)
+  --   12..23 SENT: <attack>       (I hit the rival)
+  --   24..26 BONUS: <bonus>
+  --   27     TASK FAILED
+  constant BAN_SENT  : integer := 12;
+  constant BAN_BONUS : integer := 24;
+  constant BAN_FAIL  : integer := 27;
   constant BANNER_LEN : integer := 20;
   subtype banner_t is std_logic_vector(6 * BANNER_LEN - 1 downto 0);
   function banner_codes(n : integer range 0 to 31) return banner_t;
@@ -114,7 +129,7 @@ end package chaos_pkg;
 
 package body chaos_pkg is
 
-  type banner_table_t is array (0 to 21) of banner_t;
+  type banner_table_t is array (0 to 27) of banner_t;
   constant BANNERS : banner_table_t := (
     to_codes(" INCOMING: MIRROR!  "),
     to_codes(" INCOMING: FLIPPED! "),
@@ -125,6 +140,9 @@ package body chaos_pkg is
     to_codes(" INCOMING: CURSED!  "),
     to_codes(" INCOMING: SPEED UP "),
     to_codes("LOCKED! DO THE TASK "),
+    to_codes("INCOMING: BAD APPLE "),
+    to_codes("INCOMING: OIIA OIIA!"),
+    to_codes(" INCOMING: JEVIL!   "),
     to_codes("   SENT: MIRROR!    "),
     to_codes("   SENT: FLIP!      "),
     to_codes("   SENT: BLIND!     "),
@@ -134,6 +152,9 @@ package body chaos_pkg is
     to_codes("   SENT: CURSE!     "),
     to_codes("   SENT: SPEED UP!  "),
     to_codes("   SENT: LOCK!      "),
+    to_codes("   SENT: BAD APPLE! "),
+    to_codes("   SENT: OIIA OIIA! "),
+    to_codes("   SENT: JEVIL!     "),
     to_codes(" BONUS: FREEZE TIME "),
     to_codes(" BONUS: SINK 2 ROWS "),
     to_codes(" BONUS: I PIECE NEXT"),
@@ -147,7 +168,7 @@ package body chaos_pkg is
 
   function banner_codes(n : integer range 0 to 31) return banner_t is
   begin
-    if n <= 21 then
+    if n <= 27 then
       return BANNERS(n);
     end if;
     return to_codes("                    ");
