@@ -24,15 +24,19 @@ never written VHDL by hand or opened the Vivado GUI. Read in order:
 7. [The CHAOS layer, line by line](07_chaos_walkthrough.md): slide-switch
    tasks (incl. HEX), attacks over the link (incl. LOCK), bonuses, random time
    ranges, mirror / flip / blind / bouncers /
-   the spinning OIIA cat, and how they are tested (on the `chaos` git branch).
+   the spinning OIIA cat (removed again in Part 9), and how they are tested.
 8. [Pictures and sound from the flash chip](08_flash_walkthrough.md): what
    the SPI flash is, talking SPI, the STARTUPE2 clock trick, how pictures
    (palette, bits per pixel) and sound (8-bit samples) are stored, the
    media player (frame buffer, sound ring, pacing, tearing), test 06 and the
-   pretend-flash testbench, and what fits in 7 MB (on the `media` branch).
-9. [Visual guide](tetris_visual.html) (open in a browser, or
-   https://claude.ai/artifact/28Mdg6vDhCJzwXsmgR6Cdb): interactive diagrams
-   for Parts 5, 6, 7 and 8.
+   pretend-flash testbench, and what fits in 7 MB.
+9. [The media in the game, line by line](09_media_walkthrough.md): ADPCM
+   sound in 4 bits, "delta + run length" pictures, the flash file
+   (`make_game_media.py`), the media engine, what plays when, the last
+   stage of the picture (Jevil's path), making it fit in the chip, and what
+   changed after the first test on the board.
+10. [Visual guide](tetris_visual.html) (download and open in a browser):
+   interactive diagrams for Parts 5 to 9.
 
 Quick start for Vivado:
 
