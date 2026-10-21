@@ -21,9 +21,8 @@ never written VHDL by hand or opened the Vivado GUI. Read in order:
    link and its 1-byte messages, garbage (cancel, send, rise), win / lose /
    draw, the on-screen font and text, music + sound effects (sigma-delta),
    the two-board testbench and the PC fake opponent.
-7. [Visual guide](tetris_visual.html) (open in a browser, or
-   https://claude.ai/artifact/28Mdg6vDhCJzwXsmgR6Cdb): interactive diagrams
-   for Parts 5 and 6.
+7. [Visual guide](tetris_visual.html) (download and open in a browser):
+   interactive diagrams for Parts 5 and 6.
 
 Quick start for Vivado:
 
