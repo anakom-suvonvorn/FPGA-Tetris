@@ -24,10 +24,9 @@ never written VHDL by hand or opened the Vivado GUI. Read in order:
 7. [The CHAOS layer, line by line](07_chaos_walkthrough.md): slide-switch
    tasks (incl. HEX), attacks over the link (incl. LOCK), bonuses, random time
    ranges, mirror / flip / blind / bouncers /
-   the spinning OIIA cat, and how they are tested (on the `chaos` git branch).
-8. [Visual guide](tetris_visual.html) (open in a browser, or
-   https://claude.ai/artifact/28Mdg6vDhCJzwXsmgR6Cdb): interactive diagrams
-   for Parts 5, 6 and 7.
+   the spinning OIIA cat, and how they are tested.
+8. [Visual guide](tetris_visual.html) (download and open in a browser):
+   interactive diagrams for Parts 5, 6 and 7.
 
 Quick start for Vivado:
 
