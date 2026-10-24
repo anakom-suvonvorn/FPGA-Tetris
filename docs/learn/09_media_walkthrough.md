@@ -18,7 +18,11 @@ Files: `tools/make_game_media.py`, `src/media/adpcm_dec.vhd`,
 `chaos_task.vhd`, `chaos_fx.vhd`, `chaos_render.vhd`, `tetris_render.vhd`,
 `tetris_sound.vhd`, `top_tetris.vhd`, `game/pins.xdc`. Line numbers (`L114`)
 refer to the files as they are now (git branch `media`). The visual guide
-(`tetris_visual.html`) has interactive diagrams for this part in section 16.
+(`tetris_visual.html`) has interactive diagrams for this part in section 16,
+and `media_visual.html` explains the whole flash and media path from zero
+(memory, block RAM, the file byte by byte, SPI clock by clock, every state
+machine, the frame buffer, the sound ring, timing), with simulations of the
+VHDL and a code reader that explains every short name.
 
 Contents:
 [9.0 What you get](#90-what-you-get) ·
@@ -262,7 +266,9 @@ or record r's state when continuing the music). `pcm` = the current sample,
 signed 16 bits.
 
 **The step table** (L44–50): the 89 standard sizes. A
-constant array becomes a small ROM made of LUTs.
+constant array becomes a ROM. Because it is read inside the clocked process
+(L69), Vivado builds it in a block RAM half, not from LUTs: the build report
+(`game/build/utilization_by_block.txt`) lists one RAMB18 under `u_dec`.
 
 **Clock 0** (L66): on `go`, keep the code and look up the step
 for the current `idx`.
@@ -316,7 +322,8 @@ biggest new block, so it is split up here by job.
 | faces (L607) | 4,096 × 8 bits | 2 |
 | sound ring | 2,048 × 8 bits | 1 |
 | palettes: 0..255 the item, 256..511 the sprites | 512 × 12 bits | 1 |
-| **total** | | **19 of 20** |
+| the ADPCM step table (adpcm_dec, a ROM, 9.5) | 89 × 15 bits | 1 |
+| **total** | | **20 of 20** |
 
 The chip has 10 BRAM tiles of 36 Kbit, each usable as two 18 Kbit halves.
 The game itself uses none. Why banks: a memory of 19,200 bytes would make

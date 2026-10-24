@@ -1,8 +1,9 @@
 # HANDOFF: project state for Claude (read this first after a context reset)
 
-Last updated: **2026-10-24**: all 3 layers done and working on hardware;
-READMEs of all 3 branches rewritten. Context compacted right after this; the
-user said they have "some stuff i wanna ask" next - wait for it. Keep this file current whenever
+Last updated: **2026-10-25**: all 3 layers done and working on hardware;
+READMEs of all 3 branches rewritten; new explainer page
+`docs/learn/media_visual.html` (the user's questions about flash / media).
+Keep this file current whenever
 something important changes. Durable facts also live in Claude's memory
 (`...\.claude\projects\D--All-files-Me-university-digital-system-assignment\memory\`:
 `digital-system-final-project.md`, `git-workflow.md`).
@@ -11,7 +12,28 @@ something important changes. Durable facts also live in Claude's memory
 
 ## 0. Where we are RIGHT NOW (start here)
 
-### Latest (2026-10-21 .. 24)
+### Latest (2026-10-25)
+* The user read Part 8 and was lost ("how is it stored / flashed / retrieved,
+  what is BRAM, frame buffer, sound ring, what do the states do, the short
+  variable names..."). Answer: **`docs/learn/media_visual.html`** ("Tetris
+  Duel Media Internals"), branch `media`: 18 sections from zero, in the
+  order things happen (memory, block RAM + inference + tile shapes + banks,
+  flash + erase rules, the real media file byte by byte, the Python steps,
+  flash_media.bat / spiOverJtag, spi_flash clock by clock (a JS port of the
+  VHDL), all 7 state machines with walks + code, frame buffer pixel path,
+  one frame clock by clock (JS port of E_RH..E_SND + decoder + hold against
+  the beam), sound ring, ADPCM, A/V sync + rec_pos-2 resume, media_ctrl game
+  simulator, media_mix layers, VERIFY LFSR, a code reader where clicking a
+  name shows its meaning and every write / read line, glossaries).
+  Its embedded VHDL sources and real file numbers come from
+  **`tools/update_media_visual.py`**: run it again after changing src/media
+  or rebuilding a media file. Uses only made-up pictures (no media content):
+  safe to publish. Also published as a private artifact (link in the chat).
+* Found while doing it: adpcm_dec's STEPS table is a RAMB18 (read in the
+  clocked process), so the game uses **20 of 20** BRAM halves, not 19;
+  fixed in Part 9 (9.5, 9.6).
+
+### Before that (2026-10-21 .. 24)
 * Media in the game **works on hardware** (user: "everything seems to be
   correct") after the round in docs 9.13 (flash_media.bat fix, Foxy crop,
   Kaka panel pictures back, ROM cat removed).

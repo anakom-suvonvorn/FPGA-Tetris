@@ -11,7 +11,9 @@ Files: `src/media/spi_flash.vhd`, `src/media/media_player.vhd`,
 `tools/flash_media.bat`, `sim/flash_model.vhd`, `sim/tb_flash_read.vhd`.
 Line numbers (`L114`) refer to the files as they are now (git branch
 `media`). The visual guide (`tetris_visual.html`) has interactive diagrams
-for this part in sections 14 and 15.
+for this part in sections 14 and 15, and `media_visual.html` goes through
+the whole flash and media path from zero, step by step, with simulations of
+the VHDL (Parts 8 and 9 together).
 
 Contents:
 [8.0 Why a flash chip?](#80-why-a-flash-chip) ·

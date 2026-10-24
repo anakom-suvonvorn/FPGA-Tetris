@@ -37,6 +37,13 @@ never written VHDL by hand or opened the Vivado GUI. Read in order:
    changed after the first test on the board.
 10. [Visual guide](tetris_visual.html) (download and open in a browser):
    interactive diagrams for Parts 5 to 9.
+11. [Media from zero](media_visual.html) (download and open in a browser):
+   Parts 8 and 9 explained from scratch, step by step: what memory and block
+   RAM are, the media file byte by byte (real numbers from the file), how it
+   gets into the flash, SPI clock by clock, all seven state machines, the frame
+   buffer, the sound ring, ADPCM, timing against the screen beam, what plays
+   when, and a code reader where clicking any short name tells you what it
+   means and every line that uses it.
 
 Quick start for Vivado:
 
