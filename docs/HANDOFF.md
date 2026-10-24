@@ -1,7 +1,8 @@
 # HANDOFF: project state for Claude (read this first after a context reset)
 
-Last updated: **2026-10-20** (late): media built into the game on branch
-`media`, waiting for the user's hardware test. Keep this file current whenever
+Last updated: **2026-10-24**: all 3 layers done and working on hardware;
+READMEs of all 3 branches rewritten. Context compacted right after this; the
+user said they have "some stuff i wanna ask" next - wait for it. Keep this file current whenever
 something important changes. Durable facts also live in Claude's memory
 (`...\.claude\projects\D--All-files-Me-university-digital-system-assignment\memory\`:
 `digital-system-final-project.md`, `git-workflow.md`).
@@ -10,16 +11,33 @@ something important changes. Durable facts also live in Claude's memory
 
 ## 0. Where we are RIGHT NOW (start here)
 
+### Latest (2026-10-21 .. 24)
+* Media in the game **works on hardware** (user: "everything seems to be
+  correct") after the round in docs 9.13 (flash_media.bat fix, Foxy crop,
+  Kaka panel pictures back, ROM cat removed).
+* **Branches stay SEPARATE** (user's decision): `main` = versus, `chaos` =
+  + chaos layer, `media` = + media. NO more merging chaos -> main. Each
+  branch's root `README.md` was rewritten (same "three branches" table at
+  the top, then that branch's own controls / rules / files / testbenches /
+  docs / status) and its `docs/learn/README.md` fixed (private artifact link
+  removed: GitHub readers can't open it; "download tetris_visual.html").
+  Commits: main 546033f, chaos 64df0f1, media 01eab78. The generator for
+  the 3 READMEs was a scratchpad script (gone after the session); if they
+  need changing, edit each branch's README.md directly.
+* The user pushes to GitHub themselves (`git push origin main chaos media`).
+* Checked out: `media`, working tree clean.
+
 ### Status of the 4 layers
 * Game = **"Tetris Duel, CHAOS edition"**, versus Tetris on two EDGE boards.
   1. **versus core**: `main` (tag `v1-versus` + later fixes). Played on two
      real boards with a friend on 2026-10-19: works.
-  2. **chaos**: branch `chaos` (round 2 of feedback done, see docs Part 7 §7.8).
+  2. **chaos**: branch `chaos` (round 2 of feedback done, see docs Part 7 §7.8;
+     still has the ROM OIIA cat - only `media` removed it).
   3. **media**: branch **`media`** (checked out) = chaos + test 06 + media
      plan tools. **Test 06 PASSED on hardware 2026-10-20** (ID 016017, media
      file found, VERIFY 0 bad in 83 ms, no sound underruns, A/V sync; tearing
-     only at 3.125 MHz). Media plan approved (v3) and **built into the game**
-     (see "Media in the game" below); waiting for the hardware test.
+     only at 3.125 MHz). Media plan approved (v3), **built into the game and
+     working on the boards** (see "Media in the game" below).
   4. extra mini-games: probably no time.
 * Fixes on ALL branches (made on `main`, merged main -> chaos -> media):
   1.5 s start cool-down after a game (tetris_core `cool`, output `can_start`),
@@ -29,8 +47,9 @@ something important changes. Durable facts also live in Claude's memory
   SW4 SW2. Game: 8 leftmost = task switches (task_sw bit7 = SW22 J1 ... bit0
   = SW11 L2), SW7 N10 = USB link, SW6 P12 = chaos on, SW5 sfx, SW4 music,
   SW2 pause. SW8-10 free.
-* Builds: main 3,496 LUTs (44 %); chaos/media game 6,200 LUTs (77.5 %), WNS
-  +4.6 ns, 0 BRAM. Test 06: 1,749 LUTs, 6 BRAM tiles. Builds now also write
+* Builds: main 3,496 LUTs (44 %); chaos 6,200 LUTs (77.5 %), WNS +4.6 ns,
+  0 BRAM; **media 6,797 LUTs (85 %), slices 98 %, BRAM 10/10, WNS +3.4 ns**
+  (nearly full: new features need cuts first). Test 06: 1,749 LUTs, 6 BRAM. Builds now also write
   `build\utilization_by_block.txt` (per-block numbers are muddled by Vivado's
   flattening; tetris_core ~3,000 is the real big one).
 * **Never push to GitHub.** Commit on the branch as you go.
@@ -84,7 +103,7 @@ length (40-84 s); their sound replaces the rival's music meanwhile.
 * Attack items = a long sound track + optional short video loop (two streams
   read in turns) - only Jevil uses the loop now; OIIA/Bad Apple are full A/V.
 
-### Media in the game: BUILT (2026-10-20, branch `media`), not yet on hardware
+### Media in the game (branch `media`): built 2026-10-20, works on hardware
 All 4 steps done in one go (music, win/lose, media attacks + sender cool-down,
 Jevil + faces). Bad Apple changed by the user to 0-84.2 s, fade 0.4 s.
 * `tools/make_game_media.py` -> `media/game_media.bin` (6.83 MB, git-ignored),
@@ -132,8 +151,7 @@ Jevil + faces). Bad Apple changed by the user to 0-84.2 s, fade 0.4 s.
   APPLE 8, OIIA 9, JEVIL 10; N_ATTACKS 11; banners 0..25), melody-only notes
   removed. Build now 6,797 LUTs (85 %), slices 98 %, WNS +3.4 ns; media file
   6.86 MB. User wants unused things removed generally.
-* NEXT: user re-flashes + tests the rest of the checklist in docs 9.11; then
-  merge chaos -> main when confirmed.
+* Hardware: done, works. Branches stay separate (no merge).
 
 ## 1. The assignment (short)
 
@@ -214,7 +232,8 @@ vivado\             throw-away GUI projects (git-ignored)
 **Git** (remote origin = github.com/anakom-suvonvorn/FPGA-Tetris):
 `main` = stable, tag `v1-versus`. Branch `chaos` = chaos layer (round 2
 included). Branch `media` (current) = chaos + test 06 + Part 8 docs.
-**Never pushed; never push** unless the user says so. Plan: merge `chaos` →
+**Never pushed; never push** unless the user says so. (Old plan, now
+CANCELLED by the user: merge `chaos` →
 `main` after the user's hardware test. Each branch has its own built
 `game\build\top_tetris.bit`.
 
@@ -249,7 +268,9 @@ included). Branch `media` (current) = chaos + test 06 + Part 8 docs.
 ## 4. Things the user wants from me (standing requests)
 
 * **Docs for every layer**: `docs\learn\NN_*.md` line-by-line walkthrough
-  (Parts 1–7 exist: VHDL basics, blocks, tests, Vivado, game, versus, chaos)
+  (Parts 1–9 exist on `media`: VHDL basics, blocks, tests, Vivado, game,
+  versus, chaos, flash (test 06), media in the game; 9.13 = round after the
+  first board test)
   **plus** interactive sections in the visual guide. The user strongly
   prefers real visuals over ASCII art, and step-by-step explanations from
   zero (they were confused by "wide columns" and "sigma-delta" until
@@ -269,6 +290,9 @@ included). Branch `media` (current) = chaos + test 06 + Part 8 docs.
   Sections 14 SPI (bit stepper) and 15 media (beam race / tearing, sound
   ring pacing, 7 MB planner) added 2026-10-19 (version 7). Local preview:
   launch.json "docs" in the session folder serves docs/learn on :8765.
+  Now version 10, **16 sections**: 16 = media in the game (ADPCM stepper,
+  RLE coder, Jevil Lissajous path, pipeline table); 13 (cat) has a
+  "history: removed" note. Branches main/chaos have older copies (11/13).
 * Use git as described in §3; never push.
 * Explain decisions plainly; the user catches logic gaps (e.g. the DRAW
   question) - answer honestly, fix wording/code.
@@ -293,5 +317,14 @@ included). Branch `media` (current) = chaos + test 06 + Part 8 docs.
 * VHDL is case-insensitive: this bit me twice more (port `t_hands` vs
   constant `T_HANDS`, constant `RING` vs signal `ring`). Big BRAMs: Vivado
   maps a 19,200 x 8 array to 8 tiles; split into 4K-deep banks by hand (5).
-* Resource watch: 75 % LUTs. Text layers (12 instances) are a likely place
-  to save LUTs if media needs room.
+* Resource watch (media): 85 % LUTs, 98 % slices, 100 % BRAM. Already done
+  to make room: text_multi (one font ROM per renderer), bouncers moved one
+  per clock, ROM cat removed. Next candidates: banner ROM, tetris_core.
+  Per-block truth needs `synth_design -flatten_hierarchy none` (normal
+  reports lump logic into vga_sync).
+* Testbenches with top_tetris must set `USE_STARTUP => false` (STARTUPE2's
+  sim model never stops, -runall would run forever).
+* Batch files: never put ( ) in an echo inside an if ( ... ) block (escape
+  as ^( ^)); it silently ends the block.
+* Doc line refs for new docs: write {{file:text}} markers and resolve them
+  with a small script at the end (did this for Part 9).
