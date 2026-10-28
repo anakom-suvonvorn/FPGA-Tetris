@@ -39,6 +39,13 @@ something important changes. Durable facts also live in Claude's memory
     that GL knows gets a dotted underline: click = open it in the reader
     (window.REF.lookup / window.refPick). Glossary rows clickable. E_ and
     M_ states added to GL.
+  - Fix after the user's screenshot (2000 px screen: big empty middle, side
+    index gone): docked layout = [index (only >= 1400 px)] | text (980,
+    centred) | draggable divider #refDiv | panel. Width presets fit (text
+    keeps 980, panel gets the rest, >= 420) / half and half / wide; drag
+    (pointer, arrow keys, double-click = fit) is remembered. Below 900 px
+    the panel is a drawer with the divider on its left edge. Checked at
+    2000, 1280 and 375 px.
   - Published again to the same private artifact (version 2).
 
 ### Before that (2026-10-25)
