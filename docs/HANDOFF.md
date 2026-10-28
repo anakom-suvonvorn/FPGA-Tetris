@@ -13,6 +13,28 @@ something important changes. Durable facts also live in Claude's memory
 
 ## 0. Where we are RIGHT NOW (start here)
 
+### Latest (2026-10-28 evening): submission package in `submission/`
+* User asked to plan + prepare every hand-in item (Thai with English terms;
+  docs go into Google Docs, brochure into Canva). Rules re-read from the
+  assignment PDF + the new announcement: proposal and brochure no longer
+  pre-checked but still handed in (paper + file); everything due Fri 30 Oct
+  16:00, queue sign-up closes 09:00, joint check may start 09:00 (5-minute
+  rule); all items except the piece on ONE storage medium, folders per item
+  2.1, 2.2, 2.3, 2.5.
+* `submission/README.md` = the plan (checklist, timeline, USB folder layout,
+  what to bring, cautions: Public video, YouTube copyright, friends' faces).
+  `2.1_Proposal/proposal.md`, `2.3_Design_Document/design_document.md`
+  (Top-Down: levels 0-3, every module, tests, problems), `2.5_Video/video_script.md`
+  (shot list + timed Thai narration + credits + YouTube description),
+  `demo_and_qa.md` (demo order + 21 likely questions with answers),
+  `2.2_Brochure/brochure.html` (A4 x2, rendered with headless Chrome to
+  `Brochure_example.pdf` + `_p1/_p2.png`) and `brochure_text.md` (for Canva).
+  `figures/figures.py` draws 13 Thai diagrams (SVG -> PNG via headless
+  Chrome); `build_docs.py` converts the .md to .docx (python-docx, Sarabun).
+  Placeholders `[...]` = names, student IDs, group name, video link/QR,
+  real photos: the user fills them. Sarabun is not installed on this PC, so
+  Word previews look off; Google Docs has the font.
+
 ### Latest (2026-10-28): media_visual.html round 2 (commit 2f82e9a)
 * User asked (a) ADPCM in far more detail (what is a step, idx, why those
   numbers, /8 /4 /2, pred, code), (b) whether a 10 fps video loads on a

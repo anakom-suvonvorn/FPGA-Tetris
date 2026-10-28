@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<title>Tetris Duel Brochure</title>
+<link href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;500;600;700;800&family=Sarabun:wght@400;500;600;700&family=Press+Start+2P&display=block" rel="stylesheet">
+<style>
+  @page { size: A4; margin: 0; }
+  :root {
+    --bg: #11163a; --bg2: #1a2152; --ink: #eef1ff; --muted: #a9b1dd;
+    --I: #22d3ee; --O: #facc15; --T: #a855f7; --S: #22c55e; --Z: #ef4444; --J: #3b82f6; --L: #f97316;
+    --pink: #f472b6;
+  }
+  * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  html, body { margin: 0; padding: 0; background: #555; }
+  body { font-family: 'Sarabun', 'Leelawadee UI', sans-serif; color: var(--ink); }
+  .page {
+    width: 210mm; height: 297mm; position: relative; overflow: hidden; margin: 0 auto 12px;
+    background: radial-gradient(120% 80% at 80% 0%, #2a2f7a 0%, var(--bg) 55%) , var(--bg);
+    page-break-after: always; break-after: page;
+  }
+  .page:last-child { page-break-after: auto; break-after: auto; }
+  body.shot { background: var(--bg); }
+  body.shot .page { margin: 0; }
+  .grid-bg { position: absolute; inset: 0; background-image:
+      linear-gradient(rgba(255,255,255,.035) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,.035) 1px, transparent 1px);
+    background-size: 8mm 8mm; pointer-events: none; }
+  .in { position: absolute; inset: 12mm 13mm; }
+  h1, h2, h3 { font-family: 'Kanit', sans-serif; margin: 0; }
+  .px { font-family: 'Press Start 2P', monospace; }
+
+  /* falling pieces */
+  .piece { position: absolute; display: grid; gap: 1.2mm; opacity: .9; }
+  .piece i { width: 6mm; height: 6mm; border-radius: 1mm; display: block;
+    box-shadow: inset 0 0 0 .7mm rgba(255,255,255,.25), inset -.8mm -.8mm 0 rgba(0,0,0,.25); }
+  .piece i.e { visibility: hidden; }
+
+  /* front */
+  .tag { display: inline-block; font-family: 'Kanit'; font-weight: 600; font-size: 10.5pt; letter-spacing: .5px;
+    padding: 1.2mm 3.5mm; border-radius: 99px; background: rgba(255,255,255,.08); border: .3mm solid rgba(255,255,255,.18); color: var(--muted); }
+  .logo { margin-top: 6mm; line-height: 1; }
+  .logo .t1 { font-size: 34pt; letter-spacing: 1px; color: #fff;
+    text-shadow: 0 0 0 transparent, .8mm .8mm 0 var(--T), 1.6mm 1.6mm 0 #2b1a5e; }
+  .logo .t2 { margin-top: 5mm; font-size: 15pt; color: var(--Z); letter-spacing: 2px;
+    text-shadow: .6mm .6mm 0 #4a0d14; }
+  .lead { margin-top: 6mm; font-family: 'Kanit'; font-weight: 600; font-size: 21pt; line-height: 1.25; max-width: 150mm; }
+  .lead em { font-style: normal; color: var(--O); }
+  .sub { margin-top: 3mm; font-size: 12.5pt; color: var(--muted); max-width: 160mm; line-height: 1.5; }
+
+  .screens { position: absolute; left: 0; right: 0; top: 94mm; height: 96mm; }
+  .mon { position: absolute; width: 104mm; padding: 2.4mm; background: #0a0d24; border-radius: 3mm;
+    border: .5mm solid #39407a; box-shadow: 0 3mm 8mm rgba(0,0,0,.5); }
+  .mon img { width: 100%; display: block; border-radius: 1mm; image-rendering: pixelated; }
+  .mon .lbl { position: absolute; top: -4mm; left: 4mm; font-family: 'Kanit'; font-weight: 600; font-size: 9pt;
+    background: var(--S); color: #062b12; padding: .6mm 2.6mm; border-radius: 99px; }
+  .mon.b .lbl { background: var(--Z); color: #fff; }
+  .mon.a { left: 0; top: 0; transform: rotate(-2.5deg); }
+  .mon.b { right: 0; top: 14mm; transform: rotate(2.5deg); }
+  .wire { position: absolute; left: 70mm; right: 70mm; top: 70mm; height: 20mm; }
+  .burst { position: absolute; left: 50%; top: 40mm; transform: translateX(-50%) rotate(-8deg);
+    font-family: 'Kanit'; font-weight: 800; font-size: 15pt; color: #1a0b00; background: var(--O);
+    padding: 2mm 5mm; border-radius: 2mm; box-shadow: 1mm 1mm 0 #7a5600; white-space: nowrap; z-index: 3; }
+
+  .feat { position: absolute; left: 0; right: 0; top: 191mm; display: grid; grid-template-columns: repeat(3, 1fr); gap: 4mm; }
+  .card { background: rgba(255,255,255,.06); border: .35mm solid rgba(255,255,255,.14); border-radius: 3mm; padding: 4mm 4mm 3.5mm; }
+  .card .n { font-family: 'Kanit'; font-weight: 800; font-size: 25pt; line-height: 1; }
+  .card .h { font-family: 'Kanit'; font-weight: 600; font-size: 12.5pt; margin-top: 1.5mm; }
+  .card .d { font-size: 10pt; color: var(--muted); margin-top: 1mm; line-height: 1.4; }
+  .nocpu { position: absolute; left: 0; right: 0; top: 234mm; display: flex; align-items: center; gap: 4mm;
+    background: linear-gradient(90deg, rgba(168,85,247,.25), rgba(34,211,238,.15)); border-radius: 3mm; padding: 3.5mm 5mm; }
+  .nocpu b { font-family: 'Kanit'; font-size: 13pt; white-space: nowrap; }
+  .nocpu span { font-size: 10.5pt; color: var(--muted); }
+  .foot { position: absolute; left: 0; right: 0; bottom: 0; display: flex; justify-content: space-between; align-items: flex-end;
+    font-size: 9pt; color: var(--muted); line-height: 1.45; }
+  .qr { width: 22mm; height: 22mm; background: #fff; border-radius: 2mm; color: #111; display: grid; place-items: center;
+    font-family: 'Kanit'; font-size: 8pt; text-align: center; line-height: 1.2; }
+  .qrw { display: flex; gap: 3mm; align-items: center; text-align: right; }
+
+  /* back */
+  .sec { margin-bottom: 4.5mm; }
+  .sec h2 { font-size: 17pt; display: flex; align-items: center; gap: 3mm; margin-bottom: 3mm; }
+  .sec h2 .bar { width: 3mm; height: 7mm; border-radius: 1mm; }
+  .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4mm; }
+  .step { background: rgba(255,255,255,.06); border-radius: 3mm; padding: 3.5mm; border: .35mm solid rgba(255,255,255,.12); }
+  .step .k { font-family: 'Press Start 2P'; font-size: 11pt; color: var(--I); }
+  .step .h { font-family: 'Kanit'; font-weight: 600; font-size: 12pt; margin-top: 2mm; }
+  .step .d { font-size: 10pt; color: var(--muted); margin-top: 1mm; line-height: 1.4; }
+  .chaos { display: grid; grid-template-columns: 1fr 1.35fr; gap: 5mm; align-items: start; }
+  .flow { display: flex; flex-direction: column; gap: 2.2mm; }
+  .fl { border-radius: 2.5mm; padding: 2.4mm 3.5mm; font-size: 10.5pt; line-height: 1.35; }
+  .fl b { font-family: 'Kanit'; font-weight: 600; font-size: 11.5pt; }
+  .arrow { text-align: center; color: var(--muted); font-size: 10pt; line-height: 1; }
+  .chips { display: flex; flex-wrap: wrap; gap: 1.8mm; }
+  .chip { font-family: 'Kanit'; font-weight: 500; font-size: 9.6pt; padding: 1mm 2.6mm; border-radius: 99px; border: .35mm solid; }
+  .chip small { font-family: 'Sarabun'; font-weight: 400; opacity: .85; }
+  .media { display: grid; grid-template-columns: repeat(4, 1fr); gap: 3mm; }
+  .m { border-radius: 3mm; padding: 3mm; background: rgba(244,114,182,.12); border: .35mm solid rgba(244,114,182,.4); }
+  .m .h { font-family: 'Kanit'; font-weight: 600; font-size: 11pt; color: #fbcfe8; }
+  .m .d { font-size: 9.4pt; color: var(--muted); margin-top: 1mm; line-height: 1.35; }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 5mm; }
+  table.spec { width: 100%; border-collapse: collapse; font-size: 9.4pt; }
+  table.spec td { padding: 1mm 2mm; border-bottom: .3mm solid rgba(255,255,255,.1); vertical-align: top; }
+  table.spec td:first-child { color: var(--muted); white-space: nowrap; width: 24mm; }
+  .pad { position: relative; height: 38mm; }
+  .btn { position: absolute; width: 12mm; height: 12mm; border-radius: 50%; background: #2b335f; border: .5mm solid #5d67a8;
+    display: grid; place-items: center; font-family: 'Kanit'; font-size: 7.5pt; color: #fff; }
+  .btn.c { background: var(--O); color: #1a1200; border-color: #fff3; }
+  .pl { position: absolute; font-size: 9pt; color: var(--muted); white-space: nowrap; }
+  .sw { display: flex; gap: 1.3mm; margin-top: 2mm; }
+  .sw i { width: 3.2mm; height: 8mm; border-radius: .8mm; background: #2b335f; position: relative; display: block; }
+  .sw i::after { content: ""; position: absolute; left: .5mm; right: .5mm; height: 3mm; border-radius: .5mm; background: #e5e7ff; top: .6mm; }
+  .sw i.dn::after { top: auto; bottom: .6mm; background: #7d86c4; }
+  .members { font-size: 9.5pt; line-height: 1.5; color: var(--muted); }
+  .members b { color: var(--ink); font-weight: 600; }
+</style>
+</head>
+<body>
+
+<!-- ======================== PAGE 1 (front) ======================== -->
+<section class="page" id="p1">
+  <div class="grid-bg"></div>
+  <!-- decorative falling pieces -->
+  <div class="piece" style="right:16mm;top:14mm;grid-template-columns:repeat(3,6mm);transform:rotate(12deg)"><i style="background:var(--T)"></i><i style="background:var(--T)"></i><i style="background:var(--T)"></i><i class="e"></i><i style="background:var(--T)"></i><i class="e"></i></div>
+  <div class="piece" style="right:44mm;top:40mm;grid-template-columns:repeat(2,6mm);transform:rotate(-14deg);opacity:.75"><i style="background:var(--O)"></i><i style="background:var(--O)"></i><i style="background:var(--O)"></i><i style="background:var(--O)"></i></div>
+  <div class="piece" style="right:12mm;top:62mm;grid-template-columns:repeat(4,6mm);transform:rotate(-6deg);opacity:.8"><i style="background:var(--I)"></i><i style="background:var(--I)"></i><i style="background:var(--I)"></i><i style="background:var(--I)"></i></div>
+  <div class="piece" style="right:62mm;top:12mm;grid-template-columns:repeat(3,6mm);transform:rotate(20deg);opacity:.55"><i class="e"></i><i style="background:var(--S)"></i><i style="background:var(--S)"></i><i style="background:var(--S)"></i><i style="background:var(--S)"></i><i class="e"></i></div>
+
+  <div class="in">
+    <span class="tag">FPGA · 2 ผู้เล่น · EDGE Spartan-7</span>
+    <div class="logo px">
+      <div class="t1">TETRIS<br>DUEL</div>
+      <div class="t2">CHAOS EDITION</div>
+    </div>
+    <div class="lead">ดวลเตตริสข้ามบอร์ด<br>ป่วนจอคู่แข่ง <em>เปิดมีมใส่กันได้!</em></div>
+    <div class="sub">ล้างแถวส่งขยะไปถล่มเพื่อน ทำภารกิจด้วยสวิตช์เพื่อกลับจอ ซ่อนบล็อก หรือเปิด Bad Apple!! เต็มจอคู่แข่ง พร้อมเพลง</div>
+
+    <div class="screens">
+      <div class="mon a"><span class="lbl">ผู้เล่น A</span><img src="../figures/screenshot_versus.png" alt=""></div>
+      <div class="mon b"><span class="lbl">ผู้เล่น B: โดนโจมตี!</span><img src="../figures/screenshot_chaos_flip.png" alt=""></div>
+      <div class="burst">INCOMING: FLIP!</div>
+    </div>
+
+    <div class="feat">
+      <div class="card"><div class="n" style="color:var(--I)">2 × 2</div><div class="h">2 ผู้เล่น 2 บอร์ด</div><div class="d">ต่อสาย 3 เส้น ขึ้น LINKED ใน 0.5 วินาที เริ่มพร้อมกัน ตัดสินผลตรงกัน</div></div>
+      <div class="card"><div class="n" style="color:var(--Z)">11</div><div class="h">การโจมตีสุดป่วน</div><div class="d">กลับจอ, สลับซ้ายขวา, บล็อกล่องหน, ลูกบอลบังจอ, ล็อกปุ่ม และวิดีโอ 3 เรื่อง</div></div>
+      <div class="card"><div class="n" style="color:var(--pink)">6.9 MB</div><div class="h">วิดีโอ + เพลงในตัว</div><div class="d">เพลงประกอบ คลิปตอนชนะ/แพ้ ตัวละครลอยบนจอ เก็บในแฟลชบนบอร์ด</div></div>
+    </div>
+
+    <div class="nocpu"><b>ไม่มี CPU สักตัว</b><span>เกม ภาพ เสียง การเชื่อมบอร์ด และเครื่องเล่นวิดีโอ คือวงจรดิจิทัลใน FPGA ล้วนๆ (VHDL)</span></div>
+
+    <div class="foot">
+      <div>01076113 Digital System Fundamentals 2569<br>ภาควิชาวิศวกรรมคอมพิวเตอร์ คณะวิศวกรรมศาสตร์ สจล.<br>กลุ่ม [ชื่อกลุ่ม]</div>
+      <div class="qrw"><div>ดูวิดีโอแนะนำ<br><b style="color:var(--ink)">[youtu.be/xxxx]</b></div><div class="qr">[QR<br>วิดีโอ]</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ======================== PAGE 2 (back) ======================== -->
+<section class="page" id="p2">
+  <div class="grid-bg"></div>
+  <div class="in">
+    <div class="sec">
+      <h2><span class="bar" style="background:var(--I)"></span>เล่นยังไง</h2>
+      <div class="steps">
+        <div class="step"><div class="k">1</div><div class="h">ต่อสาย 3 เส้น</div><div class="d">TX ↔ RX และ GND ระหว่างสองบอร์ด จอขึ้น <b>LINKED</b></div></div>
+        <div class="step"><div class="k">2</div><div class="h">กดเริ่มที่ไหนก็ได้</div><div class="d">ทั้งสองจอเริ่มพร้อมกัน แถบ RIVAL บอกความสูงกองของเพื่อน</div></div>
+        <div class="step"><div class="k">3</div><div class="h">ล้างแถว ส่งขยะ</div><div class="d">ล้าง 2 / 3 / 4 แถว ส่ง 1 / 2 / 4 แถวไปดันจอเพื่อน คนรอดคนสุดท้ายชนะ</div></div>
+      </div>
+    </div>
+
+    <div class="sec">
+      <h2><span class="bar" style="background:var(--Z)"></span>โหมด CHAOS: ภารกิจ → โจมตี</h2>
+      <div class="chaos">
+        <div class="flow">
+          <div class="fl" style="background:rgba(239,68,68,.15);border:.35mm solid rgba(239,68,68,.5)"><b>ภารกิจเด้งขึ้นทุก 10-17 วิ</b><br>ทำด้วยสวิตช์ 8 ตัว ไปพร้อมกับเล่น</div>
+          <div class="arrow">▼ สำเร็จ</div>
+          <div class="fl" style="background:rgba(168,85,247,.15);border:.35mm solid rgba(168,85,247,.5)"><b>5/8 โจมตีจอเพื่อน</b> · <b>3/8 โบนัส</b> ให้ตัวเอง<br><span style="color:var(--muted);font-size:9.5pt">FREEZE หยุดแรงโน้มถ่วง · SINK ลดกอง 2 แถว · I&#8209;PIECE</span></div>
+        </div>
+        <div>
+          <div style="font-family:Kanit;font-weight:600;font-size:11pt;margin-bottom:1.6mm;color:var(--muted)">ภารกิจ 7 แบบ</div>
+          <div class="chips" style="margin-bottom:3mm">
+            <span class="chip" style="border-color:var(--I)">BINARY <small>ตั้งเลขฐาน 2</small></span>
+            <span class="chip" style="border-color:var(--I)">HEX <small>ฐาน 16</small></span>
+            <span class="chip" style="border-color:var(--I)">FLIP <small>โยก 10 ครั้ง</small></span>
+            <span class="chip" style="border-color:var(--I)">MATCH <small>ตามไฟ</small></span>
+            <span class="chip" style="border-color:var(--I)">TIMING <small>ตรงจังหวะ</small></span>
+            <span class="chip" style="border-color:var(--I)">HOLD <small>อยู่ในโซน</small></span>
+            <span class="chip" style="border-color:var(--I)">HANDS <small>ห้ามแตะปุ่ม!</small></span>
+          </div>
+          <div style="font-family:Kanit;font-weight:600;font-size:11pt;margin-bottom:1.6mm;color:var(--muted)">การโจมตี 11 แบบ</div>
+          <div class="chips">
+            <span class="chip" style="border-color:var(--Z)">MIRROR</span><span class="chip" style="border-color:var(--Z)">FLIP</span>
+            <span class="chip" style="border-color:var(--Z)">BLIND</span><span class="chip" style="border-color:var(--Z)">BOUNCERS</span>
+            <span class="chip" style="border-color:var(--Z)">+3 GARBAGE</span><span class="chip" style="border-color:var(--Z)">CURSED</span>
+            <span class="chip" style="border-color:var(--Z)">SPEED</span><span class="chip" style="border-color:var(--Z)">LOCK</span>
+            <span class="chip" style="border-color:var(--pink);color:#fbcfe8">Bad Apple!!</span><span class="chip" style="border-color:var(--pink);color:#fbcfe8">OIIA OIIA</span><span class="chip" style="border-color:var(--pink);color:#fbcfe8">JEVIL</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sec">
+      <h2><span class="bar" style="background:var(--pink)"></span>ภาพและเสียงจากแฟลชบนบอร์ด</h2>
+      <div class="media">
+        <div class="m"><div class="h">เพลงตอนเล่น</div><div class="d">2 เพลงสลับกัน เล่นต่อจุดเดิมหลังโดนโจมตี</div></div>
+        <div class="m"><div class="h">วิดีโอโจมตี</div><div class="d">เล่นเป็นพื้นหลังจอเพื่อน พร้อมเสียง 40-84 วิ</div></div>
+        <div class="m"><div class="h">ชนะ / แพ้</div><div class="d">คลิปฉลอง หรือ... rickroll และ jump scare</div></div>
+        <div class="m"><div class="h">ตัวละครลอย</div><div class="d">Jevil ลอยทั่วจอ หน้าเพื่อนบนลูกบอลเด้ง</div></div>
+      </div>
+    </div>
+
+    <div class="two">
+      <div class="sec">
+        <h2><span class="bar" style="background:var(--O)"></span>ปุ่มควบคุม</h2>
+        <div class="pad">
+          <div class="btn" style="left:20mm;top:0">หมุน</div>
+          <div class="btn" style="left:5mm;top:14mm">←</div>
+          <div class="btn c" style="left:20mm;top:14mm">ตก!</div>
+          <div class="btn" style="left:35mm;top:14mm">→</div>
+          <div class="btn" style="left:20mm;top:28mm">↓</div>
+          <div class="pl" style="left:52mm;top:2mm">SW16 หมุน</div>
+          <div class="pl" style="left:52mm;top:9mm">SW14 / SW20 ซ้าย-ขวา</div>
+          <div class="pl" style="left:52mm;top:16mm">SW18 ตกทันที / เริ่มเกม</div>
+          <div class="pl" style="left:52mm;top:23mm">SW23 ตกช้า</div>
+          <div class="pl" style="left:52mm;top:31mm">สวิตช์ 8 ตัวซ้าย = ภารกิจ</div>
+        </div>
+        <div class="sw"><i></i><i class="dn"></i><i></i><i></i><i class="dn"></i><i></i><i class="dn"></i><i></i><span style="font-size:9pt;color:var(--muted);margin-left:2mm;align-self:center">SET IN BINARY: 229 = 1110 0101</span></div>
+      </div>
+      <div class="sec">
+        <h2><span class="bar" style="background:var(--S)"></span>สเปก</h2>
+        <table class="spec">
+          <tr><td>บอร์ด</td><td>EDGE Spartan-7 (XC7S15) × 2</td></tr>
+          <tr><td>ภาพ</td><td>VGA 640 × 480, 4,096 สี</td></tr>
+          <tr><td>เชื่อมบอร์ด</td><td>UART 115,200 bps, สาย 3 เส้น</td></tr>
+          <tr><td>เสียง</td><td>ADPCM 16 kHz ออกหูฟังโดยตรง</td></tr>
+          <tr><td>วิดีโอ</td><td>160 × 120 ขยาย 4×, สูงสุด 256 สี</td></tr>
+          <tr><td>วงจร</td><td>VHDL 25 ไฟล์, ใช้ชิป 85 %</td></tr>
+          <tr><td>ทดสอบแล้ว</td><td>จำลอง 13 ชุด + บอร์ดจริง</td></tr>
+          <tr><td>ราคา</td><td><b style="color:var(--O)">ฟรี*</b> <span style="color:var(--muted);font-size:8.5pt">*ต้องมีบอร์ด 2 บอร์ดและเพื่อน 1 คน</span></td></tr>
+        </table>
+      </div>
+    </div>
+
+    <div class="foot">
+      <div class="members">
+        <b>ผู้พัฒนา</b> กลุ่ม [ชื่อกลุ่ม]<br>
+        [ชื่อ-นามสกุล] [รหัส] · [ชื่อ-นามสกุล] [รหัส]<br>
+        [ชื่อ-นามสกุล] [รหัส] · [ชื่อ-นามสกุล] [รหัส]<br>
+        <span style="font-size:8pt">สื่อในเกมใช้เพื่อการศึกษา ลิขสิทธิ์เป็นของเจ้าของ</span>
+      </div>
+      <div class="qrw"><div>วิดีโอแนะนำ<br><b style="color:var(--ink)">[youtu.be/xxxx]</b></div><div class="qr">[QR<br>วิดีโอ]</div></div>
+    </div>
+  </div>
+</section>
+
+<script>
+  // ?p=1 or ?p=2 shows only that page (used to render PNG previews)
+  var m = /[?&]p=(\d)/.exec(location.search);
+  if (m) {
+    document.body.classList.add('shot');
+    document.querySelectorAll('.page').forEach(function (p) { if (p.id !== 'p' + m[1]) p.style.display = 'none'; });
+  }
+</script>
+</body>
+</html>
