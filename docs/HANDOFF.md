@@ -1,9 +1,10 @@
 # HANDOFF: project state for Claude (read this first after a context reset)
 
-Last updated: **2026-10-25**: all 3 layers done and working on hardware;
-READMEs of all 3 branches rewritten; new explainer page
-`docs/learn/media_visual.html` (the user's questions about flash / media).
-Keep this file current whenever
+Last updated: **2026-10-28**: all 3 layers done and working on hardware;
+explainer page `docs/learn/media_visual.html` extended (ADPCM in depth,
+video load timing, reference side panel). Context compacted right after
+this at the user's request; they said they have "multiple things" - more
+requests are coming, wait for them. Keep this file current whenever
 something important changes. Durable facts also live in Claude's memory
 (`...\.claude\projects\D--All-files-Me-university-digital-system-assignment\memory\`:
 `digital-system-final-project.md`, `git-workflow.md`).
@@ -12,7 +13,35 @@ something important changes. Durable facts also live in Claude's memory
 
 ## 0. Where we are RIGHT NOW (start here)
 
-### Latest (2026-10-25)
+### Latest (2026-10-28): media_visual.html round 2 (commit 2f82e9a)
+* User asked (a) ADPCM in far more detail (what is a step, idx, why those
+  numbers, /8 /4 /2, pred, code), (b) whether a 10 fps video loads on a
+  varying frame, (c) the reference (code reader / names) usable beside the
+  text, (d) compact prep. Done, all in the page:
+  - ADPCM section rewritten ("ADPCM, slowly"): names table, 1 the idea,
+    2 a ruler of 8 slots (interactive: idx + real-sample sliders; slot =
+    bits 2..0 as quarter steps, + step/8 = middle of the slot; encoder's 3
+    yes/no questions), table of the 8 codes, 3 why the step adapts (fast
+    up +2/4/6/8, slow down -1), 4 the 89 IMA steps (geometric ~1.1x, chart
+    with idx-1/+2/+4/+6/+8 marks), 5 a "microscope" (4 sounds, window of
+    25 samples with reach bands +-1 7/8 step, zoomed ruler of the current
+    sample, every encoder / decoder number, slider to change a sample),
+    6 the old whole-sound widget + 3 hardware clocks.
+  - Video timing (in "video + sound"): a 10 fps record = 0.1 s = 5.952
+    screen frames (screen = 59.52 Hz, 840,000 clocks); loads come after 6
+    frames, about 1 in 21 after 5, never 4 or 7; 15 fps: 4, sometimes 3.
+    Picture leads its sound by 16-33 ms, a sawtooth, no drift. Widget
+    simulates 30 s (284x6 + 16x5 for 10 fps).
+  - Reference panel: "reference" button (fixed bottom right) / Esc; moves
+    #refReader #refNames #refPatterns #refWords into <aside id=refPane>
+    (tabs, widths S/M/L, remembered in localStorage), sticky right column
+    >= 900 px, overlay drawer below. Every <code>name</code> in the text
+    that GL knows gets a dotted underline: click = open it in the reader
+    (window.REF.lookup / window.refPick). Glossary rows clickable. E_ and
+    M_ states added to GL.
+  - Published again to the same private artifact (version 2).
+
+### Before that (2026-10-25)
 * The user read Part 8 and was lost ("how is it stored / flashed / retrieved,
   what is BRAM, frame buffer, sound ring, what do the states do, the short
   variable names..."). Answer: **`docs/learn/media_visual.html`** ("Tetris
