@@ -43,7 +43,8 @@ never written VHDL by hand or opened the Vivado GUI. Read in order:
    gets into the flash, SPI clock by clock, all seven state machines, the frame
    buffer, the sound ring, ADPCM, timing against the screen beam, what plays
    when, and a code reader where clicking any short name tells you what it
-   means and every line that uses it.
+   means and every line that uses it. The "reference" button puts the code
+   reader, the names and the words in a panel beside the text.
 
 Quick start for Vivado:
 

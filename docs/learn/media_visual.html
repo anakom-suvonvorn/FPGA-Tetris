@@ -165,6 +165,32 @@ svg text { font-family: var(--mono); }
 .elbl { fill: var(--muted); font-size: 10.5px; }
 .elbl.on { fill: var(--accent); font-weight: 600; }
 .wave { font-family: var(--mono); font-size: 12px; }
+/* the reference panel: the code reader, the names and the words beside the text */
+[hidden] { display: none !important; }
+#refFab { position: fixed; right: calc(16px + env(safe-area-inset-right, 0px)); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 50;
+  background: var(--accent); color: var(--panel); border-color: var(--accent); font-weight: 600; box-shadow: 0 4px 14px rgba(0, 0, 0, .28); }
+#refFab[aria-pressed="true"] { background: var(--panel); color: var(--accent); }
+#refPane { background: var(--bg); min-width: 0; display: flex; flex-direction: column; gap: 10px; }
+.refHead { display: flex; flex-direction: column; gap: 6px; position: sticky; top: 0; background: var(--bg); padding-bottom: 8px; z-index: 2; border-bottom: 1px solid var(--line); }
+#refBody { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+#refBody .stage { padding: 12px; }
+body.docked .layout { max-width: none; grid-template-columns: minmax(0, 1fr) var(--refw, 520px); }
+body.docked nav.side { display: none; }
+@media (min-width: 900px) {
+  #refPane { position: sticky; top: env(safe-area-inset-top, 0px); align-self: start; height: 100vh; height: 100dvh; overflow-y: auto; padding: 12px 4px 70px 16px; border-left: 1px solid var(--line); }
+  body.docked #cdBox { max-height: calc(100vh - 330px) !important; min-height: 240px; }
+  body.docked #glBox { max-height: calc(100vh - 220px) !important; }
+}
+@media (max-width: 899px) {
+  body.docked .layout { grid-template-columns: minmax(0, 1fr); }
+  #refPane { position: fixed; top: 0; right: 0; bottom: 0; width: min(560px, 94vw); z-index: 45; overflow-y: auto;
+    padding: calc(12px + env(safe-area-inset-top, 0px)) calc(12px + env(safe-area-inset-right, 0px)) 80px 14px; box-shadow: -8px 0 24px rgba(0, 0, 0, .35); border-left: 1px solid var(--line); }
+}
+.refPh { border: 1px dashed var(--line); border-radius: 6px; padding: 10px 12px; font-size: 14px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+code.ref { cursor: pointer; text-decoration: underline dotted var(--accent); text-underline-offset: 3px; }
+code.ref:hover, code.ref:focus-visible { color: var(--accent); }
+#glTable tbody tr { cursor: pointer; }
+#glTable tbody tr:hover td { background: var(--cell); }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
 </style>
 
@@ -447,10 +473,79 @@ svg text { font-family: var(--mono); }
 </section>
 
 <!-- ================================================================ adpcm -->
-<section id="adpcm" data-short="ADPCM decoding">
-  <h2><span class="tag">adpcm_dec.vhd · STEPS · IDX</span>ADPCM: from a 4-bit code back to a sound sample</h2>
-  <p>The decoder keeps two numbers: <code>pred</code>, its guess of the current sample (−32,768 … 32,767), and <code>idx</code>, a position in a table of 89 step sizes (7, 8, 9, 10, 11, 12, 13, 14, 16, 17, … 32,767, each about 10 % bigger than the one before). Each 4-bit code moves the guess: bit 3 says which way (1 = down), bits 2..0 how far, in units of the current step:</p>
-  <div class="callout"><code>move = step/8 + (bit 2 ? step) + (bit 1 ? step/2) + (bit 0 ? step/4)</code> → anything from step/8 to 15/8 × step.<br>Then the step adapts: bits 2..0 = 0…3 (a small move): <code>idx − 1</code>; 4, 5, 6, 7 (a big move): <code>idx + 2, 4, 6, 8</code>. Loud, fast sound gets big steps; quiet sound gets fine ones.</div>
+<section id="adpcm" data-short="ADPCM, slowly">
+  <h2><span class="tag">adpcm_dec.vhd · adpcm_encode · STEPS · IDX</span>ADPCM, slowly: how 4 bits can carry a 16-bit sound</h2>
+  <p>A sound sample is a 16-bit number (−32,768 … 32,767): how far the speaker is pushed at that moment. ADPCM stores only <b>4 bits</b> per sample and still sounds almost the same. This section builds it up one idea at a time. These are the only names you need:</p>
+  <div class="scroll"><table class="t" style="min-width:560px">
+    <thead><tr><th>name</th><th>short for</th><th>what it is</th></tr></thead>
+    <tbody>
+      <tr><td><code>pred</code></td><td>prediction</td><td>the decoder's current guess of the sample. It is also exactly what goes to the speaker (<code>pcm &lt;= pred</code>). Encoder and decoder each keep one, and they are always equal.</td></tr>
+      <tr><td><code>code</code></td><td></td><td>the 4 bits stored per sample: 1 bit "up or down" + 3 bits "how far" (8 sizes)</td></tr>
+      <tr><td><code>step</code></td><td>step size</td><td>the unit the 8 sizes are measured in. Big step = big moves, coarse; small step = small moves, fine.</td></tr>
+      <tr><td><code>idx</code></td><td>index</td><td>which of the 89 step sizes in the table <code>STEPS</code> is in use now: <code>step = STEPS(idx)</code></td></tr>
+      <tr><td><code>dq</code></td><td>dequantised difference</td><td>the move: how far <code>pred</code> goes this sample, rebuilt from the code</td></tr>
+      <tr><td>diff</td><td>difference</td><td>(encoder only) how far the real sample is from <code>pred</code>: the thing the code tries to describe</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>1. The idea: don't send the sample, send how far it moved, roughly</h3>
+  <p>Sound changes smoothly: at 16,000 samples a second, each sample is close to the one before. So instead of the sample itself, ADPCM sends <b>which way and roughly how far</b> the sound moved since the last one. "Roughly" is the trick: there are only 8 possible distances (3 bits), plus up or down (1 bit). The decoder moves its guess <code>pred</code> by the chosen distance. The guess is never exactly right, but it stays close, and the next code corrects whatever error is left.</p>
+  <p>The 8 distances can't be fixed numbers: a whisper needs moves of 10, a loud drum moves of 5,000. So the distances are measured in a unit, <code>step</code>, and the step size itself changes with the sound. That's the <b>A</b> (adaptive) in ADPCM; the <b>D</b> (differential) is sending differences; <b>PCM</b> is plain sampled sound.</p>
+
+  <h3>2. What one code means: eight sizes on a ruler</h3>
+  <p>Think of a ruler starting at <code>pred</code>, marked every quarter step. The real sample lands somewhere on it. The code says which <b>slot</b> between two marks it landed in, and the decoder puts its new guess in the <b>middle of that slot</b>. Drag the real sample and watch the code, the move and the error:</p>
+  <div class="stage">
+    <div class="controls"><span class="lbl">step size: idx</span><input type="range" id="arIdx" min="0" max="88" value="40" style="width:160px" aria-label="step index"><span class="mono" id="arIdxV"></span></div>
+    <div class="controls"><span class="lbl">the real sample is pred +</span><input type="range" id="arD" min="-2.3" max="2.3" step="0.01" value="0.83" style="flex:1;min-width:180px" aria-label="difference in steps"><span class="mono" id="arDV"></span></div>
+    <div class="scroll"><svg id="arSvg" viewBox="0 0 900 270" style="min-width:700px;width:100%" role="img" aria-label="The ruler of a code"></svg></div>
+    <div class="log" id="arLog"></div>
+  </div>
+  <div class="scroll"><table class="t" style="min-width:640px">
+    <thead><tr><th>bits 2..0</th><th>the slot (how far the real sample is)</th><th>the move (dq)</th><th>= step ×</th><th>idx next</th></tr></thead>
+    <tbody>
+      <tr><td class="mono">000</td><td>0 … ¼ step</td><td>step/8</td><td class="n">0.125</td><td class="mono">− 1</td></tr>
+      <tr><td class="mono">001</td><td>¼ … ½</td><td>step/8 + step/4</td><td class="n">0.375</td><td class="mono">− 1</td></tr>
+      <tr><td class="mono">010</td><td>½ … ¾</td><td>step/8 + step/2</td><td class="n">0.625</td><td class="mono">− 1</td></tr>
+      <tr><td class="mono">011</td><td>¾ … 1</td><td>step/8 + step/2 + step/4</td><td class="n">0.875</td><td class="mono">− 1</td></tr>
+      <tr><td class="mono">100</td><td>1 … 1¼</td><td>step/8 + step</td><td class="n">1.125</td><td class="mono">+ 2</td></tr>
+      <tr><td class="mono">101</td><td>1¼ … 1½</td><td>step/8 + step + step/4</td><td class="n">1.375</td><td class="mono">+ 4</td></tr>
+      <tr><td class="mono">110</td><td>1½ … 1¾</td><td>step/8 + step + step/2</td><td class="n">1.625</td><td class="mono">+ 6</td></tr>
+      <tr><td class="mono">111</td><td>1¾ or more</td><td>step/8 + step + step/2 + step/4</td><td class="n">1.875</td><td class="mono">+ 8</td></tr>
+    </tbody>
+  </table></div>
+  <p><b>So what are the /8, /4, /2?</b> Read bits 2..0 as a number in quarter steps: bit 2 is worth 1 step, bit 1 half a step, bit 0 a quarter step. That's ordinary binary, just with a "binary point": <code>101</code> = 1 + ¼ = 1¼ steps, the bottom of slot 5. Then <code>+ step/8</code> (an eighth = half a slot) moves the guess from the bottom of the slot to its middle. The middle is the best place: whatever the real sample was in that slot, the guess is at most ⅛ step away (except in the top slot, which has no upper end).</p>
+  <p><b>Why halves, quarters and eighths, and not thirds?</b> Dividing by 2, 4 or 8 is free in hardware: it's just leaving off the lowest bits. <code>step(14 downto 3)</code> in adpcm_dec is step / 8 with no logic at all, only wires. A division by 3 would need a real divider. Note that the division rounds down: with step = 1,060, step / 8 is 132, not 132.5. The encoder rounds the same way, so it doesn't matter.</p>
+  <p><b>How the encoder finds the slot</b> (adpcm_encode, make_game_media.py L94–103): it asks three yes/no questions, biggest first, like weighing on a balance. Is the difference at least 1 step? If yes, bit 2 = 1 and take a step off. Is what's left at least ½ step? Bit 1. At least ¼ step? Bit 0. Three questions, three bits: that's the slot. The sign goes in bit 3 first: if the sample is below <code>pred</code>, bit 3 = 1 and the encoder works with the distance downwards.</p>
+
+  <h3>3. Why the step has to change size</h3>
+  <p>With a fixed step there's always a bad case. The finest the guess can get is ⅛ step from the truth, and the furthest it can move in one sample is 1⅞ steps. A small step is precise but slow: on loud sound the real samples run away from the guess, which can't keep up (it sounds harsh and distorted). A big step keeps up with anything but is coarse: quiet sound gets a hiss of errors around it. So after every sample the step is adjusted using the code that was just sent, which both sides know:</p>
+  <ul class="plain">
+    <li>the code said <b>"less than 1 step"</b> (bits 2..0 = 0 … 3): the step was bigger than needed → <code>idx − 1</code>: about 10 % smaller.</li>
+    <li>the code said <b>"1 step or more"</b> (4 … 7): the step was too small, the sound is getting away → <code>idx + 2, + 4, + 6</code> or <code>+ 8</code>: 21 %, 46 %, 77 % or 114 % bigger, the further out the more.</li>
+  </ul>
+  <p>It grows fast and shrinks slowly, on purpose. A step that is too small makes the guess fall behind the sound, which you hear as distortion, so it must catch up within a few samples. A step that is too big only adds a little noise, so it can shrink gently. In steady sound the two balance out: some codes are big, some small, and <code>idx</code> hovers around the right size. Because the encoder and the decoder see the same codes, they make the same changes and their <code>idx</code> stays equal without ever being sent.</p>
+
+  <h3>4. The 89 step sizes</h3>
+  <p><code>STEPS</code> is a list of 89 sizes from 7 to 32,767, each about <b>10 % bigger</b> than the one before (the table grows by multiplying, not adding). Why multiplying? Because loudness works in ratios: going from 10 to 20 is as big a change to the ear as 10,000 to 20,000, so the sizes are spread evenly in ratio. Why 7 to 32,767? 7 is small enough for the quietest sounds (with step 7 the moves are 0, 1, 3, 4, 7, 8, 10 and 11), 32,767 is the whole 16-bit range. How many 10 % steps fit from 7 to 32,767? 1.1<sup>88.6</sup> ≈ 32,767 / 7, so 89 entries. The exact numbers are the standard <b>IMA ADPCM</b> table (Interactive Multimedia Association, 1992), the same one used in ADPCM .wav files and in many old games. Using the standard means our Python encoder, the media_lab renders you listened to and the VHDL decoder all agree to the last number. Move over the chart:</p>
+  <div class="stage">
+    <div class="scroll"><svg id="atSvg" viewBox="0 0 900 250" style="min-width:700px;width:100%" role="img" aria-label="The 89 step sizes"></svg></div>
+    <div class="log" id="atLog"></div>
+  </div>
+
+  <h3>5. The microscope: one sample at a time</h3>
+  <p>Everything above, on real samples. On the left, a stretch of the sound: the real samples (grey), the decoder's guesses (blue), and around each guess the band it can reach with the next code (± 1⅞ steps). When the band is narrow the step is small; watch it widen when the sound gets loud. On the right, the current sample under the microscope: the old guess, the ruler of slots, where the real sample is, the slot it falls into, the move and the new guess. Below, every number of the encoder and the decoder for this sample. Drag the slider to change the real sample and see everything after it change.</p>
+  <div class="stage">
+    <div class="controls"><span class="lbl">sound</span><span class="controls" id="amSnd" role="group" aria-label="Which sound"></span></div>
+    <div class="controls"><button type="button" id="amPrev">◀ sample</button><button type="button" id="amNext">sample ▶</button><button type="button" id="amPlay">play</button><span class="sep"></span><span class="lbl">change this sample</span><input type="range" id="amEdit" min="-32768" max="32767" value="0" style="flex:1;min-width:160px" aria-label="value of this sample"><button type="button" id="amUndo">undo changes</button></div>
+    <div class="scroll"><svg id="amSvg" viewBox="0 0 900 400" style="min-width:760px;width:100%" role="img" aria-label="The current sample under the microscope"></svg></div>
+    <div class="row2">
+      <div class="readout" id="amEnc"></div>
+      <div class="readout" id="amDec"></div>
+    </div>
+    <div class="log" id="amLog"></div>
+  </div>
+
+  <h3>6. The whole sound, and the 3 clocks in hardware</h3>
   <p>Click any sample of the sound below to see its code taken apart, and the 3 clocks the hardware spends on it. Turn adaptation off to see why the adapting step matters.</p>
   <div class="stage">
     <div class="controls"><button type="button" id="adAdapt" aria-pressed="true">adaptive step (the real one)</button><span class="sep"></span><button type="button" id="adPrev">◀ sample</button><button type="button" id="adNext">sample ▶</button><button type="button" id="adPlayB">play</button></div>
@@ -473,6 +568,15 @@ svg text { font-family: var(--mono); }
     <div class="scroll"><svg id="avSvg" viewBox="0 0 900 260" style="min-width:700px;width:100%" role="img" aria-label="Pictures and sound of each record over time"></svg></div>
     <div class="log" id="avLog"></div>
   </div>
+  <h3>How regular are the loads? (one record every 5 or 6 screen frames)</h3>
+  <p>A screen frame is 840,000 clocks = <b>16.8 ms</b>: 59.52 frames a second, a little under 60 because our pixel clock is 25 MHz instead of the standard 25.175 MHz. A 10 fps record holds exactly 0.1 s of sound (800 bytes), which lasts 0.1 / 0.0168 = <b>5.952 screen frames</b>. At every frame tick the engine checks the ring afresh: "is it below low water now?" So most of the time the answer becomes yes after <b>6</b> frames, and about one time in 21 after <b>5</b>. It can never be 4 or 7. The 0.048 frame that each record is "short" of 6 adds up, and when it reaches a whole frame, that one record is loaded a frame early and the count starts over. Nothing piles up, because every decision uses the real amount of sound left in the ring, not a frame counter.</p>
+  <p>For each picture this means it appears between about 16 and 33 ms before its own sound starts: always a little early, never late, never drifting. Play with it here (30 s of video, simulated with the real numbers). The lower chart is a sawtooth: with every record loaded 6 frames after the last, the picture comes a little less early each time (6 frames is slightly more than the 5.952 its sound lasts). When the lead would drop below one frame, the ring is already below low water one tick sooner, that record comes after 5 frames, and the lead jumps back up by a whole frame (16.8 ms).</p>
+  <div class="stage">
+    <div class="controls"><span class="lbl">video</span><span class="controls" id="rgFps2" role="group" aria-label="Frames per second"></span></div>
+    <div class="scroll"><svg id="rgGap" viewBox="0 0 900 300" style="min-width:700px;width:100%" role="img" aria-label="Screen frames between record loads"></svg></div>
+    <div class="log" id="rgGapLog"></div>
+  </div>
+
   <h3>Carrying on with the music after an attack</h3>
   <p>When a media attack hits, media_ctrl stops the music and plays the attack. Later the music should continue where it was. The engine tells it <code>rec_pos</code>: the next record it was going to load. But the ring already held up to 2 records that were loaded and not yet heard (music keeps the ring between half and completely full). So media_ctrl saves <code>rec_pos − 2</code> (<code>mus_save</code>, L126) and later plays the music from there: you may hear up to a quarter second twice, but never miss any. Each music record starts with the decoder state stored in its header, so starting in the middle is exact.</p>
   <div class="stage">
@@ -521,8 +625,10 @@ svg text { font-family: var(--mono); }
 <!-- ================================================================ code -->
 <section id="code" data-short="read the code (click a name)">
   <h2><span class="tag">every name explained</span>Read the code with help: click any name</h2>
+  <div class="callout"><b>Use it while you read.</b> The <b>reference</b> button (bottom right of the window, or here: <button type="button" class="refOpen">open the reference beside the text</button>) moves this code reader, the list of names and the words into a panel on the right, so the explanation stays on the left. Every <code>name</code> in the text that the reader knows is underlined with dots: click it and the panel shows what it means and where it is used.</div>
+  <div id="refPatterns">
   <p>The short names follow a few patterns. Once you know them, most names explain themselves:</p>
-  <div class="scroll"><table class="t" style="min-width:640px">
+  <div class="scroll"><table class="t" style="min-width:420px">
     <thead><tr><th>pattern</th><th>means</th><th>examples</th></tr></thead>
     <tbody>
       <tr><td><code>S_ M_ E_ D_ C_</code></td><td>a state of spi_flash / media_player / media_engine / its picture decoder / media_ctrl</td><td>E_RH = "record header", E_SND = "sound", D_FILL</td></tr>
@@ -540,6 +646,8 @@ svg text { font-family: var(--mono); }
       <tr><td><code>bi, k</code></td><td><b>b</b>yte <b>i</b>ndex: which byte of the current read this is (k = its low 5 bits)</td><td>case k is when 5 =&gt; …</td></tr>
     </tbody>
   </table></div>
+  </div>
+  <div id="refReader">
   <p>Pick a file and click any name in the code. You get what it means, where it's declared, every line that <b>writes</b> it and every line that <b>reads</b> it (click a line number to jump there). Or type a name.</p>
   <div class="stage">
     <div class="tabs" id="cdFiles" role="group" aria-label="Files"></div>
@@ -547,23 +655,36 @@ svg text { font-family: var(--mono); }
     <div class="log" id="cdInfo" style="min-height:6em"></div>
     <div style="max-height:620px;overflow:auto;border-radius:6px" id="cdBox"><pre class="code" id="cdPre"></pre></div>
   </div>
+  </div>
+  <div id="refNames">
   <h3>Every name, on one list</h3>
   <div class="stage">
-    <div class="controls"><span class="lbl">filter</span><input type="text" id="glFind" placeholder="part of a name or a word" style="width:220px" aria-label="filter the list"></div>
-    <div class="scroll" style="max-height:520px;overflow-y:auto"><table class="t" id="glTable" style="min-width:640px"></table></div>
+    <div class="controls"><span class="lbl">filter</span><input type="text" id="glFind" placeholder="part of a name or a word" style="width:220px" aria-label="filter the list"><span class="note">click a row to open it in the code</span></div>
+    <div class="scroll" style="max-height:520px;overflow-y:auto" id="glBox"><table class="t" id="glTable" style="min-width:420px"></table></div>
+  </div>
   </div>
 </section>
 
 <!-- ================================================================ terms -->
 <section id="terms" data-short="words used">
   <h2><span class="tag">glossary</span>The words, in one place</h2>
+  <div id="refWords">
   <div class="controls"><span class="lbl">filter</span><input type="text" id="tmFind" placeholder="e.g. latency" style="width:220px" aria-label="filter the words"></div>
-  <div class="scroll"><table class="t" id="tmTable" style="min-width:600px"></table></div>
+  <div class="scroll" id="tmBox"><table class="t" id="tmTable" style="min-width:420px"></table></div>
+  </div>
 </section>
 
 <!-- @@SECTIONS@@ -->
 
 </main>
+<aside id="refPane" aria-label="Reference" hidden>
+  <div class="refHead">
+    <div class="tabs" id="refTabs" role="group" aria-label="Reference parts"></div>
+    <div class="controls"><span class="lbl">width</span><span class="controls" id="refW" role="group" aria-label="Panel width"></span><button type="button" id="refClose" aria-label="Close the reference panel">close ✕</button></div>
+  </div>
+  <div id="refBody"></div>
+</aside>
+<button type="button" id="refFab" aria-pressed="false" title="Show the code reader, the list of names and the words beside the text">reference ⇆</button>
 </div>
 
 <script>
@@ -2871,7 +2992,11 @@ const GL = {
     bcd_inc: "function: add 1 to a 4-digit BCD number (9999 stays)", lfsr8: "function: 8 LFSR steps at once (8 layers of XOR gates in one clock)", pix_bytes: "function: picture bytes for a bpp (19,200 × bpp / 8)",
     pal_bytes: "function: palette bytes for a bpp (2 per colour)", b: "variable: the byte from the flash this clock (= f_data)", k: "variable: bi's low 5 bits: which byte of the header / entry",
     go: "variable: is the next record due now? (M_WAIT)", dfill: "variable: change of fill this clock: +1 (a byte in), −1 (a byte out), or both = 0", aud_end: "variable: e_aud as a 24-bit number",
-    yi: "variable: y / 4 = picture row", xi: "variable: x / 4 = picture column", g_fb: "generate loop: makes the 5 frame buffer banks", mem: "one frame buffer bank (4,096 bytes)", u_spi: "the spi_flash inside"
+    yi: "variable: y / 4 = picture row", xi: "variable: x / 4 = picture column", g_fb: "generate loop: makes the 5 frame buffer banks", mem: "one frame buffer bank (4,096 bytes)", u_spi: "the spi_flash inside",
+    m_id: "state: ask the chip for its ID (9F)", m_id_w: "state: take the 3 ID bytes", m_hdr: "state: start reading the header", m_hdr_w: "state: take the header bytes", m_idle: "state: waiting for a command",
+    m_ent: "state: start reading the 32-byte directory entry", m_ent_w: "state: take the entry's bytes", m_pal: "state: start reading the palette", m_pal_w: "state: write the colours",
+    m_play0: "state: get ready to play (record 0, empty ring)", m_wait: "state: pacing: wait until the next record is due", m_rec: "state: start reading a whole record",
+    m_rec_w: "state: sound into the ring, picture into the frame buffer", m_ver: "state: start reading the VERIFY block", m_ver_w: "state: compare every byte with the LFSR"
   },
   "media_engine.vhd": {
     base: "flash address of the media file: 0x100000 = 1 MB", half_period: "SPI speed, fixed: 1 = 25 MHz", sample_clks: "clocks per sound code: 3,125 = 50 MHz / 16 kHz (the testbench uses 100)",
@@ -2919,7 +3044,13 @@ const GL = {
     go: "variable: is the next record due now? (E_WAIT)", dfill: "variable: change of fill this clock (+1, −1, or both = 0)",
     px: "variable: in the main process the pixel the decoder writes; in the screen process x − 430 inside the panel", rst: "variable: true in a clock that empties the ring, so nothing else changes fill then",
     xi: "variable: x as an integer", yi: "variable: y as an integer", py: "variable: y − 286 inside the panel", u_spi: "the spi_flash inside", u_dec: "the adpcm_dec inside",
-    g_fb: "generate loop: the 5 frame buffer banks", g_jev: "generate loop: the 5 Jevil banks", mem: "one bank (frame buffer or Jevil)"
+    g_fb: "generate loop: the 5 frame buffer banks", g_jev: "generate loop: the 5 Jevil banks", mem: "one bank (frame buffer or Jevil)",
+    e_hdr: "state: start reading the 16-byte header (power-up)", e_hdr_w: "state: take the header bytes", e_spr: "state: start reading the sprite block", e_spr_w: "state: send each sprite byte to its memory",
+    e_idle: "state: waiting for play / stop", e_ent: "state: start reading the item's directory entry", e_ent_w: "state: take the entry's bytes into e_…", e_pal: "state: start reading the palette",
+    e_pal_w: "state: write the colours into palette entries 0 … 255", e_start: "state: start at record from_rec, empty the ring", e_wait: "state: pacing: wait until the next record is due",
+    e_rh: "state: start reading the 8-byte record header", e_rh_w: "state: take picture address / length and the ADPCM state", e_pic: "state: start reading the picture",
+    e_pic_w: "state: the picture bytes go to the decoder (D_ states)", e_pic_end: "state: wait for the decoder to finish, then pic_ok", e_snd: "state: start reading the record's sound bytes",
+    e_snd_w: "state: sound bytes into the ring", e_next: "state: next record, or done"
   },
   "media_ctrl.vhd": {
     playing: "'1' while a game runs (from tetris_core)", result: "1 win, 2 lose, 3 draw, 4 game over (single player)", media_hit: "pulse from chaos_fx: a media attack arrived", media_id: "which: 0 Bad Apple, 1 OIIA, 2 Jevil",
@@ -3027,6 +3158,16 @@ const GL = {
   find.addEventListener('input', () => { const v = find.value.trim().toLowerCase(); const g = GL[file] || {}; const m = Object.keys(g).filter(k => k.startsWith(v)).slice(0, 8); hint.textContent = v ? (m.length ? 'press Enter: ' + m.join(', ') : 'no such name in ' + file) : ''; });
   render();
   info.innerHTML = 'Click a name in the code. Try <code>pb_v</code>, <code>fl_hold</code> or <code>e_low</code>.';
+  /* used by the reference panel and the dotted names in the text */
+  window.refPick = function (name, f) {
+    if (f && f !== file && SRC[f]) { file = f; seg(document.getElementById('cdFiles'), files.map(x => [x, x]), file, v => { file = v; cur = null; render(); info.innerHTML = 'Click a name in the code.'; }); cur = null; render(); }
+    pick(name);
+    const others = Object.keys(GL).filter(x => x !== '*' && x !== file && GL[x][name.toLowerCase()]);
+    if (others.length) {
+      info.insertAdjacentHTML('beforeend', '<br><span class="note">also in: </span>' + others.map(x => `<a href="#" data-f="${x}">${x}</a>`).join(' · '));
+      info.querySelectorAll('a[data-f]').forEach(a => a.addEventListener('click', e => { e.preventDefault(); window.refPick(name, a.dataset.f); }));
+    }
+  };
   /* the full list */
   const tb = document.getElementById('glTable'), gf = document.getElementById('glFind');
   const rows = [];
@@ -3036,9 +3177,15 @@ const GL = {
   function list() {
     const v = gf.value.trim().toLowerCase();
     const r = rows.filter(x => !v || x[0].includes(v) || x[2].toLowerCase().includes(v));
-    tb.innerHTML = '<thead><tr><th>name</th><th>file</th><th>meaning</th></tr></thead><tbody>' + r.map(x => `<tr><td class="mono">${esc(x[0])}</td><td class="mono" style="color:var(--muted)">${esc(x[1])}</td><td>${esc(x[2])}</td></tr>`).join('') + '</tbody>';
+    tb.innerHTML = '<thead><tr><th>name</th><th>file</th><th>meaning</th></tr></thead><tbody>' + r.map(x => `<tr data-n="${esc(x[0])}" data-f="${esc(x[1])}"><td class="mono">${esc(x[0])}</td><td class="mono" style="color:var(--muted)">${esc(x[1])}</td><td>${esc(x[2])}</td></tr>`).join('') + '</tbody>';
   }
   gf.addEventListener('input', list); list();
+  tb.addEventListener('click', e => {
+    const tr = e.target.closest('tr[data-n]'); if (!tr) return;
+    if (window.REF) window.REF.show('reader');
+    window.refPick(tr.dataset.n, tr.dataset.f === 'VHDL' ? null : tr.dataset.f);
+    if (!document.body.classList.contains('docked')) document.getElementById('refReader').scrollIntoView({ block: 'start' });
+  });
 })();
 
 /* ===================================================================== words */
@@ -3120,6 +3267,247 @@ const GL = {
 })();
 </script>
 
+<script>
+/* ===================================================================== ADPCM, slowly: shared helpers */
+const AD = (function () {
+  /* where slot m (bits 2..0 = m) starts, and its middle (the move), with the same integer shifts as the hardware */
+  const lo = (step, m) => (m & 4 ? step : 0) + (m & 2 ? step >> 1 : 0) + (m & 1 ? step >> 2 : 0);
+  const mid = (step, m) => (step >> 3) + lo(step, m);
+  /* the encoder's three questions for one difference */
+  function questions(diff, step) {
+    const neg = diff < 0; let d = Math.abs(diff), code = neg ? 8 : 0; const qs = [];
+    let t = step;
+    qs.push([d, t, d >= t, 4]); if (d >= t) { code |= 4; d -= t; }
+    t >>= 1; qs.push([d, t, d >= t, 2]); if (d >= t) { code |= 2; d -= t; }
+    t >>= 1; qs.push([d, t, d >= t, 1]); if (d >= t) code |= 1;
+    return { code, neg, qs };
+  }
+  const frac = v => { const q = Math.round(v * 4) / 4, w = Math.floor(q), f = q - w, F = { 0: '', 0.25: '¼', 0.5: '½', 0.75: '¾' }[f]; return (w ? w : (F ? '' : '0')) + F; };
+  return { lo, mid, questions, frac };
+})();
+
+/* ===================================================================== 2. the ruler of one code */
+(function () {
+  const svg = document.getElementById('arSvg'), log = document.getElementById('arLog'), ri = document.getElementById('arIdx'), rd = document.getElementById('arD');
+  function draw() {
+    const idx = +ri.value, step = MED.STEPS[idx], dsteps = +rd.value, diff = Math.round(dsteps * step);
+    document.getElementById('arIdxV').textContent = `${idx} → step = STEPS(${idx}) = ${fmt(step)}`;
+    document.getElementById('arDV').textContent = `${dsteps.toFixed(2)} steps = ${diff > 0 ? '+' : ''}${fmt(diff)}`;
+    const Q = AD.questions(diff, step), m = Q.code & 7, dq = AD.mid(step, m), npred = Q.neg ? -dq : dq, err = npred - diff;
+    clear(svg);
+    const X = v => 450 + v / (2.3 * step) * 425, Y0 = 120;
+    S('line', { x1: 20, x2: 880, y1: Y0, y2: Y0, class: 's-muted' }, svg);
+    [-1, 1].forEach(sg => {
+      for (let k = 0; k < 8; k++) {
+        const a = AD.lo(step, k), b = k < 7 ? AD.lo(step, k + 1) : 2.3 * step, x1 = X(sg * a), x2 = X(sg * b);
+        const chosen = (sg < 0) === Q.neg && k === m;
+        S('rect', { x: Math.min(x1, x2), y: Y0 - 34, width: Math.abs(x2 - x1), height: 34, class: chosen ? 'c-wrs' : k % 2 ? 'c-cell' : 'c-bg' }, svg).setAttribute('style', chosen ? 'stroke: var(--warn); stroke-width: 2' : '');
+        T(svg, (x1 + x2) / 2 - 12, Y0 - 40, (sg < 0 ? '1' : '0') + bin(k, 3), { class: chosen ? 'c-warn' : 'c-muted', 'font-size': 12, 'font-weight': chosen ? 700 : 400 });
+        const xm = X(sg * AD.mid(step, k));
+        S('path', { d: `M${xm - 4},${Y0 - 6} L${xm + 4},${Y0 - 6} L${xm},${Y0}z`, class: chosen ? 'c-accent' : 'c-muted' }, svg);
+        S('line', { x1: x1, x2: x1, y1: Y0 - 34, y2: Y0 + 6, class: 's-muted' }, svg);
+        if (sg > 0 || k > 0) T(svg, x1 - 8, Y0 + 20, (sg < 0 && k ? '−' : '') + AD.frac(a / step), { class: 'c-muted', 'font-size': 12 });
+      }
+    });
+    T(svg, 440, 152, 'distance from pred, in steps', { class: 'c-muted', 'font-size': 10.5 });
+    T(svg, 26, 22, 'slots below pred: bit 3 = 1 (down)', { class: 'c-muted', 'font-size': 11 });
+    T(svg, 660, 22, 'slots above pred: bit 3 = 0 (up)', { class: 'c-muted', 'font-size': 11 });
+    T(svg, 26, 38, '▼ = the middle of each slot: where the new guess goes', { class: 'c-muted', 'font-size': 11 });
+    /* pred, the real sample, the new guess */
+    const line = (v, y1, y2, cls, w) => S('line', { x1: X(v), x2: X(v), y1, y2, class: cls, 'stroke-width': w || 2 }, svg);
+    line(0, Y0 - 50, 250, 's-fg', 2); T(svg, X(0) + 4, 250, 'pred (old guess)', { class: 'c-fg', 'font-size': 12.5 });
+    line(diff, Y0 + 30, 200, 's-warn', 3); T(svg, X(diff) + (diff >= npred ? 6 : -6), 196, 'real sample', { class: 'c-warn', 'font-size': 12.5, 'font-weight': 600, 'text-anchor': diff >= npred ? 'start' : 'end' });
+    line(npred, Y0 + 30, 224, 's-accent', 3); T(svg, X(npred) + (diff >= npred ? -6 : 6), 220, 'new guess', { class: 'c-accent', 'font-size': 12.5, 'font-weight': 600, 'text-anchor': diff >= npred ? 'end' : 'start' });
+    S('path', { d: `M${X(0)},176 L${X(npred)},176`, class: 'edge on', 'marker-end': 'url(#arA)' }, svg);
+    arrowDefs(svg, 'arA', 'c-accent');
+    T(svg, (X(0) + X(npred)) / 2 - 30, 170, 'dq = ' + fmt(dq), { class: 'c-accent', 'font-size': 12.5 });
+    const qtxt = Q.qs.map(([d, t, yes, bit]) => `${fmt(d)} ≥ ${fmt(t)}? <b>${yes ? 'yes' : 'no'}</b> → bit ${bit === 4 ? 2 : bit === 2 ? 1 : 0} = ${yes ? 1 : 0}`).join(' · ');
+    log.innerHTML = `diff = ${fmt(diff)} (${dsteps.toFixed(2)} steps): ${Q.neg ? 'below pred → bit 3 = 1, and the questions use ' + fmt(-diff) : 'above pred → bit 3 = 0'}.<br>${qtxt}<br>` +
+      `code = <b>${bin(Q.code, 4)}</b> → the slot ${AD.frac(AD.lo(step, m) / step)} … ${m < 7 ? AD.frac(AD.lo(step, m + 1) / step) : '∞'} steps → dq = ${step >> 3}${m & 4 ? ' + ' + step : ''}${m & 2 ? ' + ' + (step >> 1) : ''}${m & 1 ? ' + ' + (step >> 2) : ''} = <b>${fmt(dq)}</b>. ` +
+      `New guess ${npred > 0 ? '+' : ''}${fmt(npred)}: error ${err > 0 ? '+' : ''}${fmt(err)} (${(err / step).toFixed(2)} steps)` + (m === 7 && Math.abs(diff) > dq ? ' <span class="w">: the real sample is further than the biggest move, the guess has to catch up over the next samples</span>' : '') + '.<br>' +
+      `Next: idx ${MED.IDX[m] > 0 ? '+ ' + MED.IDX[m] : '− 1'} = ${clamp(idx + MED.IDX[m], 0, 88)} → step ${fmt(MED.STEPS[clamp(idx + MED.IDX[m], 0, 88)])} (${MED.IDX[m] > 0 ? 'bigger: the sound moved a lot' : 'smaller: the sound moved little'}).`;
+  }
+  ri.addEventListener('input', draw); rd.addEventListener('input', draw);
+  draw(); onTheme(draw);
+})();
+
+/* ===================================================================== 4. the 89 step sizes */
+(function () {
+  const svg = document.getElementById('atSvg'), log = document.getElementById('atLog');
+  let hov = 40;
+  const X = i => 60 + i * 9.3, Y = v => 210 - Math.log10(v) / Math.log10(32767) * 190;
+  function draw() {
+    clear(svg);
+    [10, 100, 1000, 10000].forEach(v => { S('line', { x1: 56, x2: 890, y1: Y(v), y2: Y(v), class: 's-line' }, svg); T(svg, 4, Y(v) + 4, fmt(v), { class: 'c-muted', 'font-size': 10 }); });
+    const marks = { [hov]: 'c-warn' };
+    [-1, 2, 4, 6, 8].forEach(d => { const j = clamp(hov + d, 0, 88); if (j !== hov) marks[j] = d < 0 ? 'c-ok' : 'c-vio'; });
+    MED.STEPS.forEach((v, i) => {
+      const r = S('rect', { x: X(i), y: Y(v), width: 7.4, height: 210 - Y(v) + 1, class: marks[i] || 'c-acs', style: 'cursor:pointer' }, svg);
+      r.addEventListener('mouseenter', () => { hov = i; draw(); }); r.addEventListener('click', () => { hov = i; draw(); });
+    });
+    [-1, 2, 4, 6, 8].forEach(d => { const j = clamp(hov + d, 0, 88); if (j !== hov) T(svg, X(j) - 2, Y(MED.STEPS[j]) - 4, (d > 0 ? '+' : '') + d, { class: d < 0 ? 'c-ok' : 'c-vio', 'font-size': 10 }); });
+    T(svg, 60, 236, 'idx 0', { class: 'c-muted', 'font-size': 10 }); T(svg, X(88) - 20, 236, 'idx 88', { class: 'c-muted', 'font-size': 10 });
+    T(svg, 300, 236, 'height on a log scale: every bar ≈ 10 % taller than the one before', { class: 'c-muted', 'font-size': 10.5 });
+    const v = MED.STEPS[hov], pv = hov ? MED.STEPS[hov - 1] : null, nx = j => MED.STEPS[clamp(hov + j, 0, 88)];
+    log.innerHTML = `idx <b>${hov}</b>: step = <b>${fmt(v)}</b>` + (pv ? ` (× ${(v / pv).toFixed(3)} the one before)` : '') +
+      `. With this step the guess can move between ${fmt(v >> 3)} (code x000) and ${fmt(AD.mid(v, 7))} (x111) in one sample, and lands at most ~${fmt(v >> 3)} from the truth.<br>` +
+      `After a small code: idx ${hov} − 1 → step ${fmt(nx(-1))} <span class="o">(× ${(nx(-1) / v).toFixed(2)})</span>. After a big code: + 2 → ${fmt(nx(2))}, + 4 → ${fmt(nx(4))}, + 6 → ${fmt(nx(6))}, + 8 → ${fmt(nx(8))} <span style="color:var(--violet)">(× ${(nx(8) / v).toFixed(2)})</span>.`;
+  }
+  draw(); onTheme(draw);
+})();
+
+/* ===================================================================== 5. the microscope */
+(function () {
+  const svg = document.getElementById('amSvg'), enc = document.getElementById('amEnc'), dec = document.getElementById('amDec'), log = document.getElementById('amLog'), ed = document.getElementById('amEdit');
+  const SOUNDS = {
+    mix: ['quiet, then loud', () => Array.from({ length: 180 }, (_, i) => { const env = i < 40 ? 0.03 : i < 60 ? 0.03 + (i - 40) / 20 * 0.97 : i < 130 ? 1 : Math.max(0.05, 1 - (i - 130) / 50); return Math.round(env * (11000 * Math.sin(2 * Math.PI * i / 19) + 4000 * Math.sin(2 * Math.PI * i / 6.3))); }), 70],
+    jump: ['a sudden jump', () => Array.from({ length: 130 }, (_, i) => i < 15 ? 0 : i < 60 ? 16000 : i < 100 ? -6000 : 0), 14],
+    soft: ['a soft tone', () => Array.from({ length: 120 }, (_, i) => Math.round(900 * Math.sin(2 * Math.PI * i / 20))), 30],
+    loud: ['a loud tone', () => Array.from({ length: 120 }, (_, i) => Math.round(22000 * Math.sin(2 * Math.PI * i / 14))), 3]
+  };
+  let snd = 'jump', x = SOUNDS[snd][1](), sel = SOUNDS[snd][2];
+  seg(document.getElementById('amSnd'), Object.keys(SOUNDS).map(k => [k, SOUNDS[k][0]]), snd, v => { snd = v; x = SOUNDS[v][1](); sel = SOUNDS[v][2]; draw(); });
+  function draw() {
+    const E2 = MED.adpcmEncode(x).info, N = x.length, f = E2[sel];
+    ed.value = x[sel];
+    clear(svg);
+    arrowDefs(svg, 'amA', 'c-accent');
+    /* ---- left: the stretch around the sample */
+    const a = Math.max(0, sel - 12), b = Math.min(N - 1, sel + 12);
+    let lo = Infinity, hi = -Infinity;
+    for (let i = a; i <= b; i++) { const g = E2[i], r = 1.875 * g.step; lo = Math.min(lo, g.s, g.p0 - r, g.pred); hi = Math.max(hi, g.s, g.p0 + r, g.pred); }
+    const pad = (hi - lo) * 0.06 + 1; lo -= pad; hi += pad;
+    const LX = i => 40 + (i - a) * (440 / 24), LY = v => 330 - (v - lo) / (hi - lo) * 300;
+    S('rect', { x: 30, y: 24, width: 460, height: 312, class: 'c-bg' }, svg);
+    if (lo < 0 && hi > 0) { S('line', { x1: 30, x2: 490, y1: LY(0), y2: LY(0), class: 's-line' }, svg); T(svg, 4, LY(0) + 4, '0', { class: 'c-muted', 'font-size': 10 }); }
+    for (let i = a; i <= b; i++) {
+      const g = E2[i], r = 1.875 * g.step;
+      S('rect', { x: LX(i) - 5, y: LY(g.p0 + r), width: 10, height: Math.max(1, LY(g.p0 - r) - LY(g.p0 + r)), class: i === sel ? 'c-wrs' : 'c-acs', opacity: i === sel ? 1 : 0.7 }, svg);
+    }
+    S('line', { x1: LX(sel), x2: LX(sel), y1: 24, y2: 336, class: 's-warn', 'stroke-dasharray': '3 3' }, svg);
+    let dO = '', dP = '';
+    for (let i = a; i <= b; i++) { dO += (i > a ? 'L' : 'M') + LX(i) + ',' + LY(E2[i].s); dP += (i > a ? 'L' : 'M') + LX(i) + ',' + LY(E2[i].pred); }
+    S('path', { d: dO, class: 'edge', style: 'stroke: var(--muted); stroke-width: 1.5' }, svg);
+    S('path', { d: dP, class: 'edge', style: 'stroke: var(--accent); stroke-width: 2' }, svg);
+    for (let i = a; i <= b; i++) {
+      S('circle', { cx: LX(i), cy: LY(E2[i].s), r: 3, class: 'c-muted' }, svg);
+      const c = S('circle', { cx: LX(i), cy: LY(E2[i].pred), r: i === sel ? 5 : 3.2, class: i === sel ? 'c-warn' : 'c-accent', style: 'cursor:pointer' }, svg);
+      c.addEventListener('click', () => { sel = i; draw(); });
+    }
+    T(svg, 32, 16, `samples ${a} … ${b} · grey: real · blue: guess · bands: reach of the next code (± 1⅞ step)`, { class: 'c-muted', 'font-size': 10 });
+    /* idx strip */
+    for (let i = 0; i < 89; i++) S('rect', { x: 40 + i * 4.9, y: 356, width: 4, height: 14, class: i === f.i0 ? 'c-warn' : i === f.idx ? 'c-ok' : 'c-cell' }, svg);
+    T(svg, 40, 388, `idx: ${f.i0} (orange) → ${f.idx} (green)  ·  step ${fmt(f.step)} → ${fmt(MED.STEPS[f.idx])}`, { class: 'c-fg', 'font-size': 11 });
+    /* ---- right: the microscope */
+    const step = f.step, m = f.code & 7, neg = !!(f.code & 8), diff = f.s - f.p0, mv = f.pred - f.p0;
+    const R = Math.max(2.0 * step, Math.abs(diff) * 1.08, Math.abs(mv) * 1.08, 1), up0 = (f.code & 8) ? 52 : 326, RY = v => up0 - v / R * 286;
+    S('rect', { x: 520, y: 24, width: 370, height: 330, class: 'c-bg' }, svg);
+    T(svg, 890, 16, `sample ${sel}, zoomed: ± ${fmt(Math.round(R))} around the old guess`, { class: 'c-muted', 'font-size': 10, 'text-anchor': 'end' });
+    const sg = neg ? -1 : 1;
+    for (let k = 0; k < 8; k++) {
+      const v1 = sg * AD.lo(step, k), v2 = sg * (k < 7 ? AD.lo(step, k + 1) : Math.max(AD.lo(step, 7) + step / 4, R));
+      const y1 = RY(v1), y2 = RY(v2), top = Math.min(y1, y2), h = Math.max(0.5, Math.abs(y2 - y1));
+      if (top > 354 || top + h < 24) continue;
+      const yy = clamp(top, 24, 354), hh = Math.min(h, 354 - yy);
+      S('rect', { x: 620, y: yy, width: 150, height: hh, class: k === m ? 'c-wrs' : k % 2 ? 'c-cell' : 'c-panel' }, svg).setAttribute('style', k === m ? 'stroke: var(--warn); stroke-width: 2' : 'stroke: var(--line)');
+      if (h > 11) T(svg, 776, yy + Math.min(hh, h) / 2 + 4, (neg ? '1' : '0') + bin(k, 3) + '  ' + AD.frac(AD.lo(step, k) / step) + (k < 7 ? '–' + AD.frac(AD.lo(step, k + 1) / step) : '+') + ' st', { class: k === m ? 'c-warn' : 'c-muted', 'font-size': 10, 'font-weight': k === m ? 700 : 400 });
+    }
+    const lbls = [];
+    const hline = (v, cls, lbl, w, dash) => { const y = clamp(RY(v), 24, 354); S('line', { x1: 540, x2: 790, y1: y, y2: y, class: cls, 'stroke-width': w || 2, 'stroke-dasharray': dash || '' }, svg); lbls.push([y - 4, lbl, cls.replace('s-', 'c-')]); };
+    hline(0, 's-fg', 'old guess ' + fmt(f.p0), 1.5, '5 4');
+    hline(diff, 's-warn', 'real ' + fmt(f.s), 3);
+    hline(mv, 's-accent', 'new guess ' + fmt(f.pred), 3);
+    lbls.sort((p, q) => p[0] - q[0]);
+    for (let i = 1; i < lbls.length; i++) if (lbls[i][0] - lbls[i - 1][0] < 13) lbls[i][0] = lbls[i - 1][0] + 13;
+    lbls.forEach(([y, t, c]) => T(svg, 524, y, t, { class: c, 'font-size': 10.5, 'font-weight': 600, style: 'paint-order: stroke; stroke: var(--bg); stroke-width: 3px' }));
+    S('path', { d: `M600,${RY(0)} L600,${clamp(RY(mv), 24, 354)}`, class: 'edge on', 'marker-end': 'url(#amA)' }, svg);
+    T(svg, 548, (RY(0) + RY(mv)) / 2 + 4, 'dq ' + fmt(Math.abs(mv)), { class: 'c-accent', 'font-size': 10.5 });
+    const ey1 = clamp(RY(diff), 24, 354), ey2 = clamp(RY(mv), 24, 354);
+    S('line', { x1: 800, x2: 800, y1: ey1, y2: ey2, class: 's-hit', 'stroke-width': 3 }, svg);
+    T(svg, 806, (ey1 + ey2) / 2 + 4, 'error ' + fmt(f.pred - f.s), { class: 'c-hit', 'font-size': 10.5 });
+    /* ---- the numbers */
+    const Q = AD.questions(diff, step);
+    const kv = (k, v) => `<div class="kv"><span class="k">${k}</span><span class="v">${v}</span></div>`;
+    enc.innerHTML = '<div class="kv"><span class="k"><b>encoder</b></span><span class="v">(Python, before writing the file)</span></div>' +
+      kv('real sample', fmt(f.s)) + kv('pred before', fmt(f.p0)) + kv('diff = real − pred', `${fmt(diff)} = ${(diff / step).toFixed(2)} steps`) +
+      kv('bit 3 (sign)', `${neg ? 1 : 0}: ${neg ? 'below → work with ' + fmt(-diff) : 'above'}`) +
+      Q.qs.map(([d, t, yes, bit], j) => kv(`bit ${2 - j}: ≥ ${['step', 'step/2', 'step/4'][j]}?`, `${fmt(d)} ≥ ${fmt(t)}? <b>${yes ? 'yes → 1' : 'no → 0'}</b>${yes && j < 2 ? ', left ' + fmt(d - t) : ''}`)).join('') +
+      kv('code', `<b>${bin(f.code, 4)}</b> = ${f.code}`);
+    const parts = [`step/8 = ${step >> 3}`]; if (m & 4) parts.push(`step = ${step}`); if (m & 2) parts.push(`step/2 = ${step >> 1}`); if (m & 1) parts.push(`step/4 = ${step >> 2}`);
+    dec.innerHTML = '<div class="kv"><span class="k"><b>decoder</b></span><span class="v">(adpcm_dec on the board)</span></div>' +
+      kv('idx → step', `${f.i0} → STEPS(${f.i0}) = ${fmt(step)}`) + kv('code', bin(f.code, 4)) + kv('dq (the move)', `${parts.join(' + ')} = <b>${fmt(f.dq)}</b>`) +
+      kv('pred after', `${fmt(f.p0)} ${neg ? '−' : '+'} ${fmt(f.dq)} = <b>${fmt(f.pred)}</b>${Math.abs(f.p0 + (neg ? -f.dq : f.dq)) > 32767 ? ' (clamped)' : ''}`) + kv('error', `${fmt(f.pred - f.s)} (${((f.pred - f.s) / step).toFixed(2)} step)`) +
+      kv('idx after', `${f.i0} ${MED.IDX[m] > 0 ? '+ ' + MED.IDX[m] : '− 1'} = ${f.idx} → next step ${fmt(MED.STEPS[f.idx])}`) + kv('to the speaker', `pcm = ${fmt(f.pred)} for the next 3,125 clocks`);
+    let say;
+    if (Math.abs(diff) > AD.mid(step, 7) + step / 8) say = `<span class="w">The real sample is ${(Math.abs(diff) / step).toFixed(1)} steps away, further than the biggest move (1⅞ steps).</span> The guess takes the biggest move it can, and idx jumps by 8, so the step more than doubles: in a few samples it catches up. Look at the bands on the left widening.`;
+    else if (m >= 4) say = `A big move (bits ${bin(m, 3)} ≥ 100): the step was on the small side, so idx goes up by ${MED.IDX[m]}.`;
+    else if (Math.abs(f.pred - f.s) <= step / 8 + 1) say = 'A small move, and the guess lands within ⅛ step of the truth. The step was bigger than needed, so idx goes down by 1: the next guess gets a bit finer.';
+    else say = 'A small move: idx goes down by 1.';
+    if (step <= 10 && Math.abs(diff) < step) say += ' The step is at its smallest sizes: this is how ADPCM keeps silence silent.';
+    log.innerHTML = `<b>sample ${sel}</b>: ${say} The encoder already ran the decoder's arithmetic to get "pred after", so both sides now hold ${fmt(f.pred)} and idx ${f.idx}.`;
+  }
+  ed.addEventListener('input', () => { x[sel] = +ed.value; draw(); });
+  document.getElementById('amUndo').addEventListener('click', () => { x = SOUNDS[snd][1](); draw(); });
+  document.getElementById('amPrev').addEventListener('click', () => { sel = Math.max(0, sel - 1); draw(); });
+  document.getElementById('amNext').addEventListener('click', () => { sel = Math.min(x.length - 1, sel + 1); draw(); });
+  player(document.getElementById('amPlay'), () => { if (sel >= x.length - 1) return false; sel++; draw(); }, 700);
+  draw(); onTheme(draw);
+})();
+</script>
+
+<script>
+/* ===================================================================== how regular the loads are */
+(function () {
+  const svg = document.getElementById('rgGap'), log = document.getElementById('rgGapLog');
+  const NIB = 3125, FRAME = 840000, LOW = 264;
+  let fps = 10;
+  seg(document.getElementById('rgFps2'), [[10, '10 fps (Bad Apple, OIIA, rickroll, yippee: 800 bytes a record)'], [15, '15 fps (the jump scares: 533 bytes)']], fps, v => { fps = v; draw(); });
+  function sim(aud) {
+    let t = 0, fill = 0, hi = 0, nextTick = 0, frame = -1, pend = null, rec = 0, lastLoadFrame = null;
+    const q = [], loads = [], soundStart = [];
+    let head = -1;
+    while (t < 30 * 50e6) {
+      t += NIB;
+      if (q.length) { if (hi) { q[0].left--; fill--; if (!q[0].left) q.shift(); } hi ^= 1; }
+      const h = q.length ? q[0].r : -1;
+      if (h !== head) { head = h; if (h >= 0 && soundStart[h] === undefined) soundStart[h] = t; }
+      if (pend && t >= pend.at) { q.push({ r: pend.r, left: aud }); fill += aud; pend = null; }
+      if (t >= nextTick) {
+        frame++; nextTick += FRAME;
+        if (!pend && fill < LOW) { loads.push({ r: rec, frame, t, fill, pic: t + 12000, gap: lastLoadFrame === null ? null : frame - lastLoadFrame }); lastLoadFrame = frame; pend = { r: rec++, at: t + 20000 }; }
+      }
+    }
+    loads.forEach(l => { l.lead = soundStart[l.r] !== undefined ? (soundStart[l.r] - l.pic) / 50000 : null; });
+    return loads;
+  }
+  function draw() {
+    const aud = fps === 10 ? 800 : 533, L = sim(aud);
+    clear(svg);
+    const gaps = L.filter(l => l.gap !== null);
+    const counts = {}; gaps.forEach(l => counts[l.gap] = (counts[l.gap] || 0) + 1);
+    const n = 70, BX = i => 40 + i * 12;
+    T(svg, 6, 16, 'screen frames between two record loads, records 1 … ' + n, { class: 'c-fg', 'font-size': 11.5 });
+    const maxG = fps === 10 ? 7 : 5;
+    for (let g = 0; g <= maxG; g++) { const y = 130 - g * 15; S('line', { x1: 36, x2: 890, y1: y, y2: y, class: 's-line' }, svg); T(svg, 6, y + 4, String(g), { class: 'c-muted', 'font-size': 10 }); }
+    gaps.slice(0, n).forEach((l, i) => S('rect', { x: BX(i), y: 130 - l.gap * 15, width: 9, height: l.gap * 15, class: l.gap === Math.round(aud / 134.4) ? 'c-acs' : 'c-warn' }, svg));
+    /* lead of each picture over its sound */
+    T(svg, 6, 168, 'how long each picture is on screen before its own sound starts (ms), records 0 … ' + (L.length - 1), { class: 'c-fg', 'font-size': 11.5 });
+    const LY = ms => 282 - ms / 40 * 100;
+    [0, 10, 20, 30, 40].forEach(ms => { S('line', { x1: 36, x2: 890, y1: LY(ms), y2: LY(ms), class: 's-line' }, svg); T(svg, 6, LY(ms) + 4, String(ms), { class: 'c-muted', 'font-size': 10 }); });
+    const leads = L.filter(l => l.lead !== null), LX = i => 40 + i / (L.length - 1) * 848;
+    leads.forEach(l => S('circle', { cx: LX(l.r), cy: LY(l.lead), r: 2, class: 'c-accent' }, svg));
+    S('line', { x1: 36, x2: 890, y1: LY(16.8), y2: LY(16.8), class: 's-ok', 'stroke-dasharray': '4 3' }, svg);
+    S('line', { x1: 36, x2: 890, y1: LY(33), y2: LY(33), class: 's-ok', 'stroke-dasharray': '4 3' }, svg);
+    const later = leads.filter(l => l.r > 0), avg = (L[L.length - 1].frame - L[0].frame) / (L.length - 1), mn = Math.min(...later.map(l => l.lead)), mx = Math.max(...later.map(l => l.lead));
+    const per = aud * 2 / 16000;
+    log.innerHTML = `${aud} sound bytes = ${(per * 1000).toFixed(1)} ms per record = ${(per / 0.0168).toFixed(3)} screen frames. In 30 s, ${L.length} records were loaded: ` +
+      Object.keys(counts).sort().map(g => `<b>${counts[g]}</b> times after ${g} frames`).join(', ') + ` (average ${avg.toFixed(3)} frames). ` +
+      `Orange bars are the "one frame early" loads.<br>After record 0 (which starts with an empty ring, so its sound follows at once), every picture appeared between <b>${mn.toFixed(1)}</b> and <b>${mx.toFixed(1)} ms</b> before its sound: the dots stay in one band from the first record to the last, so picture and sound never drift apart.`;
+  }
+  draw(); onTheme(draw);
+})();
+</script>
+
 <!-- @@SCRIPTS@@ -->
 
 <script>
@@ -3168,6 +3556,8 @@ const GL = {
     ['How does the FPGA "decide" to use block RAM?', 'It doesn\'t: Vivado recognises a code pattern and builds a BRAM from it.', 'bram'],
     ['What is a frame buffer?', 'A picture kept in memory, read out pixel by pixel while the screen is drawn.', 'fb'],
     ['What is a sound ring?', 'A memory written in bursts and read at a steady speed, going round and round.', 'ring'],
+    ['What is an ADPCM step? idx? pred? Why /8, /4, /2?', 'Built up one idea at a time, with a ruler and a microscope that follows each sample.', 'adpcm'],
+    ['Does a 10 fps video load every so many frames?', 'Every 6 screen frames, sometimes 5: why, and why it never drifts.', 'av'],
     ['How does a video with sound stay in sync?', 'Records of picture + sound; the sound sets the pace.', 'av'],
     ['What do all the states do?', 'Interactive diagrams of all seven state machines, with the code of every state.', 'fsm'],
     ['What do the short variable names mean?', 'Click any name in the code to see what it is and every line that uses it.', 'code'],
@@ -3176,5 +3566,86 @@ const GL = {
   ];
   const qa = document.getElementById('qaList');
   Q.forEach(([q, a, id]) => qa.appendChild(E('a', { href: '#' + id }, '<b>' + esc(q) + '</b><span>' + esc(a) + '</span>')));
+})();
+
+/* ===================================================================== the reference panel (code reader, names, words beside the text) */
+(function () {
+  const pane = document.getElementById('refPane'), body = document.getElementById('refBody'), fab = document.getElementById('refFab');
+  const PARTS = [['reader', 'code reader', 'refReader'], ['names', 'all names', 'refNames'], ['patterns', 'name patterns', 'refPatterns'], ['words', 'words', 'refWords']];
+  const PH = {};
+  const store = (k, v) => { try { localStorage.setItem('mv_' + k, v); } catch (e) {} };
+  const read = k => { try { return localStorage.getItem('mv_' + k); } catch (e) { return null; } };
+  let open = false, tab = read('tab') || 'reader', width = +(read('w') || 520);
+  function tabs() {
+    seg(document.getElementById('refTabs'), PARTS.map(p => [p[0], p[1]]), tab, v => { tab = v; store('tab', v); show(v); });
+    seg(document.getElementById('refW'), [[400, 'S'], [520, 'M'], [680, 'L']], width, v => { width = v; store('w', v); document.documentElement.style.setProperty('--refw', v + 'px'); });
+  }
+  function show(t) {
+    if (t) tab = t;
+    if (!open) return;
+    PARTS.forEach(([k, , id]) => { document.getElementById(id).hidden = k !== tab; });
+    [...document.getElementById('refTabs').children].forEach((b, i) => b.setAttribute('aria-pressed', String(PARTS[i][0] === tab)));
+  }
+  /* keep the reader's place when the text column changes width */
+  function keepPlace(change) {
+    const secs = [...document.querySelectorAll('main > section, main > header')];
+    let s = secs[0]; secs.forEach(x => { if (x.getBoundingClientRect().top <= 100) s = x; });
+    const r = s.getBoundingClientRect(), frac = r.height ? (100 - r.top) / r.height : 0;
+    change();
+    const r2 = s.getBoundingClientRect();
+    scrollBy(0, r2.top + frac * r2.height - 100);
+  }
+  function dock() { if (!open) keepPlace(dock0); }
+  function dock0() {
+    PARTS.forEach(([, lbl, id]) => {
+      const el = document.getElementById(id);
+      if (!PH[id]) {
+        PH[id] = E('div', { class: 'refPh' }, `<span>The ${esc(lbl)} is open in the reference panel.</span>`);
+        const b = E('button', { type: 'button' }, 'bring it back here'); b.addEventListener('click', undock); PH[id].appendChild(b);
+      }
+      el.parentNode.insertBefore(PH[id], el);
+      body.appendChild(el);
+    });
+    open = true; pane.hidden = false; document.body.classList.add('docked');
+    document.documentElement.style.setProperty('--refw', width + 'px');
+    fab.setAttribute('aria-pressed', 'true'); fab.textContent = 'reference ✕';
+    store('open', '1'); tabs(); show();
+  }
+  function undock() { if (open) keepPlace(undock0); }
+  function undock0() {
+    PARTS.forEach(([, , id]) => { const el = document.getElementById(id), ph = PH[id]; el.hidden = false; if (ph && ph.parentNode) { ph.parentNode.insertBefore(el, ph); ph.remove(); } });
+    open = false; pane.hidden = true; document.body.classList.remove('docked');
+    fab.setAttribute('aria-pressed', 'false'); fab.textContent = 'reference ⇆';
+    store('open', '0');
+  }
+  fab.addEventListener('click', () => open ? undock() : dock());
+  document.getElementById('refClose').addEventListener('click', undock);
+  document.querySelectorAll('.refOpen').forEach(b => b.addEventListener('click', dock));
+  addEventListener('keydown', e => { if (e.key === 'Escape' && open && innerWidth < 900) undock(); });
+  /* a name anywhere in the text: open it in the code reader */
+  const PREF = ['media_engine.vhd', 'media_ctrl.vhd', 'media_mix.vhd', 'spi_flash.vhd', 'adpcm_dec.vhd', 'media_player.vhd', 'top_tetris.vhd', 'top_flash_read.vhd'];
+  function fileOf(n) { return PREF.find(f => GL[f] && GL[f][n]) || (GL['*'][n] ? null : undefined); }
+  function lookup(name) {
+    const n = name.toLowerCase(), f = fileOf(n);
+    if (f === undefined) return false;
+    dock(); show('reader'); window.refPick(n, f);
+    return true;
+  }
+  window.REF = { dock, undock, show: t => { if (open) show(t); }, lookup };
+  const isName = s => /^[A-Za-z_][A-Za-z0-9_]*$/.test(s) && fileOf(s.toLowerCase()) !== undefined;
+  function linkify(root) {
+    root.querySelectorAll('code:not(.ref)').forEach(c => {
+      if (c.closest('pre') || c.closest('#refPane')) return;
+      const t = c.textContent.trim();
+      if (isName(t)) { c.classList.add('ref'); c.tabIndex = 0; c.title = 'what is ' + t + '? (opens the reference)'; }
+    });
+  }
+  document.addEventListener('click', e => { const c = e.target.closest('code.ref'); if (c) { e.preventDefault(); lookup(c.textContent.trim()); } });
+  document.addEventListener('keydown', e => { const c = e.target.closest && e.target.closest('code.ref'); if (c && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); lookup(c.textContent.trim()); } });
+  const main = document.querySelector('main');
+  linkify(main);
+  let pend = null;
+  new MutationObserver(() => { if (pend) return; pend = setTimeout(() => { pend = null; linkify(main); }, 120); }).observe(main, { childList: true, subtree: true });
+  if (read('open') === '1' && innerWidth >= 900) dock();
 })();
 </script>
