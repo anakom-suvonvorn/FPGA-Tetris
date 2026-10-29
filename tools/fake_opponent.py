@@ -14,8 +14,9 @@ every message the board sends, and lets you type commands:
     l        send LOST    (the board wins)
     h 12     pretend my stack is 12 rows high (the RIVAL bar)
     x 4      send chaos ATTACK number 4 (needs SW6 chaos on, on the board):
-             0 mirror  1 flip  2 blind  3 bouncers  4 garbage ... 10 Jevil (list below)
-             5 garbage 6 cursed next  7 speed  8 lock (buttons locked until a task is done)
+             0 mirror  1 flip  2 blind  3 bouncers  4 garbage (+3)  5 cursed next
+             6 speed  7 lock (buttons locked until a task is done)
+             8 Bad Apple  9 OIIA OIIA  10 Jevil (videos: need the media file)
     a        auto mode on/off: stack grows, random garbage every few seconds
     q        quit
 

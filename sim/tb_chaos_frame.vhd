@@ -4,6 +4,8 @@
 -- Like tb_tetris_frame, with chaos switched on (SW6), the first task
 -- forced to BINARY and coming after half a second, and the pretend PC
 -- attacking:
+--   screenshot 0 (frame0.ppm) : CHAOS on, the BINARY task panel, 3 garbage
+--                               lines waiting, no attack yet
 --   screenshot 1 (frame.ppm)  : the BINARY task panel + the BLIND attack
 --   screenshot 2 (frame2.ppm) : FLIP + BOUNCERS attacks
 -- Run with:  tools\sim.bat tb_chaos_frame   (several minutes), then
@@ -33,7 +35,7 @@ architecture sim of tb_chaos_frame is
   signal pc_start : std_logic := '0';
   signal pc_busy  : std_logic;
   signal pc_line  : std_logic;
-  signal want_blind, want_flip : boolean := false;
+  signal want_garb, want_blind, want_flip : boolean := false;
 
   -- the robot's moves for each piece: rotations, then sideways steps
   type int_arr is array (natural range <>) of integer;
@@ -71,10 +73,14 @@ begin
       wait until rising_edge(clk);
       wait until pc_busy = '0';
     end procedure;
-    variable sent_c, sent_f : boolean := false;
+    variable sent_g, sent_c, sent_f : boolean := false;
   begin
     loop
       send("000" & "01001");                     -- HEARTBEAT, height 9
+      if want_garb and not sent_g then
+        send("001" & "00011");                   -- GARBAGE 3 (waits in the red meter)
+        sent_g := true;
+      end if;
       if want_blind and not sent_c then
         send("100" & "00010");                   -- ATTACK 2: BLIND
         sent_c := true;
@@ -113,6 +119,11 @@ begin
         wait until falling_edge(vs);
       end if;
     end loop;
+    want_garb <= true;                           -- the rival sends 3 garbage lines
+    wait for 50 ms;
+    report "taking screenshot 0";
+    shot <= 3;
+    wait until shot_done = 3;
     want_blind <= true;                          -- the rival sends BLIND
     wait for 50 ms;
     report "taking screenshot 1";
@@ -132,12 +143,16 @@ begin
     variable l      : line;
     variable n_hs   : integer;
     variable row    : integer;
+    variable k      : integer;
     type row_t is array (0 to 639) of integer;
     variable rr, gg, bb : row_t;
   begin
-    for k in 1 to 2 loop
+    for i in 1 to 3 loop
+      if i = 1 then k := 3; else k := i - 1; end if;
       wait until shot = k;
-      if k = 1 then
+      if k = 3 then
+        file_open(f, "frame0.ppm", write_mode);
+      elsif k = 1 then
         file_open(f, "frame.ppm", write_mode);
       else
         file_open(f, "frame2.ppm", write_mode);

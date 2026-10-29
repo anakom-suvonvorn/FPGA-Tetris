@@ -13,7 +13,36 @@ something important changes. Durable facts also live in Claude's memory
 
 ## 0. Where we are RIGHT NOW (start here)
 
-### Latest (2026-10-28 evening): submission package in `submission/`
+### Latest (2026-10-30 night): docs round 2 after the user's review
+* TA hint (via a friend): the Design Document must let someone who knows
+  nothing about FPGAs rebuild the project, and must contain the code. The
+  design doc is now ~142 pages, written in 4 parts
+  (`2.3_Design_Document/parts/1..4_*.md`, concatenated into
+  `design_document.md`): from-zero basics (FPGA, digital, VHDL, tools, full
+  pin table), research, Top-Down with a full module-to-module connection
+  table, every module 4.7.1-4.7.20 with real code excerpts, dev/test,
+  step-by-step rebuild (ch. 7), Appendix B = all 25 VHDL files + project.txt
+  + pins.xdc, Appendix C = Vivado schematics. `build_docs.py` directives:
+  `<!-- CODE: path | start regex | end regex -->` (real line numbers),
+  `<!-- SOURCE: path -->`, `<!-- PAGEBREAK -->`; numbered lists restart at 1.
+* Vivado schematics: the user exported PDFs to
+  `submission/figures/vivaldo generated schematics/` (u_* instance names;
+  u_sec = u_seg = seg7_scan, u_text is the one inside u_crender); rotated
+  -90 and cropped into `figures/vivado_png/` (full + _preview + u_core_zoom).
+* No resistors on the J5 link (user: always plain wires) - removed everywhere
+  except the LED in test 02. Attack/bonus shown as chances 62.5 % / 37.5 %.
+  Flash figure shows the real order + addresses (sprite block LAST at
+  0x788200). New fig_blocks (every connection) and fig_fsm (no overlaps,
+  SINK from S_PLAY); tetris_visual.html FSM fixed the same way (S_SINK from
+  S_PLAY + S_SINK_CHK). tb_chaos_frame takes a 3rd shot (frame0: chaos on,
+  task panel, garbage waiting); `figures/faces_on_bouncers.py` puts the real
+  face sprites on the simulated bouncers (hardware rule). Brochure: member
+  names from the team's v1 doc (row 6 there duplicated row 1).
+* Facts corrected while checking: left/right repeat every 3 frames (DAS 10),
+  game render pipeline 2 clocks (media 3, media_mix delays the game by 1),
+  12 sound effects, the 3 DSPs are in chaos_task/chaos_fx/media_engine.
+
+### Earlier (2026-10-28 evening): submission package in `submission/`
 * User asked to plan + prepare every hand-in item (Thai with English terms;
   docs go into Google Docs, brochure into Canva). Rules re-read from the
   assignment PDF + the new announcement: proposal and brochure no longer

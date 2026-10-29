@@ -66,11 +66,13 @@ class Fig:
             self.text(cx, ty + tsize * 0.45 + (i + 1) * ssize * 1.35 - 2, s, size=ssize, anchor=anc, color=INK)
 
     def arrow(self, pts, label=None, color=MUTED, dash=None, both=False, lpos=0.5, ldx=0, ldy=-6,
-              lsize=12.5, lanchor='middle', sw=2):
+              lsize=12.5, lanchor='middle', sw=2, lat=None):
         d = 'M' + ' L'.join(f'{x},{y}' for x, y in pts)
         mid = color.replace('#', '')
         da = f' stroke-dasharray="{dash}"' if dash else ''
         ms = f' marker-start="url(#s{mid})"' if both else ''
+        # white halo underneath: where two lines cross, the top one stays readable
+        self.add(f'<path d="{d}" fill="none" stroke="#fff" stroke-width="{sw + 5}" stroke-linejoin="round"/>')
         self.add(f'<path d="{d}" fill="none" stroke="{color}" stroke-width="{sw}"{da} marker-end="url(#a{mid})"{ms}/>')
         self.markers.add(color)
         if label:
@@ -82,13 +84,16 @@ class Fig:
                     best, bi = l, i
             (x1, y1), (x2, y2) = pts[bi], pts[bi + 1]
             lx, ly = x1 + (x2 - x1) * lpos + ldx, y1 + (y2 - y1) * lpos + ldy
+            if lat:
+                lx, ly = lat
             rows = label if isinstance(label, (list, tuple)) else [label]
             for i, r in enumerate(rows):
-                self.add(f'<text x="{lx}" y="{ly + i * lsize * 1.3}" font-family="{FONT}" font-size="{lsize}" '
+                self.labels.append(f'<text x="{lx}" y="{ly + i * lsize * 1.3}" font-family="{FONT}" font-size="{lsize}" '
                          f'text-anchor="{lanchor}" fill="{color}" paint-order="stroke" stroke="#fff" '
                          f'stroke-width="5" stroke-linejoin="round">{esc(r)}</text>')
 
     markers = set()
+    labels = []
 
     def svg(self):
         defs = []
@@ -97,12 +102,13 @@ class Fig:
             defs.append(f'<marker id="a{m}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="{col}"/></marker>')
             defs.append(f'<marker id="s{m}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="{col}"/></marker>')
         return (f'<svg xmlns="http://www.w3.org/2000/svg" width="{self.w}" height="{self.h}" viewBox="0 0 {self.w} {self.h}">'
-                f'<defs>{"".join(defs)}</defs><rect width="100%" height="100%" fill="{BG}"/>' + ''.join(self.parts) + '</svg>')
+                f'<defs>{"".join(defs)}</defs><rect width="100%" height="100%" fill="{BG}"/>' + ''.join(self.parts) + ''.join(self.labels) + '</svg>')
 
 
 def new(w, h):
     f = Fig(w, h)
     f.markers = set()
+    f.labels = []
     return f
 
 
@@ -203,142 +209,199 @@ def fig_hierarchy():
 
 
 def fig_blocks():
-    f = new(1580, 960)
+    # every module of top_tetris, and every module-to-module connection
+    # (from the port maps in game/top_tetris.vhd), one line per pair of modules
+    f = new(2050, 1080)
     B = {}
+    AX, BX, CX, DX, EX, QX = 200, 520, 910, 1280, 1640, 1920
 
-    def b(k, x, y, w, h, t, s, g, mono=True):
+    def b(k, x, y, w, h, t, s, g, mono=True, tsize=16):
         B[k] = (x, y, w, h)
-        f.box(x, y, w, h, t, s, g, mono=mono, tsize=16, ssize=12.5)
+        f.box(x, y, w, h, t, s, g, mono=mono, tsize=tsize, ssize=12.5)
 
-    b('btn', 20, 85, 140, 60, 'ปุ่มกด 5', [], 'pin', False)
-    b('sw', 20, 260, 140, 60, 'สวิตช์ 16', [], 'pin', False)
-    b('j5', 20, 410, 140, 80, 'J5', ['TX / RX'], 'pin', False)
-    b('fl', 20, 600, 140, 80, 'SPI Flash', ['8 MB'], 'pin', False)
-    b('vga', 1420, 85, 140, 60, 'จอ VGA', [], 'pin', False)
-    b('aud', 1420, 715, 140, 80, 'หูฟัง', ['+ บัซเซอร์'], 'pin', False)
-    b('segp', 1420, 850, 140, 80, '7-segment', [], 'pin', False)
-    b('inp', 210, 75, 220, 80, 'tetris_input', ['debounce + กดค้าง'], 'in')
-    b('swf', 210, 250, 220, 80, 'switch_filter', ['กรองสวิตช์เด้ง', '+ ตั้งค่า SW2-SW7'], 'in')
-    b('link', 210, 400, 220, 100, 'versus_link', ['UART 115,200 bps', 'ข้อความ 1 ไบต์'], 'link')
-    b('eng', 210, 560, 220, 160, 'media_engine', ['spi_flash · adpcm_dec', 'frame buffer 160×120', 'sound ring 2 KB'], 'media')
-    b('ctrl', 210, 800, 220, 110, 'media_ctrl', ['เลือกว่าจะเล่นอะไร', 'ฟังเหตุการณ์จาก', 'tetris_core / chaos_fx'], 'media')
-    b('core', 490, 40, 240, 150, 'tetris_core', ['state machine 23 สถานะ', 'กระดาน 10 × 20', 'ตรวจชน · 7-bag · garbage'], 'core')
-    b('task', 490, 250, 240, 80, 'chaos_task', ['สุ่มภารกิจ · ตรวจผล'], 'chaos')
-    b('fx', 490, 410, 240, 80, 'chaos_fx', ['ผลการโจมตี / โบนัส'], 'chaos')
-    b('sync', 490, 800, 240, 110, 'vga_sync', ['x, y, frame_tick (59.5 Hz)', 'ส่งให้ทุกโมดูล', '(ไม่ได้วาดเส้น)'], 'video')
-    b('rend', 800, 40, 240, 150, 'tetris_render', ['กระดาน บล็อก ghost', 'ข้อความ แถบ RIVAL', '(+ text_multi)'], 'video')
-    b('cren', 800, 250, 240, 80, 'chaos_render', ['แผงภารกิจ · ลูกบอล'], 'chaos')
-    b('mix', 1110, 40, 240, 150, 'media_mix', ['ชั้นวิดีโอ / sprite', 'ซ้อนกับภาพเกม'], 'video')
-    b('snd', 1110, 700, 240, 110, 'tetris_sound', ['ผสมเพลง + เอฟเฟกต์', 'sigma-delta 12 บิต'], 'sound')
-    b('seg', 1110, 850, 240, 80, 'seg7_scan', ['lines จาก tetris_core'], 'sound')
+    def L(k, y): return (B[k][0], y)
+    def R(k, y): return (B[k][0] + B[k][2], y)
+    def T(k, x): return (x, B[k][1])
+    def D(k, x): return (x, B[k][1] + B[k][3])
+
+    # pins (left: in, right: out)
+    b('btn', 20, 60, 120, 80, 'ปุ่มกด 5', ['SW14..SW23'], 'pin', False, 15)
+    b('sw', 20, 320, 120, 80, 'สวิตช์เลื่อน', ['13 ตัวที่ใช้'], 'pin', False, 15)
+    b('j5', 20, 525, 120, 110, 'J5 / USB', ['TX, RX', '(SW7 เลือก)'], 'pin', False, 15)
+    b('vga', QX, 70, 110, 80, 'จอ VGA', ['R G B hs vs'], 'pin', False, 15)
+    b('aud', QX, 520, 110, 80, 'หูฟัง', ['+ บัซเซอร์'], 'pin', False, 15)
+    b('flash', QX, 825, 110, 90, 'SPI Flash', ['8 MB'], 'pin', False, 15)
+    b('segp', QX, 955, 110, 80, '7-segment', ['4 หลัก'], 'pin', False, 15)
+    # modules
+    b('inp', AX, 50, 210, 100, 'tetris_input', ['debounce 5 ms × 5', 'กดค้าง: DAS 10 เฟรม'], 'in')
+    b('swf', AX, 300, 210, 120, 'switch_filter', ['กรองสวิตช์เด้ง', 'SW2 พัก · SW4 เพลง', 'SW5 เอฟเฟกต์ · SW6 CHAOS'], 'in')
+    b('link', AX, 520, 210, 150, 'versus_link', ['uart_tx + uart_rx', '115,200 bps', 'HEARTBEAT ทุก 6 เฟรม', 'LINKED: ไบต์ใน 30 เฟรม'], 'link')
+    b('sync', AX, 900, 300, 120, 'vga_sync', ['x, y, video_on, hs, vs', 'frame_tick (59.5 ครั้ง/วินาที)', '→ ทุกโมดูล (ไม่วาดเส้น)'], 'video')
+    b('gate', BX, 55, 210, 90, 'ตัวกรองปุ่ม', ['(เขียนใน top_tetris)', 'MIRROR สลับซ้าย-ขวา', 'LOCK ปิดทุกปุ่ม'], 'in', False, 15)
+    b('task', BX, 300, 210, 140, 'chaos_task', ['สุ่มภารกิจทุก 10-17 วิ', 'ตรวจสวิตช์ทุกเฟรม', 'สำเร็จ → สุ่ม: โจมตี', '62.5 % / โบนัส 37.5 %'], 'chaos')
+    b('core', CX, 30, 240, 170, 'tetris_core', ['FSM 23 สถานะ', 'กระดาน 10 × 20', 'ตรวจชน · 7-bag', 'ล้างแถว · garbage'], 'core')
+    b('fx', CX, 300, 240, 140, 'chaos_fx', ['ผลของการโจมตี/โบนัส', 'นับเวลาแต่ละผล', 'แบนเนอร์ INCOMING'], 'chaos')
+    b('mctrl', CX, 760, 240, 130, 'media_ctrl', ['เลือกว่าเล่นอะไร:', 'เพลง · วิดีโอโจมตี', 'ชนะ / แพ้'], 'media')
+    b('rend', DX, 30, 240, 170, 'tetris_render', ['วาดกระดาน บล็อก เงา', 'ข้อความ (text_multi)', 'แถบ RIVAL, มิเตอร์ขยะ', 'pipeline 3 clock'], 'video')
+    b('cren', DX, 300, 240, 140, 'chaos_render', ['แผงภารกิจ (text_multi)', 'ลูกบอลเด้ง 5-10 ลูก', 'แบนเนอร์'], 'chaos')
+    b('eng', DX, 740, 240, 170, 'media_engine', ['spi_flash · adpcm_dec', 'frame buffer 160 × 120', 'sound ring 2 KB', 'sprite Jevil + หน้า'], 'media')
+    b('mix', EX, 30, 200, 170, 'media_mix', ['ซ้อนภาพเกม', 'กับวิดีโอ + sprite', 'ตามโหมด bg / full', '/ over / panel'], 'video')
+    b('snd', EX, 500, 200, 130, 'tetris_sound', ['ผสมเสียงสื่อ', '+ เสียงเอฟเฟกต์', 'sigma-delta 12 บิต'], 'sound')
+    b('seg', EX, 935, 200, 120, 'seg7_scan', ['แสดง: แถวที่ล้าง', 'หรือวินาทีภารกิจ', '(เลือกใน top_tetris)'], 'sound')
+
     A = f.arrow
-    A([(160, 115), (210, 115)])
-    A([(430, 115), (490, 115)], 'ปุ่ม', C['in'][0])
-    A([(730, 115), (800, 115)], 'กระดาน', C['core'][0])
-    A([(1040, 115), (1110, 115)], 'สีเกม', C['video'][0])
-    A([(1350, 115), (1420, 115)], 'RGB', C['video'][0])
-    A([(160, 290), (210, 290)])
-    A([(430, 290), (490, 290)], 'สวิตช์ 8', C['in'][0])
-    A([(730, 290), (800, 290)], None, C['chaos'][0])
-    A([(920, 250), (920, 190)], 'overlay', C['chaos'][0], ldx=34, ldy=4)
-    A([(160, 450), (210, 450)], None, C['link'][0], both=True)
-    A([(430, 450), (490, 450)], 'ได้รับ', C['chaos'][0])
-    A([(430, 420), (460, 420), (460, 165), (490, 165)], None, C['link'][0], both=True)
-    f.lines(320, 190, ['garbage, ความสูง,', 'LOST, START'], 12.5, anchor='middle', color=C['link'][0])
-    A([(520, 330), (520, 375), (400, 375), (400, 400)], 'ATTACK id', C['chaos'][0], ldy=-7)
-    A([(730, 430), (755, 430), (755, 172), (730, 172)], None, C['chaos'][0])
-    A([(730, 455), (775, 455), (775, 172), (800, 172)], None, C['chaos'][0])
-    A([(730, 478), (790, 478), (790, 312), (800, 312)], None, C['chaos'][0])
-    f.text(748, 222, 'ผลต่อเกม', 12, 600, 'end', C['chaos'][0])
-    f.text(782, 222, 'ผลต่อภาพ', 12, 600, 'start', C['chaos'][0])
-    f.text(800, 372, 'BOUNCERS', 12, 600, 'start', C['chaos'][0])
-    f.lines(800, 400, ['เกม: FREEZE SPEED SINK CURSED LOCK +3', 'ภาพ: MIRROR FLIP BLIND'], 12, gap=18, color=C['chaos'][0])
-    A([(160, 640), (210, 640)], 'SPI', C['media'][0], both=True, ldy=-8)
-    A([(430, 600), (1230, 600), (1230, 190)], 'สีวิดีโอ + sprite', C['media'][0], ldy=-8)
-    A([(430, 660), (1080, 660), (1080, 740), (1110, 740)], 'เสียง PCM 16 บิต', C['media'][0], ldy=-8)
-    A([(320, 800), (320, 720)], 'play(item)', C['media'][0], ldx=40, ldy=4)
-    A([(1350, 755), (1420, 755)], None, C['sound'][0])
-    A([(1350, 890), (1420, 890)], None, C['sound'][0])
+    ci, cc, cl, cx, cv, cm, cs = (C[k][0] for k in ('in', 'core', 'link', 'chaos', 'video', 'media', 'sound'))
+    # input row
+    A([R('btn', 100), L('inp', 100)], None, ci)
+    A([R('inp', 100), L('gate', 100)], 'ปุ่ม 5 ตัว', ci, ldy=-8)
+    A([R('gate', 100), L('core', 100)], 'คำสั่งที่ผ่านแล้ว', ci, ldy=-8)
+    A([R('core', 70), L('rend', 70)], 'กระดาน, บล็อก, เงา, NEXT', cc, ldy=-8, lsize=12)
+    A([R('core', 150), L('rend', 150)], ['playing, lines,', 'level, result, ขยะรอ'], cc, ldy=-22, lsize=12)
+    A([R('rend', 110), L('mix', 110)], ['สีเกม', '+ hs, vs'], cv, ldy=-24)
+    A([R('mix', 110), L('vga', 110)], 'RGB', cv, ldy=-8)
+    # switches + chaos row
+    A([R('sw', 360), L('swf', 360)], None, ci)
+    A([R('swf', 345), L('task', 345)], ['สวิตช์ภารกิจ 8', 'CHAOS (SW6)'], ci, ldy=-22, lsize=12)
+    A([R('task', 345), L('fx', 345)], ['สำเร็จ/ล้มเหลว', 'โจมตีที่ส่ง, โบนัส'], cx, lat=(832, 323), lsize=12)
+    A([R('fx', 345), L('cren', 345)], ['BOUNCERS, LOCK', 'แบนเนอร์'], cx, lat=(1215, 323), lsize=12)
+    A([T('cren', DX + 180), D('rend', DX + 180)], ['overlay', '(ov_on, ov_rgb)'], cx, lat=(DX + 236, 240), lsize=12)
+    A([T('fx', CX + 120), D('core', CX + 120)], ['FREEZE SPEED SINK', 'CURSED I-PIECE +3'], cx, lat=(CX + 196, 236), lsize=12)
+    A([T('fx', CX + 210), (CX + 210, 280), (DX + 40, 280), D('rend', DX + 40)], 'FLIP, BLIND', cx, lat=(DX - 20, 274), lsize=12)
+    A([T('fx', CX + 30), (CX + 30, 270), (625, 270), D('gate', 625)], 'MIRROR, LOCK', cx, lat=(760, 264), lsize=12)
+    A([D('task', 700), (700, 480), (DX + 40, 480), D('cren', DX + 40)], 'ข้อมูลแผงภารกิจ (ข้อความ, มิเตอร์, เวลา)', cx, lat=(1000, 474), lsize=12)
+    # link
+    A([R('j5', 580), L('link', 580)], None, cl, both=True)
+    A([R('link', 545), (750, 545), (750, 175), L('core', 175)], ['ไป-กลับ: START, LOST, GARBAGE,', 'ความสูงกอง, LINKED'], cl, both=True, lat=(580, 562), lsize=12)
+    A([D('task', 560), (560, 500), (380, 500), T('link', 380)], 'ส่ง ATTACK', cx, lat=(470, 494), lsize=12)
+    A([R('link', 620), (CX + 80, 620), D('fx', CX + 80)], 'ATTACK ที่ได้รับ', cl, lat=(700, 614), lsize=12)
+    A([R('link', 655), (1250, 655), (1250, 185), L('rend', 185)], 'ความสูงคู่แข่ง (แถบ RIVAL), LINKED', cl, lat=(900, 649), lsize=12)
+    # media
+    A([D('fx', CX + 160), T('mctrl', CX + 160)], ['การโจมตี', 'วิดีโอ'], cx, lat=(CX + 205, 705), lsize=12)
+    A([R('core', 190), (1190, 190), (1190, 780), R('mctrl', 780)], ['playing,', 'result'], cc, lat=(1220, 560), lsize=12)
+    A([R('mctrl', 840), L('eng', 840)], ['play, item →', '← ready, rec_pos'], cm, both=True, ldy=-22, lsize=12)
+    A([D('mctrl', CX + 120), (CX + 120, 960), (EX - 35, 960), (EX - 35, 190), L('mix', 190)], 'show, jevil, won', cm, lat=(1300, 954), lsize=12)
+    A([D('cren', DX + 80), T('eng', DX + 80)], ['ตำแหน่งพิกเซล', 'หน้าเพื่อน'], cx, lat=(DX + 82, 590), lanchor='end', lsize=12)
+    A([R('eng', 760), (EX - 60, 760), (EX - 60, 165), L('mix', 165)], ['ภาพวิดีโอ, sprite', '↔ ตำแหน่ง Jevil'], cm, both=True, lat=(DX + 236, 700), lanchor='end', lsize=12)
+    A([R('eng', 800), (EX - 80, 800), (EX - 80, 590), L('snd', 590)], 'pcm', cm, lat=(EX - 18, 582), lsize=12)
+    A([R('eng', 870), L('flash', 870)], 'SPI 25 MHz (นาฬิกาผ่าน STARTUPE2)', cm, both=True, lat=(1750, 862), lsize=12)
+    A([R('snd', 560), L('aud', 560)], None, cs)
+    A([R('seg', 995), L('segp', 995)], None, cs)
+    f.lines(EX + 10, 662, ['tetris_sound ยังรับ: ล้างแถว/ขยะ/ชนะแพ้', 'จาก core, ภารกิจจาก chaos_task,', 'โดนโจมตีจาก chaos_fx, SW4/SW5'], 12, gap=17, color=MUTED)
+    f.lines(560, 1000, ['เส้นที่ไม่ได้วาด (ดูตารางการต่อสายในบทที่ 3):', '• x, y, frame_tick จาก vga_sync → เกือบทุกโมดูล',
+                        '• pause (SW2) → tetris_core, chaos_task, chaos_fx, tetris_render', '• lines (core) / วินาทีภารกิจ (task) → seg7_scan'], 12.5, gap=19, color=MUTED)
     return f
 
 
 def fig_fsm():
-    f = new(1560, 760)
-    W, H = 128, 48
-    P = {}
-
-    def node(k, x, y, g='core'):
-        P[k] = (x, y)
-        st, fi = C[g]
-        f.rect(x, y, W, H, st, fi, r=22, sw=2)
-        f.text(x + W / 2, y + 30, k, 14, 700, 'middle', st, mono=True)
-
-    def band(y, h, label, g):
-        st, fi = C[g]
-        f.rect(8, y, 1544, h, st, '#ffffff', r=14, sw=1.2, dash='5 4')
-        f.text(20, y + 20, label, 13, 700, 'start', st)
-
-    band(30, 120, 'เริ่มเกม / บล็อกใหม่', 'link')
-    band(190, 215, 'ทุกเฟรม (frame_tick 60 ครั้งต่อวินาที): ลองหมุน → ลองเลื่อน → ลองตก → หาเงา → ล็อกหรือยัง', 'core')
-    band(430, 150, 'เมื่อบล็อกล็อก', 'video')
-    band(600, 140, 'โบนัส CHAOS', 'chaos')
-    for i, k in enumerate(['S_IDLE', 'S_INIT', 'S_PICK', 'S_SPAWN', 'S_SPAWN_CHK']):
-        node(k, 60 + i * 190, 70, 'link')
-    row2 = ['S_PLAY', 'S_ROT', 'S_ROT_CHK', 'S_MOVE', 'S_MOVE_CHK', 'S_DOWN', 'S_DOWN_CHK', 'S_GHOST', 'S_GHOST_CHK', 'S_LOCKCHK']
-    for i, k in enumerate(row2):
-        node(k, 24 + i * 152, 262)
-    for i, k in enumerate(['S_LOCK', 'S_CLEAR', 'S_SCORE', 'S_ATTACK', 'S_HOLE', 'S_GARB']):
-        node(k, 24 + 9 * 152 - i * 200, 476, 'video')
-    node('S_SINK', 24, 660, 'chaos')
-    node('S_SINK_CHK', 230, 660, 'chaos')
-
-    def r(k): return (P[k][0] + W, P[k][1] + H / 2)
-    def l(k): return (P[k][0], P[k][1] + H / 2)
-    def t(k, dx=0): return (P[k][0] + W / 2 + dx, P[k][1])
-    def bo(k, dx=0): return (P[k][0] + W / 2 + dx, P[k][1] + H)
-
+    # same layout as the state machine in docs/learn/tetris_visual.html:
+    # a centre spine (new piece -> ghost -> lock check), the once-a-frame loop
+    # round the left, lock/clear/score up the right, garbage top right and the
+    # chaos SINK bonus far right. Every arrow is one 'state <= ...' in tetris_core.
+    S = 1.32
+    f = new(int(1180 * S), int(660 * S) + 26)
+    W, H = 124 * S, 40 * S
+    N = {
+        'S_IDLE': (100, 60), 'S_INIT': (260, 60), 'S_PICK': (420, 60), 'S_SPAWN': (580, 60),
+        'S_SPAWN_CHK': (580, 155), 'S_GHOST': (580, 250), 'S_GHOST_CHK': (580, 345), 'S_LOCKCHK': (580, 440),
+        'S_PLAY': (580, 540), 'S_ROT': (420, 540), 'S_ROT_CHK': (260, 540), 'S_MOVE': (100, 540),
+        'S_MOVE_CHK': (100, 440), 'S_DOWN': (100, 345), 'S_DOWN_CHK': (100, 250),
+        'S_LOCK': (760, 440), 'S_CLEAR': (760, 345), 'S_SCORE': (760, 250),
+        'S_ATTACK': (760, 155), 'S_HOLE': (940, 155), 'S_GARB': (940, 60),
+        'S_SINK': (1080, 440), 'S_SINK_CHK': (1080, 345)}
+    G = {'S_IDLE': 'link', 'S_INIT': 'link', 'S_PICK': 'link', 'S_SPAWN': 'link', 'S_SPAWN_CHK': 'link',
+         'S_LOCK': 'video', 'S_CLEAR': 'video', 'S_SCORE': 'video', 'S_ATTACK': 'video',
+         'S_HOLE': 'video', 'S_GARB': 'video', 'S_SINK': 'chaos', 'S_SINK_CHK': 'chaos'}
+    P = lambda x, y: (x * S, y * S + 34)
+    def T(n): return P(N[n][0], N[n][1] - 20)
+    def Bo(n): return P(N[n][0], N[n][1] + 20)
+    def Lf(n): return P(N[n][0] - 62, N[n][1])
+    def R(n): return P(N[n][0] + 62, N[n][1])
     A = f.arrow
-    A([r('S_IDLE'), l('S_INIT')], 'START', '#059669', ldy=-8)
-    A([r('S_INIT'), l('S_PICK')], None, '#059669')
-    A([r('S_PICK'), l('S_SPAWN')], '7-bag', '#059669', ldy=-8)
-    A([r('S_SPAWN'), l('S_SPAWN_CHK')], None, '#059669')
-    A([bo('S_SPAWN_CHK'), (P['S_SPAWN_CHK'][0] + W / 2, 170), (P['S_GHOST'][0] + W / 2, 170), t('S_GHOST')], 'วางได้', '#059669', lpos=0.5)
-    # connector pills
-    def pill(x, y, s, col):
-        f.rect(x, y, len(s) * 7.6 + 22, 26, col, '#ffffff', r=13, sw=1.5)
-        f.text(x + 11, y + 18, s, 12.5, 600, 'start', col)
+    cg, cc, cv, cx = C['link'][0], C['core'][0], C['video'][0], C['chaos'][0]
 
-    A([r('S_SPAWN_CHK'), (1010, 94)], None, '#dc2626')
-    pill(1012, 81, '→ S_IDLE: ไม่มีที่วาง = แพ้, ส่ง LOST', '#dc2626')
-    for a, b2 in zip(row2, row2[1:]):
-        A([r(a), l(b2)], None, C['core'][0])
-    # skip arcs below the row
-    for a, b2, lab in (('S_ROT', 'S_MOVE', 'ไม่ได้กดหมุน'), ('S_MOVE', 'S_MOVE_CHK', None), ('S_MOVE', 'S_DOWN', 'ไม่ได้กดเลื่อน'), ('S_DOWN', 'S_GHOST', 'ยังไม่ถึงเวลาตก')):
-        if b2 == 'S_MOVE_CHK':
-            continue
-        x1, x2 = P[a][0] + W / 2, P[b2][0] + W / 2
-        A([(x1, 310), (x1, 345), (x2, 345), (x2, 310)], lab, MUTED, ldy=16)
-    # loop back
-    x1, x2 = P['S_LOCKCHK'][0] + W / 2, P['S_PLAY'][0] + W / 2
-    A([(x1 + 20, 310), (x1 + 20, 378), (x2, 378), (x2, 310)], 'ยังไม่ล็อก: รอ frame_tick ถัดไป', C['core'][0], lpos=0.5, ldy=18)
-    A([bo('S_LOCKCHK', -20), (P['S_LOCKCHK'][0] + W / 2 - 20, 476)], ['พื้นใต้บล็อก 0.5 วิ', 'หรือ hard drop'], C['video'][0], ldx=-80, ldy=-2)
-    row3 = ['S_LOCK', 'S_CLEAR', 'S_SCORE', 'S_ATTACK', 'S_HOLE', 'S_GARB']
-    labs = [None, None, None, 'มีขยะรอ', None]
-    f.text(P['S_LOCK'][0] + W / 2, 544, 'ใช้ 4 clock', 12.5, 400, 'middle', C['video'][0])
-    f.text(P['S_CLEAR'][0] + W / 2, 544, '1 แถวต่อ clock', 12.5, 400, 'middle', C['video'][0])
-    for (a, b2), lab in zip(zip(row3, row3[1:]), labs):
-        A([l(a), r(b2)], lab, C['video'][0], ldy=-8)
-    A([bo('S_ATTACK'), (P['S_ATTACK'][0] + W / 2, 541)], None, C['video'][0])
-    pill(P['S_ATTACK'][0] - 10, 542, '→ S_PICK (ไม่มีขยะรอ)', C['video'][0])
-    A([bo('S_GARB'), (P['S_GARB'][0] + W / 2, 541)], None, C['video'][0])
-    pill(P['S_GARB'][0] - 70, 542, '→ S_PICK  หรือ  → S_IDLE (ล้นจอ = แพ้)', C['video'][0])
-    # sink
-    A([bo('S_PLAY'), (P['S_PLAY'][0] + W / 2, 660)], 'โบนัส SINK', C['chaos'][0], ldx=46, lpos=0.72)
-    A([r('S_SINK'), l('S_SINK_CHK')], None, C['chaos'][0])
-    A([r('S_SINK_CHK'), (420, 684)], None, C['chaos'][0])
-    pill(422, 671, '→ S_GHOST (ยังวางได้)  หรือ  → S_IDLE (แพ้)', C['chaos'][0])
-    f.lines(840, 668, ['แต่ละสถานะใช้ 1-2 clock: ทั้งรอบใช้ไม่กี่ร้อย clock', 'จาก 840,000 clock ต่อเฟรม (16.8 ms)',
-                       '"_CHK" = ดูผลจากตัวตรวจชนตัวเดียวที่ใช้ร่วมกัน'], 13.5, color=MUTED)
+    def E(pts, lab=None, col=cc, at=None, dash=None, anchor='middle'):
+        pts = [p if isinstance(p[0], float) else P(*p) for p in pts]
+        A(pts, lab, col, dash=dash, lat=P(*at) if at else None, lanchor=anchor, lsize=13)
+
+    # new game / new piece
+    E([R('S_IDLE'), Lf('S_INIT')], 'เริ่ม', cg, at=(180, 50))
+    E([R('S_INIT'), Lf('S_PICK')], None, cg)
+    E([R('S_PICK'), Lf('S_SPAWN')], 'ได้บล็อก', cg, at=(500, 50))
+    E([Bo('S_SPAWN'), T('S_SPAWN_CHK')], None, cg)
+    E([Bo('S_SPAWN_CHK'), T('S_GHOST')], 'วางได้', cg, at=(612, 207))
+    E([Lf('S_SPAWN_CHK'), (130, 155), (130, 80)], 'ไม่มีที่วาง: แพ้', '#dc2626', at=(330, 147))
+    # spine
+    E([Bo('S_GHOST'), T('S_GHOST_CHK')], None)
+    E([Bo('S_GHOST_CHK'), T('S_LOCKCHK')], 'ชนแล้ว', at=(614, 397))
+    E([Bo('S_LOCKCHK'), T('S_PLAY')], 'ยังไม่ล็อก', at=(624, 494))
+    E([R('S_LOCKCHK'), Lf('S_LOCK')], 'ล็อก', cv, at=(670, 432))
+    # frame loop (left)
+    E([Lf('S_PLAY'), R('S_ROT')], 'frame_tick', at=(500, 512))
+    E([Lf('S_ROT'), R('S_ROT_CHK')], 'กดหมุน', at=(345, 512))
+    E([Lf('S_ROT_CHK'), R('S_MOVE')], 'หมุนได้ / ลองครบ 5 ที่', at=(170, 512))
+    E([T('S_MOVE'), Bo('S_MOVE_CHK')], 'กดซ้าย/ขวา', at=(108, 496), anchor='start')
+    E([T('S_MOVE_CHK'), Bo('S_DOWN')], None)
+    E([T('S_DOWN'), Bo('S_DOWN_CHK')], 'ถึงเวลาตก / กดตกช้า', at=(108, 302), anchor='start')
+    E([R('S_DOWN_CHK'), Lf('S_GHOST')], None)
+    E([Bo('S_ROT'), (420, 600), (100, 600), Bo('S_MOVE')], 'ไม่ได้กดหมุน', MUTED, at=(260, 618), dash='6 4')
+    E([Lf('S_MOVE'), (22, 540), (22, 345), Lf('S_DOWN')], 'ไม่ได้กดเลื่อน', MUTED, at=(28, 396), dash='6 4', anchor='start')
+    E([R('S_DOWN'), (470, 345), (470, 262), (518, 262)], 'ไม่ต้องตก', MUTED, at=(300, 337), dash='6 4')
+    # lock, clear, score (right)
+    E([T('S_LOCK'), Bo('S_CLEAR')], 'เขียนครบ 4 แถว', cv, at=(770, 397), anchor='start')
+    E([T('S_CLEAR'), Bo('S_SCORE')], 'ลบแถวเต็มเสร็จ', cv, at=(770, 318), anchor='start')
+    E([T('S_SCORE'), Bo('S_ATTACK')], 'นับแถวเสร็จ', cv, at=(770, 207), anchor='start')
+    E([T('S_ATTACK'), (760, 18), (420, 18), T('S_PICK')], 'บล็อกถัดไป', cv, at=(560, 12))
+    E([R('S_ATTACK'), Lf('S_HOLE')], 'มีขยะรอ', cv, at=(850, 147))
+    E([T('S_HOLE'), Bo('S_GARB')], 'สุ่มช่องว่างได้', cv, at=(950, 112), anchor='start')
+    E([(900, 40), (900, 31), (445, 31), (445, 40)], None, cv)
+    f.text(*P(800, 27), 'ดันครบ', 13, 400, 'middle', cv)
+    E([(980, 40), (980, 2), (100, 2), T('S_IDLE')], 'ดันจนล้นจอ: แพ้', '#dc2626', at=(1060, 8))
+    # chaos SINK (far right)
+    E([Bo('S_PLAY'), (580, 588), (1080, 588), Bo('S_SINK')], 'sink_left > 0 (เพิ่งได้โบนัส SINK)', cx, at=(830, 604))
+    E([T('S_SINK'), Bo('S_SINK_CHK')], 'เลื่อนครบ', cx, at=(1088, 397), anchor='start')
+    E([T('S_SINK_CHK'), (1080, 292), (670, 292), (670, 250), R('S_GHOST')], 'บล็อกยังวางได้', cx, at=(900, 286))
+    # self loops: state stays for several clocks
+    loops = {'S_IDLE': ('b', 'รอเริ่ม'), 'S_PICK': ('b', 'สุ่มใหม่'), 'S_PLAY': ('r', 'รอ frame_tick'),
+             'S_ROT_CHK': ('t', 'ลอง kick ถัดไป'), 'S_GHOST_CHK': ('l', 'ลงอีก 1 แถว'), 'S_LOCK': ('r', 'แถวถัดไป'),
+             'S_CLEAR': ('r', '1 แถว/clock'), 'S_SCORE': ('r', '1 แถว/clock'), 'S_HOLE': ('r', 'สุ่มใหม่'),
+             'S_GARB': ('r', '1 แถว/clock'), 'S_SINK': ('l', '1 แถว/clock'), 'S_SINK_CHK': ('l', 'ยกบล็อก 1 แถว')}
+    for n, (side, lab) in loops.items():
+        cx0, cy0 = P(*N[n])
+        col = C[G.get(n, 'core')][0]
+        if side == 'r':
+            x0 = cx0 + W / 2
+            d = f'M{x0},{cy0 - 10} C{x0 + 40},{cy0 - 28} {x0 + 40},{cy0 + 28} {x0 + 2},{cy0 + 10}'
+            tx, ty, an = x0 + 36, cy0 + 5, 'start'
+        elif side == 'l':
+            x0 = cx0 - W / 2
+            d = f'M{x0},{cy0 - 10} C{x0 - 40},{cy0 - 28} {x0 - 40},{cy0 + 28} {x0 - 2},{cy0 + 10}'
+            tx, ty, an = x0 - 36, cy0 + 30, 'end'
+        elif side == 't':
+            y0 = cy0 - H / 2
+            d = f'M{cx0 - 18},{y0} C{cx0 - 30},{y0 - 40} {cx0 + 30},{y0 - 40} {cx0 + 18},{y0 - 2}'
+            tx, ty, an = cx0 - 34, y0 - 30, 'end'
+        else:
+            y0 = cy0 + H / 2
+            d = f'M{cx0 - 18},{y0} C{cx0 - 30},{y0 + 40} {cx0 + 30},{y0 + 40} {cx0 + 18},{y0 + 2}'
+            tx, ty, an = cx0 + 32, y0 + 30, 'start'
+        mid = col.replace('#', '')
+        f.markers.add(col)
+        f.add(f'<path d="{d}" fill="none" stroke="{col}" stroke-width="1.8" marker-end="url(#a{mid})"/>')
+        f.labels.append(f'<text x="{tx}" y="{ty}" font-family="{FONT}" font-size="12" text-anchor="{an}" fill="{col}" '
+                        f'paint-order="stroke" stroke="#fff" stroke-width="5" stroke-linejoin="round">{esc(lab)}</text>')
+    for n, (x, y) in N.items():
+        g = G.get(n, 'core')
+        st, fi = C[g]
+        px, py = P(x, y)
+        f.rect(px - W / 2, py - H / 2, W, H, st, fi, r=10, sw=2)
+        f.text(px, py + 6, n, 15, 700, 'middle', st, mono=True)
+    # captions
+    f.text(*P(250, 390), 'ทุกเฟรม (60 ครั้ง/วินาที):', 14, 700, 'start', cc)
+    f.lines(*P(250, 410), ['ลองหมุน → ลองเลื่อน → ลองตก', '→ หาเงา → ล็อกหรือยัง', 'แต่ละขั้น 1 clock (20 ns)'], 13, color=MUTED)
+    f.text(*P(180, 118), 'คู่แข่งแพ้ (ได้ LOST) ในสถานะใดก็ได้ → S_IDLE = ชนะ', 13, 700, 'start', '#dc2626')
+    f.text(*P(1080, 500), 'โบนัส SINK', 14, 700, 'middle', cx)
+    f.text(*P(940, 230), 'ขยะจากคู่แข่ง', 14, 700, 'middle', cv)
+    f.text(*P(830, 520), 'ล็อก → ล้างแถว → นับ', 14, 700, 'middle', cv)
     return f
 
 
@@ -442,49 +505,84 @@ def fig_media_path():
 
 
 def fig_flash():
-    f = new(1500, 560)
+    # addresses read from media/game_media.bin (header + directory), see
+    # tools/make_game_media.py layout(): items in order, sprite block LAST
+    f = new(1500, 900)
     x0, x1 = 40, 1460
-    sc = (x1 - x0) / 8.0
-    f.text(40, 36, 'แผนที่หน่วยความจำแฟลช 8 MB (S25FL064L)', 19, 700)
-    segs = [(0, 0.54, 'ไฟล์ .bit', 'core'), (0.54, 1.0, 'ว่าง', 'pin'), (1.0, 7.86, 'game_media.bin (6.86 MB)', 'media'), (7.86, 8.0, '', 'pin')]
-    for a, b2, t, g in segs:
+    MB = 1 << 20
+    sc = (x1 - x0) / (8 * MB)
+    f.text(40, 34, 'ชิปแฟลช 8 MB (S25FL064L): ที่อยู่ 0x000000 - 0x7FFFFF', 19, 700)
+    top = [(0, 0x83956, 'ไฟล์ .bit', 'core'), (0x83956, 0x100000, 'ว่าง', 'pin'),
+           (0x100000, 0x78BA00, 'game_media.bin  6,863,360 ไบต์ (0x100000 - 0x78B9FF)', 'media'), (0x78BA00, 0x800000, 'ว่าง', 'pin')]
+    for a, b2, t, g in top:
         st, fi = C[g]
-        f.rect(x0 + a * sc, 60, (b2 - a) * sc, 70, st, fi, r=4, sw=1.5)
-        if t:
-            f.text(x0 + (a + b2) / 2 * sc, 101, t, 14, 700, 'middle', st)
-    for mb in range(9):
-        f.text(x0 + mb * sc, 152, f'{mb} MB', 12.5, 400, 'middle', MUTED, mono=True)
-    # zoom
-    zx = x0 + 1.0 * sc
-    f.add(f'<path d="M{zx},130 L{x0},200 M{x0 + 7.86 * sc},130 L{x1},200" stroke="{LINE}" stroke-dasharray="4 4"/>')
-    parts = [('header', 24, '"TDM2" + กลุ่มรายการ'), ('directory', 24, '16 ไบต์ต่อรายการ'), ('sprite block', 34, 'Jevil 8 ท่า, หน้า 4 รูป'),
-             ('records ของแต่ละรายการ', 50, 'header 8 ไบต์ + เสียง'), ('ภาพ delta + RLE', 70, 'เก็บครั้งเดียว ใช้ซ้ำได้')]
-    tot = sum(p[1] for p in parts)
+        f.rect(x0 + a * sc, 50, (b2 - a) * sc, 60, st, fi, r=3, sw=1.5)
+        f.text(x0 + (a + b2) / 2 * sc, 86, t, 13.5 if g != 'pin' else 12, 700, 'middle', st)
+    for adr in (0, 0x100000, 0x200000, 0x300000, 0x400000, 0x500000, 0x600000, 0x700000, 0x800000):
+        f.text(x0 + adr * sc, 128, f'0x{adr:06X}', 11.5, 400, 'middle', MUTED, mono=True)
+    f.text(x0 + 0x40000 * sc, 146, '(~527 KB ถ้าเขียน .bit ลงแฟลช)', 11.5, 400, 'middle', MUTED)
+    # the file, item by item, in the order it is stored
+    items = [(0x100000, 0x100200, 'header + directory', 'pc'),
+             (0x100200, 0x216500, 'เพลง 1', 'sound'), (0x216500, 0x2BB200, 'เพลง 2', 'sound'),
+             (0x2BB200, 0x405600, 'Bad Apple!!', 'chaos'), (0x405600, 0x589900, 'OIIA OIIA', 'chaos'),
+             (0x589900, 0x5DF300, 'Jevil', 'chaos'),
+             (0x5DF300, 0x6C6900, 'แพ้: rickroll', 'link'), (0x6C6900, 0x6E6C00, 'แพ้: อื่นๆ 7', 'link'),
+             (0x6E6C00, 0x783600, 'ชนะ: yippee', 'core'), (0x783600, 0x788200, 'ชนะ 3', 'core'),
+             (0x788200, 0x78BA00, 'sprite', 'media')]
+    y = 200
+    f.add(f'<path d="M{x0 + 0x100000 * sc},110 L{x0},{y} M{x0 + 0x78BA00 * sc},110 L{x1},{y}" stroke="{LINE}" stroke-dasharray="4 4" fill="none"/>')
+    s2 = (x1 - x0) / (0x78BA00 - 0x100000)
+    for a, b2, t, g in items:
+        st, fi = C[g]
+        xa, xb = x0 + (a - 0x100000) * s2, x0 + (b2 - 0x100000) * s2
+        f.rect(xa, y, max(3, xb - xa), 64, st, fi, r=2, sw=1.4)
+        if xb - xa > 70:
+            f.text((xa + xb) / 2, y + 30, t, 13, 700, 'middle', st)
+            f.text((xa + xb) / 2, y + 50, f'0x{a:06X}', 11, 400, 'middle', INK, mono=True)
+    f.text(x0, y - 10, 'ข้างใน game_media.bin เรียงตามที่เก็บจริง (ตัวเลข = ที่อยู่เริ่มของแต่ละส่วนในแฟลช)', 15, 700)
+    # callouts for the two tiny parts at the very start and the very end
+    f.arrow([(x0 + 2, y + 64), (x0 + 2, y + 96), (x0 + 30, y + 96)], None, C['pc'][0])
+    f.lines(x0 + 36, y + 101, ['header 16 ไบต์ @ 0x100000 ("TDM2", กลุ่มรายการ, ที่อยู่ sprite = 0x788200)',
+                               'directory 17 × 16 ไบต์ @ 0x100010 (ที่อยู่ palette / record ของแต่ละรายการ)'], 13, gap=19)
+    f.arrow([(x1 - 2, y + 64), (x1 - 2, y + 96), (x1 - 30, y + 96)], None, C['media'][0])
+    f.lines(x1 - 36, y + 101, ['sprite block อยู่ท้ายสุด @ 0x788200 - 0x78B97F', 'โหลดครั้งเดียวตอนเปิดเครื่อง (ดูด้านล่าง)'], 13, gap=19, anchor='end')
+    f.text(x0, y + 160, 'แต่ละรายการ = palette → records → ภาพ (แต่ละรายการเริ่มที่ที่อยู่หาร 256 ลงตัว)', 13.5, 400, 'start', MUTED)
+    # sprite block zoom
+    y2 = 410
+    f.text(40, y2 - 12, 'sprite block (14,208 ไบต์) ซูม', 15, 700)
+    parts = [(0x788200, 512, 'palette 256 สี × 2 ไบต์', 'สี 1-15 = Jevil, 16-255 = หน้า'),
+             (0x788400, 9600, 'Jevil 8 ท่า × 48 × 50 พิกเซล', '4 บิตต่อพิกเซล (2 พิกเซลต่อไบต์)'),
+             (0x78A980, 4096, 'หน้าเพื่อน 4 รูป × 32 × 32', '1 ไบต์ต่อพิกเซล')]
     xx = x0
-    for nm, wv, ds in parts:
-        w = (x1 - x0) * wv / tot
-        f.rect(xx, 200, w, 80, C['media'][0], C['media'][1], r=4, sw=1.5)
-        f.text(xx + w / 2, 233, nm, 14, 700, 'middle', C['media'][0])
-        f.text(xx + w / 2, 257, ds, 12, 400, 'middle', INK)
+    widths = [260, 760, 400]
+    for (a, n, t, d), w in zip(parts, widths):
+        f.rect(xx, y2, w, 74, C['media'][0], C['media'][1], r=4, sw=1.5)
+        f.text(xx + w / 2, y2 + 26, t, 13.5, 700, 'middle', C['media'][0])
+        f.text(xx + w / 2, y2 + 46, d, 12, 400, 'middle', INK)
+        f.text(xx + w / 2, y2 + 65, f'0x{a:06X}  ({n:,} ไบต์)', 11.5, 400, 'middle', MUTED, mono=True)
         xx += w
     # one record
-    f.text(40, 330, 'หนึ่ง record (เช่น วิดีโอ 10 fps = 0.1 วินาที)', 17, 700)
+    y3 = 560
+    f.text(40, y3, 'หนึ่ง record ของรายการที่มีเสียง (เช่น วิดีโอ 10 fps = 0.1 วินาที)', 15, 700)
     rx = 40
-    rec = [('ที่อยู่ภาพ', 140), ('ความยาวภาพ', 140), ('ADPCM pred', 120), ('idx', 60), ('เสียง 800 ไบต์ (1,600 ตัวอย่าง × 4 บิต)', 560)]
+    rec = [('ที่อยู่ภาพ 3 ไบต์', 170), ('ความยาวภาพ 2', 150), ('ADPCM pred 2', 140), ('idx 1', 70), ('เสียง 800 ไบต์ = 1,600 ตัวอย่าง × 4 บิต', 560)]
     for nm, w in rec:
         g = 'media' if 'เสียง' not in nm else 'sound'
-        f.rect(rx, 345, w, 54, C[g][0], C[g][1], r=4, sw=1.5)
-        f.text(rx + w / 2, 378, nm, 13.5, 600, 'middle', C[g][0])
+        f.rect(rx, y3 + 14, w, 52, C[g][0], C[g][1], r=4, sw=1.5)
+        f.text(rx + w / 2, y3 + 46, nm, 13, 600, 'middle', C[g][0])
         rx += w
-    f.text(40, 422, '└──── header 8 ไบต์ ────┘', 13, 400, 'start', MUTED, mono=True)
+    f.text(40, y3 + 88, '└────── header 8 ไบต์ ──────┘', 13, 400, 'start', MUTED, mono=True)
+    f.text(1140, y3 + 46, 'record r อยู่ที่ record0 + r × (8 + aud)', 13, 400, 'start', MUTED)
     # rle codes
-    f.text(40, 470, 'รหัส run-length ของภาพ (1 ไบต์ควบคุม)', 17, 700)
-    codes = [('00nnnnnn', 'SKIP', 'ข้าม n+1 พิกเซลที่ไม่เปลี่ยน'), ('01nnnnnn', 'FILL', 'เติม n+1 พิกเซลด้วยสีในไบต์ถัดไป'), ('1nnnnnnn', 'COPY', 'n+1 พิกเซลตามมาแบบเรียงบิต')]
+    y4 = 700
+    f.text(40, y4, 'รหัสของภาพแบบ delta + run-length (1 ไบต์ควบคุม)', 15, 700)
+    codes = [('00nnnnnn', 'SKIP', 'ข้าม n+1 พิกเซล (เหมือนภาพก่อน)'), ('01nnnnnn c', 'FILL', 'เติม n+1 พิกเซลด้วยสี c'), ('1nnnnnnn …', 'COPY', 'n+1 พิกเซลตามมา บิตเรียงกัน')]
     for i, (b2, nm, ds) in enumerate(codes):
         x = 40 + i * 475
-        f.rect(x, 488, 455, 56, C['video'][0], C['video'][1], r=6, sw=1.5)
-        f.text(x + 14, 522, b2, 15, 700, 'start', C['video'][0], mono=True)
-        f.text(x + 120, 522, f'{nm}: {ds}', 14, 400, 'start', INK)
+        f.rect(x, y4 + 16, 455, 56, C['video'][0], C['video'][1], r=6, sw=1.5)
+        f.text(x + 14, y4 + 50, b2, 14, 700, 'start', C['video'][0], mono=True)
+        f.text(x + 132, y4 + 50, f'{nm}: {ds}', 13.5, 400, 'start', INK)
+    f.text(40, y4 + 110, 'ภาพ 160 × 120 พิกเซล เรียงทีละแถว (โหมด panel 96 × 88) · ภาพแรกของรายการไม่มี SKIP · ทุกค่าเก็บแบบ little-endian', 13, 400, 'start', MUTED)
     return f
 
 
@@ -623,8 +721,8 @@ def fig_chaos():
     f.box(310, 60, 250, 110, 'ผู้เล่นทำด้วยสวิตช์', ['8 ตัวซ้าย', 'ไปพร้อมกับเล่นเตตริส'], 'in', mono=False)
     f.box(620, 20, 230, 80, 'สำเร็จ', [], 'link', mono=False)
     f.box(620, 130, 230, 80, 'หมดเวลา', ['ไม่มีอะไรเกิดขึ้น'], 'pin', mono=False)
-    f.box(920, 20, 230, 80, 'โจมตี (5/8)', ['ถ้าเชื่อมบอร์ดอยู่'], 'chaos', mono=False)
-    f.box(920, 130, 230, 80, 'โบนัส (3/8)', ['FREEZE SINK I-PIECE'], 'link', mono=False)
+    f.box(920, 20, 230, 80, 'โอกาส 62.5 %: โจมตี', ['(5 ใน 8, ต้องเชื่อมบอร์ด)'], 'chaos', mono=False)
+    f.box(920, 130, 230, 80, 'โอกาส 37.5 %: โบนัส', ['FREEZE / SINK / I-PIECE'], 'link', mono=False)
     f.box(1200, 20, 180, 80, 'จอคู่แข่ง', ['ผ่าน ATTACK id'], 'core', mono=False)
     A([(250, 115), (310, 115)])
     A([(560, 100), (620, 60)])

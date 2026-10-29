@@ -4,7 +4,13 @@
 # Writes 2.1_Proposal\Proposal.docx and 2.3_Design_Document\Design_Document.docx.
 # Only the Markdown this folder uses is understood: # headings, paragraphs,
 # * / - / 1. lists, | tables |, ![caption](picture), > quotes, ``` code,
-# **bold**, *italic*, `code`.
+# **bold**, *italic*, `code`. Plus three directives (one per line):
+#   <!-- CODE: path | first-line regex | last-line regex -->
+#        lines of a source file (path from the project folder) with their
+#        real line numbers: from the first line matching the first regex to
+#        the next line matching the second one
+#   <!-- SOURCE: path -->     a whole source file (the code appendix)
+#   <!-- PAGEBREAK -->
 import os, re, sys
 from docx import Document
 from docx.enum.section import WD_ORIENT
@@ -15,6 +21,7 @@ from docx.oxml.ns import qn
 from docx.shared import Cm, Pt, RGBColor
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+ROOT = os.path.dirname(HERE)
 FONT, MONO = 'Sarabun', 'Consolas'
 ACCENT = RGBColor(0x4C, 0x1D, 0x95)
 
@@ -116,7 +123,7 @@ def add_table(doc, rows):
             if i == 0 and not empty_hdr:
                 shade(c, 'EDE9FE')
     # column widths in proportion to the longest text in each column
-    weight = [min(max(len(r[j]) if j < len(r) else 0 for r in data), 45) + 6 for j in range(ncol)]
+    weight = [max(min(max(len(r[j]) if j < len(r) else 0 for r in data), 45), 14) + 6 for j in range(ncol)]
     t.autofit = False
     for j in range(ncol):
         wcm = Cm(16.6 * weight[j] / sum(weight))
@@ -134,9 +141,70 @@ def add_picture(doc, md_dir, cap, path):
     from PIL import Image
     w, h = Image.open(full).size
     width = 16.5 if w / h > 1.1 else 11.0
+    if width * h / w > 21.5:                        # too tall for the page
+        width = 21.5 * w / h
     p.add_run().add_picture(full, width=Cm(width))
     c = doc.add_paragraph(); c.alignment = WD_ALIGN_PARAGRAPH.CENTER
     r = c.add_run(cap); set_font(r, FONT, 10, None, RGBColor(0x5B, 0x64, 0x75)); r.italic = True
+
+
+def code_lines(doc, lines, first_no=None, size=8.5):
+    """source lines on a light grey background, Consolas, with line numbers"""
+    for k, ln in enumerate(lines):
+        p = doc.add_paragraph()
+        pf = p.paragraph_format
+        pf.space_after = Pt(0); pf.space_before = Pt(0); pf.line_spacing = 1.0
+        pf.left_indent = Cm(0.2)
+        ppr = p._element.get_or_add_pPr()
+        sh = OxmlElement('w:shd')
+        sh.set(qn('w:val'), 'clear'); sh.set(qn('w:color'), 'auto'); sh.set(qn('w:fill'), 'F4F5F7')
+        ppr.append(sh)
+        if first_no is not None:
+            r = p.add_run(f'{first_no + k:4d}  '); set_font(r, MONO, size, None, RGBColor(0x8A, 0x93, 0xA3))
+        r = p.add_run(ln.rstrip('\n').replace('\t', '    ') or ' '); set_font(r, MONO, size)
+    doc.add_paragraph().paragraph_format.space_after = Pt(2)
+
+
+def code_excerpt(doc, spec):
+    path, a, b = [x.strip() for x in spec.split('|')]
+    src = open(os.path.join(ROOT, path), encoding='utf-8').read().split('\n')
+    i = next(k for k, l in enumerate(src) if re.search(a, l))
+    j = next(k for k in range(i, len(src)) if re.search(b, src[k]))
+    cap = doc.add_paragraph()
+    cap.paragraph_format.space_after = Pt(1); cap.paragraph_format.keep_with_next = True
+    r = cap.add_run(f'{path}  บรรทัด {i + 1}-{j + 1}'); set_font(r, MONO, 8.5, True, RGBColor(0x4C, 0x1D, 0x95))
+    code_lines(doc, src[i:j + 1], i + 1)
+
+
+def source_file(doc, path):
+    src = open(os.path.join(ROOT, path), encoding='utf-8').read().rstrip('\n').split('\n')
+    h = doc.add_heading('', level=3)
+    add_inline(h, f'`{path}` ({len(src):,} บรรทัด)')
+    code_lines(doc, src, 1, size=7.5)
+
+
+def new_numbering(doc, style_name):
+    """a new w:num for a numbered list, so that each list starts again at 1"""
+    numbering = doc.part.numbering_part.element
+    numpr = doc.styles[style_name].element.pPr.find(qn('w:numPr'))
+    num_id = numpr.find(qn('w:numId')).get(qn('w:val'))
+    abstract = next(n.find(qn('w:abstractNumId')).get(qn('w:val'))
+                    for n in numbering.findall(qn('w:num')) if n.get(qn('w:numId')) == num_id)
+    new_id = max(int(n.get(qn('w:numId'))) for n in numbering.findall(qn('w:num'))) + 1
+    num = OxmlElement('w:num'); num.set(qn('w:numId'), str(new_id))
+    an = OxmlElement('w:abstractNumId'); an.set(qn('w:val'), abstract); num.append(an)
+    ov = OxmlElement('w:lvlOverride'); ov.set(qn('w:ilvl'), '0')
+    so = OxmlElement('w:startOverride'); so.set(qn('w:val'), '1'); ov.append(so); num.append(ov)
+    numbering.append(num)
+    return new_id
+
+
+def set_num(p, num_id):
+    ppr = p._element.get_or_add_pPr()
+    numpr = OxmlElement('w:numPr')
+    il = OxmlElement('w:ilvl'); il.set(qn('w:val'), '0'); numpr.append(il)
+    ni = OxmlElement('w:numId'); ni.set(qn('w:val'), str(num_id)); numpr.append(ni)
+    ppr.append(numpr)
 
 
 def convert(md_path, out_path, chapter_breaks):
@@ -148,6 +216,7 @@ def convert(md_path, out_path, chapter_breaks):
     doc = Document()
     setup(doc)
     i, para, first_h2 = 0, [], True
+    list_num = None                                 # numbering of the numbered list in progress
 
     def flush():
         nonlocal para
@@ -159,13 +228,23 @@ def convert(md_path, out_path, chapter_breaks):
     while i < len(lines):
         ln = lines[i]
         s = ln.strip()
+        if s and not re.match(r'^\d+\.\s', ln) and not ln.startswith('  '):
+            list_num = None                         # any other block ends a numbered list
+        m = re.match(r'^<!--\s*(CODE|SOURCE|PAGEBREAK)\s*:?\s*(.*?)\s*-->$', s)
+        if m:
+            flush()
+            if m.group(1) == 'CODE':
+                code_excerpt(doc, m.group(2))
+            elif m.group(1) == 'SOURCE':
+                source_file(doc, m.group(2))
+            else:
+                doc.add_paragraph().add_run().add_break(WD_BREAK.PAGE)
+            i += 1; continue
         if s.startswith('```'):
-            flush(); i += 1
+            flush(); i += 1; blk = []
             while i < len(lines) and not lines[i].strip().startswith('```'):
-                p = doc.add_paragraph(); p.paragraph_format.space_after = Pt(0)
-                p.paragraph_format.left_indent = Cm(0.6)
-                r = p.add_run(lines[i]); set_font(r, MONO, 9.5)
-                i += 1
+                blk.append(lines[i]); i += 1
+            code_lines(doc, blk, None, size=9)
             i += 1; continue
         m = re.match(r'^(#{1,4})\s+(.*)$', s)
         if m:
@@ -199,6 +278,10 @@ def convert(md_path, out_path, chapter_breaks):
                 i += 1; item += ' ' + lines[i].strip()
             style = 'List Number' if m.group(2)[0].isdigit() else 'List Bullet'
             p = doc.add_paragraph(style=style)
+            if style == 'List Number' and not m.group(1):
+                if list_num is None:
+                    list_num = new_numbering(doc, 'List Number')
+                set_num(p, list_num)
             if m.group(1):
                 p.paragraph_format.left_indent = Cm(1.6)
             box = '☐ ' if m.group(3) else ''

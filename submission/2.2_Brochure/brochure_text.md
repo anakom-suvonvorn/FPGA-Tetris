@@ -21,7 +21,7 @@
 
 **ฟอนต์ที่ใช้ในตัวอย่าง** (มีใน Canva ทั้งหมด): หัวข้อ **Kanit** (หนา), เนื้อความ **Sarabun**, โลโก้ **Press Start 2P**
 **สี:** พื้น `#11163A` (น้ำเงินเข้ม), สีบล็อกเตตริส I `#22D3EE` O `#FACC15` T `#A855F7` S `#22C55E` Z `#EF4444` J `#3B82F6` L `#F97316`, ชมพูสื่อ `#F472B6`
-**รูป:** `figures/screenshot_versus.png`, `screenshot_chaos_flip.png` (ปก), `screenshot_chaos_task.png` (P4), `screenshot_win.png` (P5)
+**รูป:** `figures/screenshot_chaos_on.png`, `screenshot_chaos_flip.png` (ปก: โหมด CHAOS เปิด / โดนโจมตี + หน้าเพื่อนบนลูกบอล), `screenshot_chaos_task.png` (P4), `screenshot_win.png` (P5)
 แนะนำให้ **เปลี่ยนเป็นรูปถ่ายจริง** ของบอร์ดสองบอร์ดกับจอขณะเล่น (ดูน่าเชื่อกว่าภาพจากการจำลอง)
 **พิมพ์:** พื้นเข้มเต็มหน้าใช้หมึกเยอะ และเครื่องพิมพ์ทั่วไปจะมีขอบขาว ถ้าอยากประหยัดหมึก ให้กลับเป็นพื้นขาวแล้วใช้สีบล็อกเป็นสีเน้น
 
