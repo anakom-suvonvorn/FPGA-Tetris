@@ -132,7 +132,7 @@ def add_table(doc, rows):
     doc.add_paragraph().paragraph_format.space_after = Pt(2)
 
 
-def add_picture(doc, md_dir, cap, path):
+def add_picture(doc, md_dir, cap, path, fixed=None):
     full = os.path.normpath(os.path.join(md_dir, path))
     if not os.path.exists(full):
         p = doc.add_paragraph(); add_inline(p, f'[รูป: {cap}]'); return
@@ -143,6 +143,8 @@ def add_picture(doc, md_dir, cap, path):
     width = 16.5 if w / h > 1.1 else 11.0
     if width * h / w > 21.5:                        # too tall for the page
         width = 21.5 * w / h
+    if fixed:                                       # ![cap](path){w=4} = 4 cm wide
+        width = fixed
     p.add_run().add_picture(full, width=Cm(width))
     c = doc.add_paragraph(); c.alignment = WD_ALIGN_PARAGRAPH.CENTER
     r = c.add_run(cap); set_font(r, FONT, 10, None, RGBColor(0x5B, 0x64, 0x75)); r.italic = True
@@ -266,9 +268,9 @@ def convert(md_path, out_path, chapter_breaks):
             while i < len(lines) and lines[i].strip().startswith('|'):
                 rows.append(lines[i]); i += 1
             add_table(doc, rows); continue
-        m = re.match(r'^!\[(.*?)\]\((.*?)\)$', s)
+        m = re.match(r'^!\[(.*?)\]\((.*?)\)(?:\{w=([\d.]+)\})?$', s)
         if m:
-            flush(); add_picture(doc, md_dir, m.group(1), m.group(2)); i += 1; continue
+            flush(); add_picture(doc, md_dir, m.group(1), m.group(2), m.group(3) and float(m.group(3))); i += 1; continue
         m = re.match(r'^(\s*)([*-]|\d+\.)\s+(\[[ x]\]\s+)?(.*)$', ln)
         if m and s:
             flush()

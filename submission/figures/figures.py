@@ -571,7 +571,10 @@ def fig_flash():
         f.rect(rx, y3 + 14, w, 52, C[g][0], C[g][1], r=4, sw=1.5)
         f.text(rx + w / 2, y3 + 46, nm, 13, 600, 'middle', C[g][0])
         rx += w
-    f.text(40, y3 + 88, '└────── header 8 ไบต์ ──────┘', 13, 400, 'start', MUTED, mono=True)
+    hx1 = 40 + sum(w for nm, w in rec[:4])  # header = first 4 fields (3+2+2+1 bytes)
+    by = y3 + 76
+    f.add(f'<path d="M42 {by - 6} V{by} H{hx1 - 2} V{by - 6}" fill="none" stroke="{MUTED}" stroke-width="1.5"/>')
+    f.text((40 + hx1) / 2, by + 18, 'header 8 ไบต์', 13, 600, 'middle', MUTED)
     f.text(1140, y3 + 46, 'record r อยู่ที่ record0 + r × (8 + aud)', 13, 400, 'start', MUTED)
     # rle codes
     y4 = 700

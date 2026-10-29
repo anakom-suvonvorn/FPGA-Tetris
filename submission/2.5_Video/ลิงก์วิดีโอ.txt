@@ -1,0 +1,3 @@
+Tetris Duel: CHAOS Edition
+วิดีโอ (YouTube): https://youtu.be/YtPQ8QKf48c
+ซอร์สโค้ด (GitHub): https://github.com/anakom-suvonvorn/FPGA-Tetris

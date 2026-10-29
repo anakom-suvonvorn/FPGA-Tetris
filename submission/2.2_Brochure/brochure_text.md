@@ -97,7 +97,8 @@
 > ชนกภูมิ สันติอัศวราภรณ์ 68011641
 
 **QR + ลิงก์**
-> ดูวิดีโอแนะนำ: สแกนเลย หรือเปิด [youtu.be/xxxx] + [QR code]
+> ดูวิดีโอแนะนำ: สแกนเลย หรือเปิด youtu.be/YtPQ8QKf48c + QR code (ไฟล์ `submission/figures/qr_video.png`)
+> โค้ดทั้งหมดบน GitHub: github.com/anakom-suvonvorn/FPGA-Tetris
 
 **ตัวเล็กล่างสุด**
 > 01076113 Digital System Fundamentals 2569

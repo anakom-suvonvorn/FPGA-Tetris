@@ -13,6 +13,18 @@ something important changes. Durable facts also live in Claude's memory
 
 ## 0. Where we are RIGHT NOW (start here)
 
+### Latest (2026-10-30, round 3)
+* Video: https://youtu.be/YtPQ8QKf48c (QR `submission/figures/qr_video.png`);
+  code: https://github.com/anakom-suvonvorn/FPGA-Tetris. Both are on the doc
+  cover, appendix ก, brochure, video script, demo sheet, READMEs and
+  `2.5_Video/ลิงก์วิดีโอ.txt`.
+* User asked: no full-source appendix (link GitHub instead) and no VHDL
+  syntax primer. Appendices are now ก files, ข Vivado schematics. Doc ~68 pages.
+* New 9.1 "finished piece" with the team's photos (`figures/final_result.jpg`,
+  `just_board_with_3d_printed_on.jpg`): they 3D-printed a labelled cover +
+  big buttons for each board.
+* build_docs: `![cap](path){w=3.5}` sets a fixed image width in cm.
+
 ### Latest (2026-10-30 night): docs round 2 after the user's review
 * TA hint (via a friend): the Design Document must let someone who knows
   nothing about FPGAs rebuild the project, and must contain the code. The

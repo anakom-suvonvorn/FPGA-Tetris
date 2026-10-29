@@ -5,6 +5,8 @@ written in VHDL. Final project for Digital System Fundamentals (01076113),
 CE KMITL, 2569. Everything runs inside the FPGA: game logic, VGA picture,
 sound, and the link between the boards.
 
+**Video:** https://youtu.be/YtPQ8QKf48c
+
 > **This is the `media` branch.** Everything on `chaos` **plus media from the board's SPI flash chip**: real music, three video attacks that play behind the rival's game (Bad Apple, OIIA OIIA, Jevil), a random clip or picture when you win or lose, Jevil floating over the screen and friends' faces on the bouncers.
 
 ## The three branches

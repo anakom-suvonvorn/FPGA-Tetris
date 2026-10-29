@@ -111,8 +111,9 @@
   .members { margin: auto 0; border-radius: 3mm; padding: 3.5mm 4mm; background: rgba(255,255,255,.06); border: .35mm solid rgba(255,255,255,.14); }
   .members .who { font-size: 9.4pt; line-height: 1.6; margin-top: 1.5mm; }
   .qrbox { display: flex; gap: 4mm; align-items: center; }
-  .qr { width: 26mm; height: 26mm; flex: none; background: #fff; border-radius: 2mm; color: #111; display: grid; place-items: center;
-    font-family: 'Kanit'; font-size: 8pt; text-align: center; line-height: 1.2; }
+  .qr { width: 26mm; height: 26mm; flex: none; background: #fff; border-radius: 2mm; overflow: hidden; }
+  .qr img { width: 100%; height: 100%; display: block; image-rendering: pixelated; }
+  .qrbox .t .url { color: var(--ink); font-size: 8.6pt; }
   .qrbox .t { font-size: 9pt; color: var(--muted); line-height: 1.45; }
   .qrbox .t b { display: block; font-family: 'Kanit'; font-size: 12pt; color: var(--ink); font-weight: 600; }
   .fine { margin-top: 4mm; font-size: 7.6pt; color: var(--muted); line-height: 1.45; border-top: .3mm solid rgba(255,255,255,.12); padding-top: 2.5mm; }
@@ -212,8 +213,8 @@
         </div>
       </div>
       <div class="qrbox">
-        <div class="qr">[QR<br>วิดีโอ]</div>
-        <div class="t"><b>ดูวิดีโอแนะนำ</b>สแกนเลย หรือเปิด<br><span style="color:var(--ink)">[youtu.be/xxxx]</span></div>
+        <div class="qr"><img src="../figures/qr_video.png" alt="QR วิดีโอ"></div>
+        <div class="t"><b>ดูวิดีโอแนะนำ</b>สแกนเลย หรือเปิด<br><span class="url">youtu.be/YtPQ8QKf48c</span><br><span style="display:block;margin-top:1.5mm">โค้ดทั้งหมดบน GitHub:</span><span class="url" style="white-space:nowrap">github.com/anakom-suvonvorn/</span><br><span class="url" style="white-space:nowrap">FPGA-Tetris</span></div>
       </div>
       <div class="fine">01076113 Digital System Fundamentals 2569<br>ภาควิชาวิศวกรรมคอมพิวเตอร์ คณะวิศวกรรมศาสตร์ สจล.<br>สื่อในเกมใช้เพื่อการศึกษา ลิขสิทธิ์เป็นของเจ้าของ</div>
     </div>
