@@ -27,8 +27,9 @@ something important changes. Durable facts also live in Claude's memory
   (Top-Down: levels 0-3, every module, tests, problems), `2.5_Video/video_script.md`
   (shot list + timed Thai narration + credits + YouTube description),
   `demo_and_qa.md` (demo order + 21 likely questions with answers),
-  `2.2_Brochure/brochure.html` (A4 x2, rendered with headless Chrome to
-  `Brochure_example.pdf` + `_p1/_p2.png`) and `brochure_text.md` (for Canva).
+  `2.2_Brochure/brochure.html` (tri-fold: A4 landscape, outside P2|P6|P1 at
+  97/100/100 mm, inside P3|P4|P5; Chrome --print-to-pdf to `Brochure_example.pdf`,
+  PNGs `Brochure_outside/inside.png` rendered from that PDF with pypdfium2) and `brochure_text.md` (for Canva).
   `figures/figures.py` draws 13 Thai diagrams (SVG -> PNG via headless
   Chrome); `build_docs.py` converts the .md to .docx (python-docx, Sarabun).
   Placeholders `[...]` = names, student IDs, group name, video link/QR,

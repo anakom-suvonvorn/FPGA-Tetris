@@ -11,7 +11,7 @@
 | # | รายการ | รูปแบบ | ไฟล์ในโฟลเดอร์นี้ | ทำต่อใน |
 |---|---|---|---|---|
 | 2.1 | **Proposal** (ไม่ต้องผ่านตรวจก่อนแล้ว) | กระดาษ **และ** ไฟล์ ส่งชุดเดียว | `2.1_Proposal/proposal.md` → `Proposal.docx` | Google Docs |
-| 2.2 | **Brochure** (ไม่ต้องผ่านตรวจก่อนแล้ว) | A4 1 แผ่น (หน้า-หลัง) กระดาษ **และ** ไฟล์ | `2.2_Brochure/brochure.html` → `Brochure_example.pdf` + `brochure_text.md` | Canva |
+| 2.2 | **Brochure** (ไม่ต้องผ่านตรวจก่อนแล้ว) | A4 แนวนอน 1 แผ่น พับ 3 ตอน (หน้า-หลัง) กระดาษ **และ** ไฟล์ | `2.2_Brochure/brochure.html` → `Brochure_example.pdf` + `brochure_text.md` | Canva |
 | 2.3 | **Design Document** | ไฟล์ (แนะนำให้พิมพ์ติดไปด้วย) | `2.3_Design_Document/design_document.md` → `Design_Document.docx` | Google Docs |
 | 2.4 | **ชิ้นงาน** | บอร์ด 2 บอร์ด + จอ + ลำโพง | (ของจริง) | - |
 | 2.5 | **วีดีทัศน์** 1-5 นาที, โพสต์ **สาธารณะ** | ชื่อ `CE_KMITL_Digital_2569_TetrisDuel` + short link | `2.5_Video/video_script.md` | ตัดต่อ + YouTube |
@@ -47,8 +47,9 @@
   * สารบัญ: ใน Google Docs ให้ Insert → Table of contents (สร้างจากหัวข้อให้อัตโนมัติ)
 * **รูปประกอบ** อยู่ใน `figures/*.png` (สร้างจาก `figures/figures.py`) ลากลง Google Docs หรือ Canva ได้เลย
 * **Brochure**: `2.2_Brochure/Brochure_example.pdf` เป็นตัวอย่างที่ทำเสร็จแล้ว ใช้ได้ 2 แบบ:
+  เป็น **แผ่นพับ 3 ตอน** (A4 แนวนอน, พิมพ์สองหน้าแบบพลิกด้านสั้น แล้วพับ)
   1. ใช้ตัวนี้เลย (พิมพ์ได้ทันที) หรือ
-  2. ทำใหม่ใน Canva (A4, 2 หน้า) โดยใช้ข้อความใน `brochure_text.md` และรูปใน `figures/`
+  2. ทำใหม่ใน Canva (A4 แนวนอน 2 หน้า แบ่ง 3 ช่อง ขนาดช่องดูใน `brochure_text.md`) โดยใช้ข้อความใน `brochure_text.md` และรูปใน `figures/`
      (Canva เปิด PDF ให้แก้ได้ด้วย: Create design → Import file → เลือก PDF แต่ฟอนต์ไทยอาจเพี้ยน)
 * **ส่วนที่ต้องเติมเอง** ทำเครื่องหมายไว้เป็น `[...]` (ชื่อ, รหัส, ลิงก์, รูปถ่ายจริง) ค้นหาด้วย Ctrl+F คำว่า `[`
 
@@ -109,7 +110,7 @@ CE_KMITL_Digital_2569_TetrisDuel\
 |---|---|
 | `README.md` | ไฟล์นี้ (แผนการส่งงาน) |
 | `2.1_Proposal/proposal.md` | ข้อความ Proposal ฉบับเต็ม |
-| `2.2_Brochure/brochure.html` | Brochure ตัวอย่าง (A4 2 หน้า) → `Brochure_example.pdf`, `Brochure_p1.png`, `Brochure_p2.png` |
+| `2.2_Brochure/brochure.html` | Brochure ตัวอย่าง แผ่นพับ 3 ตอน (A4 แนวนอน ด้านนอก + ด้านใน) → `Brochure_example.pdf`, `Brochure_outside.png`, `Brochure_inside.png` |
 | `2.2_Brochure/brochure_text.md` | ข้อความ Brochure แยกเป็นช่อง สำหรับ Canva |
 | `2.3_Design_Document/design_document.md` | Design Document ฉบับเต็ม (Top-Down) |
 | `2.5_Video/video_script.md` | สคริปต์บรรยาย + shot list + ซับ + เครดิต |
