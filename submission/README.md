@@ -44,7 +44,9 @@
   (Google Docs มีฟอนต์นี้)
   * **นำเข้า Google Docs:** Google Drive → New → File upload → เลือก `.docx` →
     คลิกขวา → Open with → Google Docs → File → **Save as Google Docs** → Share ให้เพื่อน
-  * สารบัญ: ใน Google Docs ให้ Insert → Table of contents (สร้างจากหัวข้อให้อัตโนมัติ)
+  * มีหน้าปก (จัดทำโดย / เสนอ / รายวิชา) ทั้งสองไฟล์ และ Design Document มีคำนำ บทคัดย่อ สารบัญ ภาพที่ 1, 2, ... และเลขหน้า
+  * สารบัญ: Word เติมให้แล้วตอน build ใน Google Docs ให้คลิกที่สารบัญแล้วกดปุ่ม refresh (ถ้าหายไป: Insert → Table of contents)
+  * **PDF ให้ Export จาก Google Docs** (File → Download → PDF) เพราะเครื่องที่ build ไม่มีฟอนต์ Sarabun
 * **รูปประกอบ** อยู่ใน `figures/*.png` (สร้างจาก `figures/figures.py`) ลากลง Google Docs หรือ Canva ได้เลย
 * **Brochure**: `2.2_Brochure/Brochure_example.pdf` เป็นตัวอย่างที่ทำเสร็จแล้ว ใช้ได้ 2 แบบ:
   เป็น **แผ่นพับ 3 ตอน** (A4 แนวนอน, พิมพ์สองหน้าแบบพลิกด้านสั้น แล้วพับ)
@@ -115,7 +117,7 @@ CE_KMITL_Digital_2569_TetrisDuel\
 | `2.1_Proposal/proposal.md` | ข้อความ Proposal ฉบับเต็ม |
 | `2.2_Brochure/brochure.html` | Brochure ตัวอย่าง แผ่นพับ 3 ตอน (A4 แนวนอน ด้านนอก + ด้านใน) → `Brochure_example.pdf`, `Brochure_outside.png`, `Brochure_inside.png` |
 | `2.2_Brochure/brochure_text.md` | ข้อความ Brochure แยกเป็นช่อง สำหรับ Canva |
-| `2.3_Design_Document/design_document.md` | Design Document ฉบับเต็ม (~140 หน้า: พื้นฐานจากศูนย์, Top-Down ทุกโมดูลพร้อมโค้ดจริง, วิธีสร้างซ้ำ, ภาคผนวกโค้ดทุกบรรทัด + schematic จาก Vivado) แก้ที่ `parts/*.md` แล้วรวมเป็นไฟล์นี้ โค้ดในเอกสารดึงจากไฟล์จริงตอนรัน `python build_docs.py` |
+| `2.3_Design_Document/design_document.md` | Design Document ฉบับเต็ม (~75 หน้า: Top-Down ระดับ 0-4, พื้นฐานจากศูนย์, Top-Down ทุกโมดูลพร้อมโค้ดจริง, วิธีสร้างซ้ำ, schematic จาก Vivado; โค้ดเต็มอ้างไปที่ GitHub) แก้ที่ `parts/*.md` แล้วรวมเป็นไฟล์นี้ โค้ดในเอกสารดึงจากไฟล์จริงตอนรัน `python build_docs.py` |
 | `figures/faces_on_bouncers.py` | ภาพหน้าจอสำหรับเอกสาร: ใส่หน้าเพื่อนบนลูกบอลตามกติกาเดียวกับวงจร (ภาพจำลองไม่มีแฟลช) |
 | `figures/vivado_png/` | schematic จาก Vivado (หมุนแล้ว) ทุกโมดูล; PDF ต้นฉบับอยู่ใน `figures/vivaldo generated schematics/` |
 | `2.5_Video/video_script.md` | สคริปต์บรรยาย + shot list + ซับ + เครดิต |

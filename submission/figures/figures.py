@@ -113,7 +113,8 @@ def new(w, h):
 
 
 # ---------------------------------------------------------------- figures
-def fig_system():
+def fig_system(plan=False):
+    # plan=True: the proposal's version, only what was known before building
     f = new(1400, 660)
     for side, bx, mir in (('A', 50, False), ('B', 920, True)):
         mx = bx + 75
@@ -124,8 +125,8 @@ def fig_system():
         f.rect(mx + 120, 160, 40, 16, '#334155', '#334155', r=2)
         f.rect(bx, 200, 430, 300, '#166534', '#ecfdf3', r=14, sw=3)
         f.text(bx + (414 if mir else 16), 226, f'บอร์ด {side}: EDGE Spartan-7', 16, 700, 'end' if mir else 'start', '#166534')
-        f.box(bx + 120, 248, 190, 110, 'XC7S15 FPGA', ['วงจร top_tetris', '50 MHz, 8,000 LUT', 'block RAM 45 KB'], 'core', tsize=16)
-        f.box(bx + 120, 380, 190, 100, 'SPI Flash 8 MB', ['เพลง วิดีโอ รูป', '6.9 MB'], 'media', tsize=16)
+        f.box(bx + 120, 248, 190, 110, 'XC7S15 FPGA', ['วงจรเกมทั้งหมด' if plan else 'วงจร top_tetris', '50 MHz, 8,000 LUT', 'block RAM 45 KB'], 'core', tsize=16)
+        f.box(bx + 120, 380, 190, 100, 'SPI Flash 8 MB', ['เพลง วิดีโอ รูป', 'เขียนไว้ล่วงหน้า' if plan else '6.9 MB'], 'media', tsize=16)
         io_x, out_x = (bx + 324, bx + 14) if mir else (bx + 14, bx + 324)
         f.box(io_x, 248, 92, 70, 'ปุ่ม 5', ['บังคับบล็อก'], 'in', mono=False, tsize=15, ssize=12)
         f.box(io_x, 330, 92, 70, 'สวิตช์ 16', ['ภารกิจ/ตั้งค่า'], 'in', mono=False, tsize=15, ssize=12)
@@ -151,15 +152,17 @@ def fig_system():
         f.arrow([(hx, 482), (hx, 538)], None, '#0d9488')
     ax, bxx = 50 + 416, 920 + 14
     labels = ['ขา 5 TX  ————→  ขา 6 RX', 'ขา 6 RX  ←————  ขา 5 TX', 'ขา 2 GND  ———  ขา 2 GND']
+    if plan:
+        labels = ['TX  ————→  RX', 'RX  ←————  TX', 'GND  ———  GND']
     for y, col in zip([262, 284, 306], ['#059669', '#0891b2', '#334155']):
         f.add(f'<path d="M{ax},{y} C{ax + 140},{y + 90} {bxx - 140},{y + 90} {bxx},{y}" fill="none" stroke="{col}" stroke-width="4"/>')
     f.rect(560, 120, 290, 106, '#059669', '#ffffff', r=10)
     f.text(705, 146, 'สายเชื่อม 3 เส้น (J5)', 16, 700, 'middle', '#059669')
-    f.lines(705, 170, ['UART 115,200 bps', 'ข้อความ 1 ไบต์: garbage, ความสูง,', 'แพ้, เริ่มเกม, การโจมตี'], 13, anchor='middle')
+    f.lines(705, 170, ['UART (ส่งทีละบิต)' if plan else 'UART 115,200 bps', 'ข้อความสั้น: ส่งขยะ, ความสูงกอง,' if plan else 'ข้อความ 1 ไบต์: garbage, ความสูง,', 'แพ้, เริ่มเกม, การโจมตี'], 13, anchor='middle')
     f.lines(705, 410, labels, 13, gap=20, anchor='middle', color='#334155', mono=True)
     f.rect(520, 520, 370, 120, '#334155', '#f6f7f9', r=12, dash='6 5')
     f.text(705, 548, 'คอมพิวเตอร์ (ใช้ครั้งเดียวก่อนเล่น)', 15, 700, 'middle', '#334155')
-    f.lines(705, 574, ['Vivado: สร้างไฟล์ .bit → โหลดลง FPGA', 'Python: แปลงวิดีโอ/เพลง/รูป → game_media.bin', '→ เขียนลง SPI Flash ของทั้งสองบอร์ด'], 13, anchor='middle')
+    f.lines(705, 574, ['Vivado: สร้างไฟล์ .bit → โหลดลง FPGA', 'Python: แปลงวิดีโอ/เพลง/รูป → ไฟล์สื่อ' if plan else 'Python: แปลงวิดีโอ/เพลง/รูป → game_media.bin', '→ เขียนลง SPI Flash ของทั้งสองบอร์ด'], 13, anchor='middle')
     f.arrow([(520, 560), (290, 482)], None, '#334155', dash='6 5')
     f.arrow([(890, 560), (1110, 482)], None, '#334155', dash='6 5')
     return f
@@ -242,7 +245,7 @@ def fig_blocks():
     b('core', CX, 30, 240, 170, 'tetris_core', ['FSM 23 สถานะ', 'กระดาน 10 × 20', 'ตรวจชน · 7-bag', 'ล้างแถว · garbage'], 'core')
     b('fx', CX, 300, 240, 140, 'chaos_fx', ['ผลของการโจมตี/โบนัส', 'นับเวลาแต่ละผล', 'แบนเนอร์ INCOMING'], 'chaos')
     b('mctrl', CX, 760, 240, 130, 'media_ctrl', ['เลือกว่าเล่นอะไร:', 'เพลง · วิดีโอโจมตี', 'ชนะ / แพ้'], 'media')
-    b('rend', DX, 30, 240, 170, 'tetris_render', ['วาดกระดาน บล็อก เงา', 'ข้อความ (text_multi)', 'แถบ RIVAL, มิเตอร์ขยะ', 'pipeline 3 clock'], 'video')
+    b('rend', DX, 30, 240, 170, 'tetris_render', ['วาดกระดาน บล็อก เงา', 'ข้อความ (text_multi)', 'แถบ RIVAL, มิเตอร์ขยะ', 'pipeline 2 clock'], 'video')
     b('cren', DX, 300, 240, 140, 'chaos_render', ['แผงภารกิจ (text_multi)', 'ลูกบอลเด้ง 5-10 ลูก', 'แบนเนอร์'], 'chaos')
     b('eng', DX, 740, 240, 170, 'media_engine', ['spi_flash · adpcm_dec', 'frame buffer 160 × 120', 'sound ring 2 KB', 'sprite Jevil + หน้า'], 'media')
     b('mix', EX, 30, 200, 170, 'media_mix', ['ซ้อนภาพเกม', 'กับวิดีโอ + sprite', 'ตามโหมด bg / full', '/ over / panel'], 'video')
@@ -745,11 +748,201 @@ def fig_chaos():
     return f
 
 
+def fig_plan():
+    """proposal: how it will work, as planned function blocks (no file names)"""
+    f = new(1420, 800)
+    f.rect(200, 20, 1000, 640, '#475569', '#fbfbfd', r=16, sw=2.5)
+    f.text(1185, 646, 'FPGA XC7S15: ทุกส่วนทำงานพร้อมกัน ด้วยสัญญาณนาฬิกา 50 MHz ตัวเดียว', 14, 700, 'end', '#475569')
+
+    def b(x, y, w, h, t, sub, g):
+        f.box(x, y, w, h, t, sub, g, mono=False, tsize=17, ssize=13)
+    for y, t, sub in ((85, 'ปุ่มกด 5 ปุ่ม', ['บังคับบล็อก']), (310, 'สวิตช์เลื่อน', ['ภารกิจ / ตั้งค่า']), (530, 'สายเชื่อม J5', ['ไปอีกบอร์ด'])):
+        b(20, y, 150, 70, t, sub, 'pin')
+    for y, t, sub in ((20, '7-segment', ['ตัวเลข']), (200, 'จอ VGA', ['640 × 480']), (530, 'หูฟัง', ['เสียง'])):
+        b(1240, y, 160, 70, t, sub, 'pin')
+    b(520, 700, 220, 80, 'SPI Flash 8 MB', ['เพลง วิดีโอ รูป'], 'media')
+    b(230, 70, 200, 100, 'รับอินพุต', ['กรองสัญญาณเด้ง', 'กดค้าง = เลื่อนต่อเนื่อง'], 'in')
+    b(520, 70, 220, 110, 'กติกาเกม', ['state machine', 'กระดานในหน่วยความจำ', 'ตรวจชน · ล้างแถว'], 'core')
+    b(520, 290, 220, 110, 'ภารกิจ CHAOS', ['สุ่มภารกิจ (LFSR)', 'ตรวจสวิตช์ · จับเวลา', 'สำเร็จ → โจมตี / โบนัส'], 'chaos')
+    b(520, 510, 220, 110, 'อ่านสื่อจากแฟลช', ['อ่านผ่าน SPI', 'ถอดภาพวิดีโอ', 'ถอดรหัสเสียง'], 'media')
+    b(230, 510, 200, 110, 'การสื่อสาร', ['UART ส่ง/รับทีละบิต', 'ข้อความ 1 ไบต์', 'รู้ว่าสายต่ออยู่ไหม'], 'link')
+    b(800, 70, 220, 330, 'สร้างภาพ VGA', ['นับตำแหน่งพิกเซล', 'และสร้างจังหวะ sync', '', 'คำนวณสีทีละพิกเซล:', 'กระดาน บล็อก ข้อความ', 'ภาพซ้อนของ CHAOS', 'วิดีโอเป็นพื้นหลัง'], 'video')
+    b(800, 510, 220, 110, 'เสียง', ['ผสมเพลง + เอฟเฟกต์', 'ออกขา FPGA โดยตรง'], 'sound')
+    A = f.arrow
+    A([(170, 120), (230, 120)], None, C['in'][0])
+    A([(170, 345), (520, 345)], 'สวิตช์ภารกิจ', C['chaos'][0], lat=(330, 335))
+    A([(170, 565), (230, 565)], None, C['link'][0], both=True)
+    A([(430, 120), (520, 120)], 'คำสั่ง', C['in'][0], lat=(475, 110))
+    A([(740, 120), (800, 120)], 'สถานะเกม', C['core'][0], lat=(770, 110), lsize=11.5)
+    A([(630, 290), (630, 180)], ['ผลการโจมตี', '/ โบนัส'], C['chaos'][0], lat=(690, 228))
+    A([(740, 345), (800, 345)], 'ภาพซ้อน', C['chaos'][0], lat=(770, 335), lsize=11.5)
+    A([(740, 540), (770, 540), (770, 380), (800, 380)], ['ภาพ', 'วิดีโอ'], C['media'][0], lat=(762, 455), lanchor='end')
+    A([(740, 580), (800, 580)], 'เสียง', C['media'][0], lat=(770, 570))
+    A([(1020, 235), (1240, 235)], 'RGB + sync', C['video'][0], lat=(1130, 225))
+    A([(1020, 565), (1240, 565)], 'สัญญาณเสียง', C['sound'][0], lat=(1130, 555))
+    A([(630, 70), (630, 50), (1240, 50)], 'จำนวนแถวที่ล้าง', C['core'][0], lat=(1140, 42))
+    A([(430, 540), (465, 540), (465, 150), (520, 150)], ['ขยะ, ความสูงกอง,', 'แพ้, เริ่มเกม'], C['link'][0], both=True, lat=(350, 240))
+    A([(430, 585), (490, 585), (490, 370), (520, 370)], ['การโจมตี', 'ส่ง / รับ'], C['link'][0], both=True, lat=(350, 430))
+    A([(630, 620), (630, 700)], 'SPI', C['media'][0], both=True, lat=(645, 688), lanchor='start')
+    return f
+
+
+def fig_top_io():
+    """design doc level 1: top_tetris as one box with all its pins"""
+    f = new(1400, 660)
+    f.rect(520, 40, 360, 580, C['core'][0], C['core'][1], r=14, sw=3)
+    f.text(700, 290, 'top_tetris', 26, 700, 'middle', C['core'][0], mono=True)
+    f.lines(700, 322, ['game/top_tetris.vhd', 'อินพุต 22 ขา · เอาต์พุต 35 ขา', 'ข้างในคือระดับ 2 (ข้อ 4.4)'], 14, anchor='middle', gap=22)
+    f.lines(700, 560, ['flash SCLK ไม่ใช่ขาปกติ: ออกทาง', 'STARTUPE2 ไปขา CCLK ของชิป'], 12.5, anchor='middle', color=MUTED, gap=19)
+    ins = [('clk', 'นาฬิกา 50 MHz (ขา H11)'),
+           ('btn_left, btn_right, btn_rot, btn_soft, btn_hard', 'ปุ่มกด 5 ปุ่ม'),
+           ('sw_task(7..0)', 'สวิตช์ภารกิจ 8 ตัว'),
+           ('sw_pause, sw_music, sw_sfx, sw_chaos, sw_usb', 'สวิตช์ตั้งค่า 5 ตัว'),
+           ('link_rx', 'J5 ขา 6 ← อีกบอร์ด'),
+           ('usb_rx', 'USB-UART ← คอมพิวเตอร์'),
+           ('flash_miso', 'ข้อมูลจากชิปแฟลช')]
+    outs = [('vga_r/g/b(3..0), vga_hs, vga_vs', 'จอ VGA (14 ขา)'),
+            ('audio_l, audio_r', 'ช่องหูฟัง'),
+            ('buzzer', 'บัซเซอร์บนบอร์ด'),
+            ('seg_n(7..0), dig(3..0)', '7-segment 4 หลัก (12 ขา)'),
+            ('link_tx', 'J5 ขา 5 → อีกบอร์ด'),
+            ('usb_tx', 'USB-UART → คอมพิวเตอร์'),
+            ('flash_cs_n, flash_mosi', 'ชิปแฟลช'),
+            ('flash_wp_n, flash_hold_n', 'ชิปแฟลช (ค้างไว้ที่ 1)')]
+    for k, (n, d) in enumerate(ins):
+        y = 90 + k * 70
+        f.arrow([(30, y), (520, y)], None, C['in'][0])
+        f.text(508, y - 9, n, 13, 600, 'end', C['in'][0], mono=True)
+        f.text(36, y + 20, d, 13.5, 400, 'start', INK)
+    for k, (n, d) in enumerate(outs):
+        y = 90 + k * 66
+        f.arrow([(880, y), (1370, y)], None, C['video'][0])
+        f.text(892, y - 9, n, 13, 600, 'start', C['video'][0], mono=True)
+        f.text(1364, y + 20, d, 13.5, 400, 'end', INK)
+    return f
+
+
+def _panel(h, name, file):
+    f = new(1400, h)
+    f.rect(230, 40, 940, h - 70, '#334155', '#fbfbfd', r=14, sw=2.5)
+    f.text(248, 68, name, 17, 700, 'start', '#334155', mono=True)
+    f.text(248 + len(name) * 10.5 + 14, 68, file, 13, 400, 'start', MUTED, mono=True)
+    return f
+
+
+def _b(f, x, y, w, h, t, sub, sub_inst=False):
+    # blue = a sub-module (instance), grey = logic written inside this module
+    f.box(x, y, w, h, t, sub, 'in' if sub_inst else 'pin', mono=sub_inst, tsize=15, ssize=12.5)
+
+
+def fig_l3_input():
+    f = _panel(320, 'tetris_input (u_input)', 'src/game/tetris_input.vhd')
+    for k in (2, 1):
+        f.rect(300 + k * 8, 100 - k * 8, 220, 120, C['in'][0], C['in'][1], r=10)
+    _b(f, 300, 100, 220, 120, 'u_db: debounce', ['× 5 (ปุ่มละตัว)', 'sync 2 FF, รอนิ่ง 5 ms', '→ กด (pulse), ค้าง (level)'], True)
+    _b(f, 640, 85, 400, 160, 'สร้างคำสั่ง', ['หมุน, ตกทันที: 1 ครั้งต่อการกด', 'ซ้าย / ขวา: กด 1 ครั้ง ค้างครบ 10 เฟรม', 'แล้วซ้ำทุก 3 เฟรม (ตัวนับต่อปุ่ม)', 'ตกช้า: ค้างแล้วซ้ำทุก 2 เฟรม'])
+    A = f.arrow
+    A([(20, 160), (300, 160)], 'btn(4..0) ← ปุ่ม 5 ตัว', C['in'][0], lat=(130, 150))
+    A([(20, 268), (840, 268), (840, 245)], 'frame_tick ← vga_sync', C['in'][0], lat=(130, 258))
+    A([(520, 160), (640, 160)], ['pressed,', 'held'], C['in'][0], lat=(580, 140))
+    A([(1040, 165), (1380, 165)], ['a_left, a_right, a_rot,', 'a_soft, a_hard → ตัวกรองปุ่ม'], C['in'][0], lat=(1275, 130))
+    return f
+
+
+def fig_l3_link():
+    f = _panel(420, 'versus_link (u_link)', 'src/game/versus_link.vhd')
+    _b(f, 290, 85, 300, 130, 'เลือกข้อความ', ['จำคำขอไว้จนตัวส่งว่าง', 'START > LOST > ATTACK >', 'GARBAGE > HEARTBEAT', 'HEARTBEAT ทุก 6 เฟรม, ขยะรวมกัน'])
+    _b(f, 700, 105, 200, 80, 'u_tx: uart_tx', ['ส่งทีละบิต 115,200 bps'], True)
+    _b(f, 290, 255, 200, 90, 'u_rx: uart_rx', ['sync 2 FF', 'รับทีละบิต'], True)
+    _b(f, 600, 250, 240, 100, 'ถอดข้อความ', ['type 3 บิต + value 5 บิต', '→ พัลส์ got_* 1 clock'])
+    _b(f, 900, 250, 220, 100, 'ตัวนับความเงียบ', ['มีไบต์มาใน 30 เฟรม', '(0.5 วินาที) → link_ok'])
+    A = f.arrow
+    col = C['link'][0]
+    A([(20, 150), (290, 150)], ['start, lost, garb(n), att(id), height', '← tetris_core, chaos_task'], col, lat=(130, 118))
+    A([(590, 145), (700, 145)], 'ไบต์', col, lat=(645, 135))
+    A([(900, 145), (1380, 145)], 'link_tx → J5 ขา 5', col, lat=(1275, 135))
+    A([(20, 300), (290, 300)], 'link_rx ← J5 ขา 6 (หรือ USB)', col, lat=(130, 290))
+    A([(490, 300), (600, 300)], ['ไบต์', '+ valid'], col, lat=(545, 280))
+    A([(840, 300), (900, 300)], None, col)
+    A([(1120, 300), (1380, 300)], 'link_ok', col, lat=(1275, 290))
+    A([(720, 350), (720, 375), (1380, 375)], 'got_start, got_lost, got_garb(n), got_att(id), opp_height', col, lat=(1050, 368))
+    return f
+
+
+def fig_l3_render():
+    f = _panel(470, 'tetris_render (u_render)', 'src/game/tetris_render.vhd')
+    _b(f, 290, 85, 300, 155, 'stage 1 (clock 1)', ['(x, y) → ช่องไหนของกระดาน', 'อ่านแถวกระดานแถวนั้น', 'บล็อก / เงา / NEXT ทับไหม', 'แถบ RIVAL', '→ รีจิสเตอร์ s1_*'])
+    _b(f, 290, 285, 300, 90, 'u_text: text_multi', ['ROM ฟอนต์ 5 × 7', 'NEXT, LINES, LINKED, WIN …'], True)
+    _b(f, 700, 110, 270, 230, 'stage 2 (clock 2)', ['เลือกสีตามชั้น:', 'ข้อความ > บล็อกที่ตก >', 'บล็อกในกอง > เงา > ตาราง', 'overlay ของ CHAOS ทับบนสุด', 'FLIP / BLIND เปลี่ยนตำแหน่ง', 'hs, vs หน่วง 2 clock เท่ากัน', '→ สี + see_bg + keep'])
+    A = f.arrow
+    col = C['video'][0]
+    A([(20, 120), (290, 120)], 'x, y, video_on, hs, vs ← vga_sync', col, lat=(140, 110))
+    A([(268, 120), (268, 330), (290, 330)], None, col)
+    A([(20, 185), (290, 185)], 'กระดาน, บล็อก, คะแนน ← tetris_core', col, lat=(140, 175))
+    A([(20, 225), (290, 225)], 'ความสูงคู่แข่ง, link_ok ← versus_link', col, lat=(140, 215))
+    A([(590, 160), (700, 160)], 's1_*', col, lat=(645, 150))
+    A([(590, 330), (660, 330), (660, 260), (700, 260)], 't_*', col, lat=(625, 320))
+    A([(20, 415), (680, 415), (680, 310), (700, 310)], ['ov_on, ov_rgb ← chaos_render', 'fx_flip, fx_blind ← chaos_fx'], col, lat=(150, 386))
+    A([(970, 200), (1380, 200)], ['r, g, b, hs, vs, see_bg, keep', '→ media_mix'], col, lat=(1270, 172))
+    return f
+
+
+def fig_l3_chaos():
+    f = _panel(430, 'chaos_render (u_crender)', 'src/game/chaos_render.vhd')
+    _b(f, 300, 85, 300, 110, 'แผงภารกิจ', ['กรอบ, สวิตช์ 8 ตัว, ไฟเป้าหมาย', 'มิเตอร์ + โซนเขียว, แถบเวลา', 'กรอบแดงเมื่อโดน LOCK'])
+    _b(f, 300, 215, 300, 80, 'u_text: text_multi', ['ข้อความแผงภารกิจ + แบนเนอร์'], True)
+    _b(f, 300, 310, 300, 75, 'ลูกบอลเด้ง 5-10 ลูก', ['ขยับและเด้งขอบทุกเฟรม'])
+    _b(f, 720, 150, 250, 140, 'รวมเป็นภาพซ้อน', ['พิกเซลนี้มีของไหม', '→ ov_on, ov_rgb', '(ทันพร้อม text_multi)'])
+    A = f.arrow
+    col = C['chaos'][0]
+    A([(20, 125), (300, 125)], 'ข้อมูลภารกิจ t_*, task_sw ← chaos_task', col, lat=(145, 115))
+    A([(20, 255), (300, 255)], 'ban_on, ban_id ← chaos_fx', col, lat=(145, 245))
+    A([(20, 335), (300, 335)], 'fx_bounce, fx_nbounce ← chaos_fx', col, lat=(145, 325))
+    A([(600, 135), (690, 135), (690, 175), (720, 175)], None, col)
+    A([(600, 255), (720, 255)], None, col)
+    A([(600, 345), (700, 345), (700, 275), (720, 275)], None, col)
+    A([(970, 210), (1380, 210)], 'ov_on, ov_rgb → tetris_render', col, lat=(1275, 200))
+    A([(600, 372), (1380, 372)], 'face_en, face_addr → media_engine (หน้าเพื่อนบนลูกบอล)', col, lat=(1050, 364))
+    f.text(1150, 68, 'x, y จาก vga_sync เข้าทุกกล่อง', 12.5, 400, 'end', MUTED)
+    return f
+
+
+def fig_l3_media():
+    f = _panel(560, 'media_engine (u_media)', 'src/media/media_engine.vhd')
+    _b(f, 290, 85, 280, 135, 'ตัวอ่านไฟล์สื่อ (FSM)', ['header → สารบัญ → palette', '→ record ทีละอัน:', 'header 8 ไบต์ → ภาพ → เสียง', 'จังหวะ: ตามเสียงที่เหลือใน ring'])
+    _b(f, 290, 300, 220, 90, 'u_spi: spi_flash', ['คำสั่ง READ, 25 MHz', 'ส่งออกทีละไบต์'], True)
+    _b(f, 650, 95, 220, 70, 'ถอดภาพ delta + RLE', ['1 พิกเซลต่อ clock'])
+    _b(f, 950, 95, 190, 70, 'frame buffer', ['160 × 120 × 8 บิต'])
+    _b(f, 650, 210, 220, 80, 'sound ring 2 KB', ['block RAM'])
+    _b(f, 950, 210, 190, 80, 'u_dec: adpcm_dec', ['4 บิต → 16 บิต', 'ทีละตัว ทุก 3,125 clock'], True)
+    _b(f, 650, 330, 220, 80, 'sprite RAM', ['palette, Jevil, หน้า 4 รูป', 'โหลดครั้งเดียวตอนเปิดเครื่อง'])
+    _b(f, 950, 330, 190, 110, 'อ่านพิกเซลให้จอ', ['(x, y) → สี', 'ผ่าน palette', 'ใช้ 3 clock'])
+    A = f.arrow
+    col = C['media'][0]
+    A([(20, 130), (290, 130)], 'play, item, from_rec, stop ← media_ctrl', col, lat=(140, 120))
+    A([(570, 100), (622, 100), (622, 78), (1380, 78)], 'ready, busy, pos, สารบัญ → media_ctrl', col, lat=(1270, 70))
+    A([(20, 345), (290, 345)], ['sclk, cs_n, mosi / miso', '↔ ชิปแฟลช'], col, both=True, lat=(140, 318))
+    A([(400, 220), (400, 300)], 'ที่อยู่ / ไบต์', col, both=True, lat=(410, 265), lanchor='start')
+    A([(570, 125), (650, 125)], None, col)
+    A([(870, 125), (950, 125)], None, col)
+    A([(570, 190), (612, 190), (612, 250), (650, 250)], None, col)
+    A([(570, 205), (596, 205), (596, 370), (650, 370)], None, col)
+    A([(870, 250), (950, 250)], None, col)
+    A([(1140, 250), (1380, 250)], 'pcm → tetris_sound', col, lat=(1265, 240))
+    A([(1140, 125), (1160, 125), (1160, 385), (1140, 385)], None, col)
+    A([(870, 370), (950, 370)], None, col)
+    A([(20, 485), (1045, 485), (1045, 440)], ['x, y ← vga_sync', 'j_addr ← media_mix, face_addr ← chaos_render'], col, lat=(180, 458))
+    A([(1140, 420), (1380, 420)], ['rgb, see, zone, s_on, s_rgb', '→ media_mix'], col, lat=(1275, 398))
+    return f
+
+
 FIGS = {
     'system': fig_system, 'hierarchy': fig_hierarchy, 'blocks': fig_blocks, 'fsm': fig_fsm,
     'link': fig_link, 'media_path': fig_media_path, 'flash': fig_flash, 'layers': fig_layers,
     'resources': fig_resources, 'timeline': fig_timeline, 'flow': fig_flow, 'vmodel': fig_vmodel,
-    'chaos': fig_chaos,
+    'chaos': fig_chaos, 'system_plan': lambda: fig_system(True), 'plan': fig_plan, 'top_io': fig_top_io,
+    'l3_input': fig_l3_input, 'l3_link': fig_l3_link, 'l3_render': fig_l3_render, 'l3_chaos': fig_l3_chaos,
+    'l3_media': fig_l3_media,
 }
 
 

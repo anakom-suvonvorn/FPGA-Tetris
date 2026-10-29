@@ -13,6 +13,24 @@ something important changes. Durable facts also live in Claude's memory
 
 ## 0. Where we are RIGHT NOW (start here)
 
+### Latest (2026-10-30, round 4): "official" look + real top-down levels
+* Team's own edits: `Proposal_v1.docx` (they CUT post-build facts: a
+  proposal = the plan before building) and `Design_Document_v2.docx` (only
+  removed the TOC placeholder). proposal.md now = their v1 text, planned
+  figures `fig_system_plan` + `fig_plan` (no file names, no measured numbers).
+* build_docs: cover page (<!-- COVER -->: members, เสนอ รศ. ดร. เจริญ
+  วงษ์ชุ่มเย็น, course block), คำนำ/บทคัดย่อ/สารบัญ (<!-- TOC -->, Word fills
+  it via pywin32), "บทที่ N", "ภาพที่ N" captions, page numbers, black
+  headings, grey table header, code-word-aware column widths.
+  This PC has no Google "Sarabun" font: Word previews use a fallback, so the
+  real PDFs come from Google Docs (set DOCS_PREVIEW to get Word previews).
+* DD chapter 4 levels: 4.2 ระดับ 0 system, 4.3 ระดับ 1 top_tetris box
+  (`fig_top_io`), 4.4 ระดับ 2 inside top (fig_blocks + tables + Vivado + tree),
+  4.5 ระดับ 3 inside the 5 modules with sub-modules (`fig_l3_*`), 4.7 details.
+  fig_hierarchy (functional groups) no longer used.
+* User renamed Brochure_example.pdf -> Brochure.pdf and split the link txt
+  files themselves (left uncommitted on purpose).
+
 ### Latest (2026-10-30, round 3)
 * Video: https://youtu.be/YtPQ8QKf48c (QR `submission/figures/qr_video.png`);
   code: https://github.com/anakom-suvonvorn/FPGA-Tetris. Both are on the doc

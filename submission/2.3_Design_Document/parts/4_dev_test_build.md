@@ -275,7 +275,7 @@ tools\program.bat game
 * วิดีโอมีความละเอียดเพียง 160 × 120 เพราะไม่มี RAM ภายนอก
 * แนวทางต่อไป: มินิเกมเพิ่ม, เล่นได้มากกว่า 2 คน (ต่อสายแบบวง), ใช้คีย์บอร์ด PS/2
 
-## 10. แหล่งอ้างอิง
+## เอกสารอ้างอิง
 
 1. EDGE Spartan 7 FPGA Development Board User Manual
 2. AMD/Xilinx, *7 Series FPGAs Memory Resources User Guide* (UG473): block RAM

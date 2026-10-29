@@ -4,13 +4,21 @@
 # Writes 2.1_Proposal\Proposal.docx and 2.3_Design_Document\Design_Document.docx.
 # Only the Markdown this folder uses is understood: # headings, paragraphs,
 # * / - / 1. lists, | tables |, ![caption](picture), > quotes, ``` code,
-# **bold**, *italic*, `code`. Plus three directives (one per line):
+# **bold**, *italic*, `code`. Pictures: ![caption](path) gets "ภาพที่ N";
+# ![caption](path){w=3.5,nonum} sets the width in cm / leaves the number out.
+# Directives (one per line):
+#   <!-- COVER: kind of report -->   the cover page (members, course, ...)
+#   <!-- TOC -->              table of contents (filled in by Word, see below)
+#   <!-- RIGHT: text -->      a right-aligned line (the คำนำ signature)
 #   <!-- CODE: path | first-line regex | last-line regex -->
 #        lines of a source file (path from the project folder) with their
 #        real line numbers: from the first line matching the first regex to
 #        the next line matching the second one
 #   <!-- SOURCE: path -->     a whole source file (the code appendix)
 #   <!-- PAGEBREAK -->
+# In the Design Document, "## 4. title" becomes "บทที่ 4 title" and every
+# chapter starts on a new page. If Word is installed (pywin32), Word then
+# fills in the table of contents (and writes a preview .pdf to %DOCS_PREVIEW% if set).
 import os, re, sys
 from docx import Document
 from docx.enum.section import WD_ORIENT
@@ -23,7 +31,17 @@ from docx.shared import Cm, Pt, RGBColor
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 FONT, MONO = 'Sarabun', 'Consolas'
-ACCENT = RGBColor(0x4C, 0x1D, 0x95)
+INKC = RGBColor(0x00, 0x00, 0x00)
+GREY = RGBColor(0x55, 0x5B, 0x66)
+
+MEMBERS = [('ธีรนัย ธรรมเพชร', '68010542'), ('นนธพัชร์ น้อยสวัสดิ์', '68010558'),
+           ('พิสิษฐ์ ปัญคิวจณาณ์', '68010798'), ('อนาคม อเล็กซองดรู สุวรรณวร', '68011217'),
+           ('ชนกภูมิ สันติอัศวราภรณ์', '68011641')]
+TEACHER = 'รศ. ดร. เจริญ วงษ์ชุ่มเย็น'
+COURSE = ['รายงานนี้เป็นส่วนหนึ่งของรายวิชา 01076113 Digital System Fundamentals',
+          'ภาคเรียนที่ 1 ปีการศึกษา 2569',
+          'ภาควิชาวิศวกรรมคอมพิวเตอร์ คณะวิศวกรรมศาสตร์',
+          'สถาบันเทคโนโลยีพระจอมเกล้าเจ้าคุณทหารลาดกระบัง']
 
 DOCS = [
     ('2.1_Proposal/proposal.md', '2.1_Proposal/Proposal.docx', False),
@@ -70,16 +88,67 @@ def setup(doc):
     set_font(st['Normal'], FONT, 11)
     st['Normal'].paragraph_format.space_after = Pt(4)
     st['Normal'].paragraph_format.line_spacing = 1.15
-    sizes = {1: 22, 2: 17, 3: 14, 4: 12}
+    sizes = {1: 18, 2: 18, 3: 14, 4: 12}
     for lv, sz in sizes.items():
         s = st[f'Heading {lv}']
-        set_font(s, FONT, sz, True, ACCENT if lv <= 2 else RGBColor(0x1D, 0x24, 0x33))
+        set_font(s, FONT, sz, True, INKC)
+        s.font.italic = False
         s.paragraph_format.space_before = Pt(14 if lv <= 2 else 10)
         s.paragraph_format.space_after = Pt(6)
         s.paragraph_format.keep_with_next = True
     for name in ('List Bullet', 'List Number'):
         set_font(st[name], FONT, 11)
+    # page number at the bottom, not on the cover
+    sec.different_first_page_header_footer = True
+    fp = sec.footer.paragraphs[0]
+    fp.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    field(fp, 'PAGE', '1')
+    for r in fp.runs:
+        set_font(r, FONT, 10)
 
+
+def field(p, instr, shown=''):
+    """a Word field (PAGE, TOC ...) in paragraph p"""
+    def run(tag, **at):
+        r = OxmlElement('w:r'); e = OxmlElement(tag)
+        for k, v in at.items():
+            e.set(qn(k), v)
+        if tag == 'w:instrText':
+            e.set(qn('xml:space'), 'preserve'); e.text = instr
+        if tag == 'w:t':
+            e.text = shown
+        r.append(e); p._p.append(r)
+    run('w:fldChar', **{'w:fldCharType': 'begin'})
+    run('w:instrText')
+    run('w:fldChar', **{'w:fldCharType': 'separate'})
+    run('w:t')
+    run('w:fldChar', **{'w:fldCharType': 'end'})
+
+
+def centre(doc, text, size=11, bold=False, before=0, after=2):
+    p = doc.add_paragraph(); p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    p.paragraph_format.space_before = Pt(before); p.paragraph_format.space_after = Pt(after)
+    r = p.add_run(text); set_font(r, FONT, size, bold, INKC)
+    return p
+
+
+def cover(doc, kind):
+    centre(doc, kind, 20, True, before=60, after=10)
+    centre(doc, 'Tetris Duel: CHAOS Edition', 26, True, after=4)
+    centre(doc, 'เกมเตตริสต่อสู้สองผู้เล่นบนบอร์ด FPGA', 16, after=0)
+    centre(doc, 'จัดทำโดย', 14, True, before=70, after=6)
+    t = doc.add_table(rows=len(MEMBERS), cols=2)
+    t.alignment = WD_TABLE_ALIGNMENT.CENTER
+    for i, (name, sid) in enumerate(MEMBERS):
+        for j, (txt, w) in enumerate(((name, 6.2), ('รหัสนักศึกษา ' + sid, 4.4))):
+            c = t.cell(i, j); c.width = Cm(w)
+            c.paragraphs[0].paragraph_format.space_after = Pt(1)
+            r = c.paragraphs[0].add_run(txt); set_font(r, FONT, 13, None, INKC)
+    centre(doc, 'เสนอ', 14, True, before=40, after=4)
+    centre(doc, TEACHER, 13)
+    for k, line in enumerate(COURSE):
+        centre(doc, line, 13, before=130 if k == 0 else 0, after=0)
+    doc.add_paragraph().add_run().add_break(WD_BREAK.PAGE)
 
 INLINE = re.compile(r'(\*\*[^*]+\*\*|`[^`]+`|\*[^*\s][^*]*\*)')
 
@@ -121,18 +190,37 @@ def add_table(doc, rows):
             c.paragraphs[0].paragraph_format.space_after = Pt(0)
             add_inline(c.paragraphs[0], r[j] if j < len(r) else '', size=10, bold=(i == 0 and not empty_hdr))
             if i == 0 and not empty_hdr:
-                shade(c, 'EDE9FE')
+                shade(c, 'E5E7EB')
     # column widths in proportion to the longest text in each column
     weight = [max(min(max(len(r[j]) if j < len(r) else 0 for r in data), 45), 14) + 6 for j in range(ncol)]
+    widths = [16.6 * w / sum(weight) for w in weight]
+    # but never narrower than the longest code word (`switch_filter`), which Word can't break;
+    # Thai has no spaces and wraps anywhere, so only ASCII words count
+    need = [max([len(tok.strip('`*,()')) * 0.2 + 0.45 for r in data if j < len(r)
+                 for tok in re.findall(r'[\x21-\x7e]+', r[j])] + [0]) for j in range(ncol)]
+    for _ in range(3):
+        short = [j for j in range(ncol) if widths[j] < need[j]]
+        if not short:
+            break
+        extra = sum(need[j] - widths[j] for j in short)
+        rest = [j for j in range(ncol) if j not in short]
+        free = sum(widths[j] for j in rest)
+        for j in short:
+            widths[j] = need[j]
+        for j in rest:
+            widths[j] -= extra * widths[j] / free
     t.autofit = False
     for j in range(ncol):
-        wcm = Cm(16.6 * weight[j] / sum(weight))
+        wcm = Cm(widths[j])
         for i in range(len(data)):
             t.cell(i, j).width = wcm
     doc.add_paragraph().paragraph_format.space_after = Pt(2)
 
 
-def add_picture(doc, md_dir, cap, path, fixed=None):
+FIGNO = [0]
+
+
+def add_picture(doc, md_dir, cap, path, fixed=None, number=True):
     full = os.path.normpath(os.path.join(md_dir, path))
     if not os.path.exists(full):
         p = doc.add_paragraph(); add_inline(p, f'[รูป: {cap}]'); return
@@ -147,7 +235,10 @@ def add_picture(doc, md_dir, cap, path, fixed=None):
         width = fixed
     p.add_run().add_picture(full, width=Cm(width))
     c = doc.add_paragraph(); c.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    r = c.add_run(cap); set_font(r, FONT, 10, None, RGBColor(0x5B, 0x64, 0x75)); r.italic = True
+    if number:
+        FIGNO[0] += 1
+        r = c.add_run(f'ภาพที่ {FIGNO[0]} '); set_font(r, FONT, 10, True, INKC)
+    r = c.add_run(cap); set_font(r, FONT, 10, None, GREY)
 
 
 def code_lines(doc, lines, first_no=None, size=8.5):
@@ -157,6 +248,7 @@ def code_lines(doc, lines, first_no=None, size=8.5):
         pf = p.paragraph_format
         pf.space_after = Pt(0); pf.space_before = Pt(0); pf.line_spacing = 1.0
         pf.left_indent = Cm(0.2)
+        pf.keep_with_next = len(lines) <= 30 and k < len(lines) - 1   # short blocks stay on one page
         ppr = p._element.get_or_add_pPr()
         sh = OxmlElement('w:shd')
         sh.set(qn('w:val'), 'clear'); sh.set(qn('w:color'), 'auto'); sh.set(qn('w:fill'), 'F4F5F7')
@@ -174,7 +266,7 @@ def code_excerpt(doc, spec):
     j = next(k for k in range(i, len(src)) if re.search(b, src[k]))
     cap = doc.add_paragraph()
     cap.paragraph_format.space_after = Pt(1); cap.paragraph_format.keep_with_next = True
-    r = cap.add_run(f'{path}  บรรทัด {i + 1}-{j + 1}'); set_font(r, MONO, 8.5, True, RGBColor(0x4C, 0x1D, 0x95))
+    r = cap.add_run(f'{path}  บรรทัด {i + 1}-{j + 1}'); set_font(r, MONO, 8.5, True, GREY)
     code_lines(doc, src[i:j + 1], i + 1)
 
 
@@ -217,6 +309,7 @@ def convert(md_path, out_path, chapter_breaks):
         lines = lines[end + 1:]
     doc = Document()
     setup(doc)
+    FIGNO[0] = 0
     i, para, first_h2 = 0, [], True
     list_num = None                                 # numbering of the numbered list in progress
 
@@ -224,6 +317,7 @@ def convert(md_path, out_path, chapter_breaks):
         nonlocal para
         if para:
             p = doc.add_paragraph()
+            p.paragraph_format.first_line_indent = Cm(1)
             add_inline(p, ' '.join(s.strip() for s in para))
             para = []
 
@@ -232,10 +326,17 @@ def convert(md_path, out_path, chapter_breaks):
         s = ln.strip()
         if s and not re.match(r'^\d+\.\s', ln) and not ln.startswith('  '):
             list_num = None                         # any other block ends a numbered list
-        m = re.match(r'^<!--\s*(CODE|SOURCE|PAGEBREAK)\s*:?\s*(.*?)\s*-->$', s)
+        m = re.match(r'^<!--\s*(CODE|SOURCE|PAGEBREAK|COVER|TOC|RIGHT)\s*:?\s*(.*?)\s*-->$', s)
         if m:
             flush()
-            if m.group(1) == 'CODE':
+            if m.group(1) == 'COVER':
+                cover(doc, m.group(2))
+            elif m.group(1) == 'TOC':
+                field(doc.add_paragraph(), 'TOC \\o "2-3" \\h \\z \\u', '(สารบัญ: เปิดใน Word แล้วคลิกขวา → Update Field)')
+            elif m.group(1) == 'RIGHT':
+                p = doc.add_paragraph(); p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+                add_inline(p, m.group(2))
+            elif m.group(1) == 'CODE':
                 code_excerpt(doc, m.group(2))
             elif m.group(1) == 'SOURCE':
                 source_file(doc, m.group(2))
@@ -259,7 +360,10 @@ def convert(md_path, out_path, chapter_breaks):
                     doc.add_paragraph().add_run().add_break(WD_BREAK.PAGE)
                 first_h2 = False
             h = doc.add_heading('', level=lv)
-            add_inline(h, m.group(2))
+            title = m.group(2)
+            if lv == 2 and chapter_breaks:
+                title = re.sub(r'^(\d+)\.\s+', r'บทที่ \1 ', title)
+            add_inline(h, title)
             if lv == 1:
                 h.alignment = WD_ALIGN_PARAGRAPH.CENTER
             i += 1; continue
@@ -268,9 +372,11 @@ def convert(md_path, out_path, chapter_breaks):
             while i < len(lines) and lines[i].strip().startswith('|'):
                 rows.append(lines[i]); i += 1
             add_table(doc, rows); continue
-        m = re.match(r'^!\[(.*?)\]\((.*?)\)(?:\{w=([\d.]+)\})?$', s)
+        m = re.match(r'^!\[(.*?)\]\((.*?)\)(?:\{(.*?)\})?$', s)
         if m:
-            flush(); add_picture(doc, md_dir, m.group(1), m.group(2), m.group(3) and float(m.group(3))); i += 1; continue
+            opts = dict((o.split('=') + [''])[:2] for o in (m.group(3) or '').split(',') if o)
+            flush(); add_picture(doc, md_dir, m.group(1), m.group(2), float(opts['w']) if opts.get('w') else None,
+                                 'nonum' not in opts); i += 1; continue
         m = re.match(r'^(\s*)([*-]|\d+\.)\s+(\[[ x]\]\s+)?(.*)$', ln)
         if m and s:
             flush()
@@ -300,6 +406,38 @@ def convert(md_path, out_path, chapter_breaks):
     flush()
     doc.save(out_path)
     print('wrote', out_path)
+    word_finish(out_path)
+
+
+def word_finish(path):
+    """let Word fill in the table of contents, save, and write the PDF"""
+    try:
+        import win32com.client
+    except ImportError:
+        print('  (no pywin32: open the .docx in Word and update the table of contents yourself)')
+        return
+    word = win32com.client.DispatchEx('Word.Application')
+    word.Visible = False
+    try:
+        d = word.Documents.Open(os.path.abspath(path))
+        for k in range(1, d.TablesOfContents.Count + 1):
+            d.TablesOfContents(k).Update()
+        for name in ('TOC 2', 'TOC 3'):
+            try:
+                st = d.Styles(name)
+                st.Font.Name = FONT; st.Font.Size = 11
+            except Exception:
+                pass
+        d.Save()
+        # a preview PDF only where asked: this PC lacks the Sarabun font, so Word
+        # draws it with another one (make the real PDF from Google Docs)
+        pv = os.environ.get('DOCS_PREVIEW')
+        if pv:
+            d.ExportAsFixedFormat(os.path.join(pv, os.path.basename(path)[:-5] + '.pdf'), 17)
+        d.Close(False)
+        print('  Word: table of contents filled in' + (', preview PDF in ' + pv if pv else ''))
+    finally:
+        word.Quit()
 
 
 if __name__ == '__main__':
