@@ -144,7 +144,7 @@ def fig_system():
         f.text(hx, 625, 'หูฟัง / ลำโพง', 14, 600, 'middle', '#0d9488')
         f.arrow([(hx, 482), (hx, 538)], None, '#0d9488')
     ax, bxx = 50 + 416, 920 + 14
-    labels = ['ขา 5 TX  →  330 Ω  →  ขา 6 RX', 'ขา 6 RX  ←  330 Ω  ←  ขา 5 TX', 'ขา 2 GND  ———  ขา 2 GND']
+    labels = ['ขา 5 TX  ————→  ขา 6 RX', 'ขา 6 RX  ←————  ขา 5 TX', 'ขา 2 GND  ———  ขา 2 GND']
     for y, col in zip([262, 284, 306], ['#059669', '#0891b2', '#334155']):
         f.add(f'<path d="M{ax},{y} C{ax + 140},{y + 90} {bxx - 140},{y + 90} {bxx},{y}" fill="none" stroke="{col}" stroke-width="4"/>')
     f.rect(560, 120, 290, 106, '#059669', '#ffffff', r=10)

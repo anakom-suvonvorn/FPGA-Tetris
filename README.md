@@ -30,7 +30,7 @@ with `git checkout <branch>`. Each has its own ready-built
 
 * 2 EDGE Spartan-7 boards (1 is enough for single player), each with a VGA
   monitor
-* 3 jumper wires + two 330 Ω resistors to link the boards (header J5)
+* 3 jumper wires to link the boards (header J5)
 * headphones or powered speakers on the audio jack (optional; the buzzer
   needs jumper J6)
 * a Windows PC with Vivado 2025.2 (the scripts look in
@@ -55,11 +55,11 @@ with `git checkout <branch>`. Each has its own ready-built
    `tools\program.bat game`, or with the TA's FPGA Builder:
    `tools\load_into_builder.bat` -> type `game` -> open the Builder -> Program.
    The ready-built bitstream is `game\build\top_tetris.bit`.
-2. **Connect the boards** with 3 jumper wires on header J5 (two 330 Ω
-   resistors in the signal wires):
+2. **Connect the boards** with 3 jumper wires on header J5 (wired
+   straight, crossed over):
    ```
-   Board A  J5 pin 5 (TX) ---[330 Ω]---> J5 pin 6 (RX)  Board B
-   Board A  J5 pin 6 (RX) <---[330 Ω]--- J5 pin 5 (TX)  Board B
+   Board A  J5 pin 5 (TX) -------------> J5 pin 6 (RX)  Board B
+   Board A  J5 pin 6 (RX) <------------- J5 pin 5 (TX)  Board B
    Board A  J5 pin 2 (GND) ------------- J5 pin 2 (GND) Board B
    ```
    Within half a second both screens say **LINKED**. Without a second

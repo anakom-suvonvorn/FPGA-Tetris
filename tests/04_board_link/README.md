@@ -11,15 +11,15 @@ Do test 02 first: it confirms that J5 pin 5 is L14 and pin 6 is M13.
 ## You need
 
 * 2 boards, both loaded with this same design;
-* 3 female-to-female jumper wires;
-* 2 resistors, about 330 Ω (220 Ω–1 kΩ is fine).
+* 3 female-to-female jumper wires (nothing else: the wires go straight
+  from pin to pin).
 
 ## Step 1: one board, loopback
 
 1. Load the design into one board: `tools\program.bat 04_board_link`.
 2. The display shows `xx.--`: left = this board's switches (SW10…SW2,
    in hex), right = `--` because nothing is being received.
-3. Connect **J5 pin 5 to J5 pin 6** on the same board (through a resistor).
+3. Connect **J5 pin 5 to J5 pin 6** on the same board with one wire.
 4. The right two digits now show the same value as the left. Flip some of the
    8 right-hand switches: both halves change together.
 
@@ -31,8 +31,8 @@ Wire them like this (see `docs\concepts.md` §9 for why):
 
 ```
    Board A                                    Board B
-   J5 pin 5  (TX) ---[330 Ω]--------------->  J5 pin 6  (RX)
-   J5 pin 6  (RX) <---------------[330 Ω]---  J5 pin 5  (TX)
+   J5 pin 5  (TX) ------------------------->  J5 pin 6  (RX)
+   J5 pin 6  (RX) <-------------------------  J5 pin 5  (TX)
    J5 pin 2  (GND) -------------------------  J5 pin 2  (GND)
 ```
 

@@ -210,7 +210,7 @@ canvas { display: block; max-width: 100%; height: auto; border-radius: 4px; imag
 <!-- ================================================================ 3 -->
 <section id="fsm">
   <h2><span class="tag">tetris_core · state_t</span>One frame through the state machine</h2>
-  <p>Each box is a <code>when S_… =&gt;</code> in the code. Each step below is <b>one clock</b> (20 ns). Pick a situation and step through it. The highlighted box is the state the machine is in during that clock. Every arrow is a possible change of state (the four states on the right are new for versus garbage and the chaos SINK bonus). Dashed arrows are the "nothing to do, skip" paths. A curved arrow back into the same box means the state repeats for several clocks. Follow it from the top: a new piece flows down the middle into <code>S_GHOST</code>; the frame loop goes round the left and bottom; locking goes up the right side back to <code>S_PICK</code>.</p>
+  <p>Each box is a <code>when S_… =&gt;</code> in the code. Each step below is <b>one clock</b> (20 ns). Pick a situation and step through it. The highlighted box is the state the machine is in during that clock. Every arrow is a possible change of state (the three states at the top right are for versus garbage; the two at the bottom right are the chaos SINK bonus, which <code>S_PLAY</code> starts at any moment, not only when a piece locks). Dashed arrows are the "nothing to do, skip" paths. A curved arrow back into the same box means the state repeats for several clocks. Follow it from the top: a new piece flows down the middle into <code>S_GHOST</code>; the frame loop goes round the left and bottom; locking goes up the right side back to <code>S_PICK</code>.</p>
   <div class="stage">
     <div class="controls" role="group" aria-label="Scenario" id="scnBtns"></div>
     <div class="controls">
@@ -220,7 +220,7 @@ canvas { display: block; max-width: 100%; height: auto; border-radius: 4px; imag
       <button id="fsmReset">restart</button>
       <span class="clock" id="fsmClock"></span>
     </div>
-    <div class="scroll"><svg id="fsmSvg" viewBox="0 0 1060 625" style="min-width:800px;width:100%" role="img" aria-label="State machine diagram"></svg></div>
+    <div class="scroll"><svg id="fsmSvg" viewBox="0 0 1140 625" style="min-width:800px;width:100%" role="img" aria-label="State machine diagram"></svg></div>
     <div class="log" id="fsmLog" aria-live="polite"></div>
   </div>
 </section>
@@ -797,7 +797,8 @@ canvas { display: block; max-width: 100%; height: auto; border-radius: 4px; imag
     S_PLAY: [580, 540], S_ROT: [420, 540], S_ROT_CHK: [260, 540], S_MOVE: [100, 540],
     S_MOVE_CHK: [100, 440], S_DOWN: [100, 345], S_DOWN_CHK: [100, 250],
     S_LOCK: [760, 440], S_CLEAR: [760, 345], S_SCORE: [760, 250],
-    S_ATTACK: [760, 155], S_HOLE: [920, 155], S_GARB: [920, 60], S_SINK: [920, 250]
+    S_ATTACK: [760, 155], S_HOLE: [920, 155], S_GARB: [920, 60],
+    S_SINK: [1060, 440], S_SINK_CHK: [1060, 345]
   };
   const NW = 124, NH = 38;
   const T = n => [NODES[n][0], NODES[n][1] - NH / 2], B = n => [NODES[n][0], NODES[n][1] + NH / 2];
@@ -815,15 +816,17 @@ canvas { display: block; max-width: 100%; height: auto; border-radius: 4px; imag
     [[B("S_LOCKCHK"), T("S_PLAY")], "no lock", 590, 497],
     [[R("S_LOCKCHK"), Lf("S_LOCK")], "lock", 670, 432],
     [[T("S_LOCK"), B("S_CLEAR")], "4 rows done", 770, 397],
-    [[T("S_CLEAR"), B("S_SCORE")], "done", 770, 302],
+    [[T("S_CLEAR"), B("S_SCORE")], "done", 770, 318],
     [[T("S_SCORE"), B("S_ATTACK")], "lines counted", 770, 207],
     [[T("S_ATTACK"), [760, 24], [420, 24], T("S_PICK")], "next piece", 470, 19],
     [[R("S_ATTACK"), Lf("S_HOLE")], "rise", 826, 147],
     [[T("S_HOLE"), B("S_GARB")], "hole picked", 928, 112],
     [[[890, NODES.S_GARB[1] - NH / 2], [890, 24], [420, 24], T("S_PICK")], "rows done", 800, 36],
     [[[950, NODES.S_GARB[1] - NH / 2], [950, 6], [100, 6], T("S_IDLE")], "pushed out: lose", 790, 17],
-    [[[NODES.S_ATTACK[0] + NW / 2, 165], [840, 165], [840, 250], Lf("S_SINK")], "sink", 846, 214],
-    [[R("S_SINK"), [1040, 250], [1040, 24], [420, 24], T("S_PICK")], "rows gone", 990, 242],
+    // chaos SINK: straight from S_PLAY as soon as sink_left > 0 (not only after a lock)
+    [[B("S_PLAY"), [580, 588], [1060, 588], B("S_SINK")], "sink_left > 0 (a SINK bonus came)", 640, 604],
+    [[T("S_SINK"), B("S_SINK_CHK")], "rows done", 1068, 397],
+    [[T("S_SINK_CHK"), [1060, 290], [670, 290], [670, 250], R("S_GHOST")], "piece fits", 900, 284],
     [[Lf("S_PLAY"), R("S_ROT")]],
     [[Lf("S_ROT"), R("S_ROT_CHK")]],
     [[Lf("S_ROT_CHK"), R("S_MOVE")]],
@@ -840,13 +843,13 @@ canvas { display: block; max-width: 100%; height: auto; border-radius: 4px; imag
   const LOOPS = {
     S_IDLE: ["bottomleft", "wait for start", 30, 116, "start"], S_PICK: ["bottom", "retry"], S_PLAY: ["right", "wait for frame_tick"],
     S_ROT_CHK: ["top", "next kick"], S_GHOST_CHK: ["left", "1 row lower"], S_LOCK: ["right", "next box row"],
-    S_CLEAR: ["right", "1 row / clock"], S_SCORE: ["left", "1 line / clock", 680, 292, "middle"], S_SINK: ["bottom", "1 row / clock"],
+    S_CLEAR: ["right", "1 row / clock"], S_SCORE: ["right", "1 line / clock"], S_SINK: ["left", "1 row / clock", 985, 480, "end"], S_SINK_CHK: ["left", "lift piece 1 row", 990, 378, "end"],
     S_HOLE: ["right", "retry", 998, 194, "middle"], S_GARB: ["right", "1 row / clock", 1000, 34, "middle"]
   };
   let nodeEls = {};
   function drawFsm() {
     const svg = document.getElementById("fsmSvg");
-    svg.setAttribute("viewBox", "0 0 1060 625");
+    svg.setAttribute("viewBox", "0 0 1140 625");
     svg.innerHTML = "";
     const defs = el("defs", {}, svg);
     const mk = el("marker", { id: "arr", viewBox: "0 0 10 10", refX: 9, refY: 5, markerWidth: 7, markerHeight: 7, orient: "auto-start-reverse" }, defs);
@@ -855,7 +858,8 @@ canvas { display: block; max-width: 100%; height: auto; border-radius: 4px; imag
     el("text", { x: 300, y: 450, class: "c-muted", "font-size": 12 }, svg, "once per frame");
     el("text", { x: 300, y: 466, class: "c-muted", "font-size": 11 }, svg, "(60 times a second)");
     el("text", { x: 830, y: 520, "text-anchor": "middle", class: "c-muted", "font-size": 12 }, svg, "lock · clear · score");
-    el("text", { x: 862, y: 212, class: "c-muted", "font-size": 12 }, svg, "versus + chaos");
+    el("text", { x: 862, y: 212, class: "c-muted", "font-size": 12 }, svg, "versus garbage");
+    el("text", { x: 1060, y: 500, "text-anchor": "middle", class: "c-muted", "font-size": 12 }, svg, "chaos SINK bonus");
     el("text", { x: 180, y: 120, class: "c-muted", "font-size": 12 }, svg, "new game / new piece");
     el("text", { x: 180, y: 136, class: "c-accent", "font-size": 11, "font-weight": 600 }, svg, "rival LOST, in any state → S_IDLE (WIN!)");
     // edges
@@ -978,18 +982,11 @@ canvas { display: block; max-width: 100%; height: auto; border-radius: 4px; imag
       ["S_SPAWN", "new piece at (6, 0) → S_SPAWN_CHK"],
       ["S_SPAWN_CHK", "fits → S_GHOST"],
       ...tail(12)],
-    "chaos bonus: sink": [["S_LOCKCHK", "the piece locks (a SINK bonus came in earlier: sink_left = 2, pending = 0) → S_LOCK"],
-      ["S_LOCK", "4 box rows written into the field", 4],
-      ["S_CLEAR", "no full rows", 20],
-      ["S_CLEAR", "done → S_SCORE"],
-      ["S_SCORE", "score_left = 0 → S_ATTACK"],
-      ["S_ATTACK", "nothing to send; sink_left = 2 → S_SINK (garbage would wait for the next lock)"],
+    "chaos bonus: sink": [["S_PLAY", "Waiting for frame_tick. In the clock before, a SINK bonus arrived (fx_sink pulse: sink_left = 2, waiting garbage cancelled). sink_left > 0 → S_SINK at once: no frame_tick and no lock needed"],
       ["S_SINK", "every row takes the row ABOVE it, an empty row enters at the top: the bottom row is gone. sink_left = 1"],
       ["S_SINK", "again: sink_left = 0"],
-      ["S_SINK", "sink_left = 0 → S_PICK"],
-      ["S_PICK", "next piece → S_SPAWN"],
-      ["S_SPAWN", "→ S_SPAWN_CHK"],
-      ["S_SPAWN_CHK", "fits → S_GHOST"],
+      ["S_SINK", "sink_left = 0 → cand = the falling piece exactly where it is now. → S_SINK_CHK"],
+      ["S_SINK_CHK", "collide = 0: the piece still fits, so it stays where it is on the screen. (If a block had moved down into it, cand_y − 1 and check again: the piece is lifted.) → S_GHOST"],
       ...tail(14)],
     "win: rival lost": [tick,
       ["S_ROT", "nothing → S_MOVE"],

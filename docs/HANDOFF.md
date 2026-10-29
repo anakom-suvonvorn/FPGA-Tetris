@@ -268,7 +268,7 @@ Jevil + faces). Bad Apple changed by the user to 0-84.2 s, fade 0.4 s.
   F2 = to PC (FPGA tx)** - the manual and the TA Builder labels are swapped.
 * J5 header: pins 1..4 = 5V GND 3V3 GND; pins 5..20 = L14 M13 H14 H13 F11 G11
   C14 D14 E13 F13 F14 G14 D13 D12 E12 F12. Link uses pin 5 (L14) tx, pin 6
-  (M13) rx (PULLUP), GND pin 2. Crossed wires + 330 Ω.
+  (M13) rx (PULLUP), GND pin 2. Crossed plain wires, no resistors (user, 2026-10-29).
 * Buzzer B14 (jumper J6), audio jack L/R A13/B13 (driven directly by pins;
   sigma-delta - not yet heard on hardware), PS/2 C12/E11. **Flash** (from
   Vivado `get_package_pins`, not yet hardware-verified): FCS_B C11, D00/MOSI

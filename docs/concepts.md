@@ -271,8 +271,8 @@ for the cable between the two boards.
 
 ```
    Board A                                    Board B
-   J5 pin 5  (L14, TX) ---[330 Ω]------------> J5 pin 6  (M13, RX)
-   J5 pin 6  (M13, RX) <------------[330 Ω]--- J5 pin 5  (L14, TX)
+   J5 pin 5  (L14, TX) ----------------------> J5 pin 6  (M13, RX)
+   J5 pin 6  (M13, RX) <---------------------- J5 pin 5  (L14, TX)
    J5 pin 2  (GND)     ----------------------- J5 pin 2  (GND)
 ```
 
@@ -280,9 +280,9 @@ for the cable between the two boards.
 * **Ground wire:** a voltage only means something relative to ground. The
   boards are powered separately, so without this wire the receiver can't
   tell 0 from 1.
-* **330 Ω resistors:** if a pin assignment is wrong and two outputs end up
-  fighting each other, the resistor limits the current to ~10 mA so nothing
-  gets damaged. Normal signals pass through unaffected at this speed.
+* **Plain wires, nothing in between:** both boards use 3.3 V pins
+  (LVCMOS33), so an output of one board can drive an input of the other
+  directly. Just check each TX goes to the other board's RX (never TX to TX).
 
 ## 10. Simulation and testbenches
 

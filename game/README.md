@@ -112,8 +112,8 @@ Same as test 04 (test that first):
 
 ```
    Board A                                    Board B
-   J5 pin 5  (TX) ---[330 Ω]--------------->  J5 pin 6  (RX)
-   J5 pin 6  (RX) <---------------[330 Ω]---  J5 pin 5  (TX)
+   J5 pin 5  (TX) ------------------------->  J5 pin 6  (RX)
+   J5 pin 6  (RX) <-------------------------  J5 pin 5  (TX)
    J5 pin 2  (GND) -------------------------  J5 pin 2  (GND)
 ```
 

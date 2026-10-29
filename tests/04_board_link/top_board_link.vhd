@@ -10,11 +10,11 @@
 --                         or "--" if nothing has arrived for 0.25 seconds
 --                         (cable unplugged, other board off, wrong wiring)
 --
--- Wiring with jumper wires, through a 330 ohm resistor on each signal wire
--- (the resistor protects the pins if something is plugged in wrong):
+-- Wiring with plain jumper wires, straight from pin to pin (both boards
+-- use 3.3 V pins):
 --
---     Board A  J5 pin 5 (L14, link_tx)  ---[330]--->  Board B  J5 pin 6 (M13, link_rx)
---     Board A  J5 pin 6 (M13, link_rx)  <---[330]---  Board B  J5 pin 5 (L14, link_tx)
+--     Board A  J5 pin 5 (L14, link_tx)  ---------->  Board B  J5 pin 6 (M13, link_rx)
+--     Board A  J5 pin 6 (M13, link_rx)  <----------  Board B  J5 pin 5 (L14, link_tx)
 --     Board A  J5 pin 2 or 4 (GND)      ------------  Board B  J5 pin 2 or 4 (GND)
 --
 --   TX of one board always goes to RX of the other (crossed over).
