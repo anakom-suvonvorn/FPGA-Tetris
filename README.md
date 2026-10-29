@@ -145,6 +145,8 @@ README saying what you should see.
   sim\                 testbenches (+ a .prj file list each); sim\out = their output
   tools\               build.bat, program.bat, sim.bat, build_all.bat, vivado_gui.bat,
                         load_into_builder.bat (fills the TA's FPGA Builder), fake_opponent.py
+  cad\
+    cover\             3D-printed cover plate for the board with labels (make_cover.py, out\cover.3mf)
   docs\
     learn\             the course: VHDL from zero, then every file line by line
     concepts.md         how VGA, serial, J5, clocks and timing work

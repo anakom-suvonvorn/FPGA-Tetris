@@ -1,0 +1,4 @@
+# vendor product photo, used only for out/check_overlay.png
+ref/
+out/check_overlay.png
+__pycache__/
