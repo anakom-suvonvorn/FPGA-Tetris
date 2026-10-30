@@ -31,7 +31,7 @@
 
 | เมื่อไร | ทำอะไร | ใคร |
 |---|---|---|
-| **พ. 28 ต.ค. คืนนี้** | 1. ใส่ **ชื่อ-รหัส นศ. ทุกคน** และชื่อกลุ่มแทน `[...]` ในทุกไฟล์<br>2. อัปโหลด `Proposal.docx` และ `Design_Document.docx` ขึ้น Google Drive แล้วเปิดด้วย Google Docs<br>3. **ลงคิวส่งงาน** (ปิด 30 ต.ค. 09:00 แต่ลงไว้ก่อนเลย)<br>4. ถ่ายฟุตเทจของจริง (ดู shot list ใน `video_script.md`) | ทุกคน |
+| **พ. 28 ต.ค. คืนนี้** | 1. ใส่ **ชื่อ-รหัส นศ. ทุกคน** แทน `[...]` ในทุกไฟล์<br>2. อัปโหลด `Proposal.docx` และ `Design_Document.docx` ขึ้น Google Drive แล้วเปิดด้วย Google Docs<br>3. **ลงคิวส่งงาน** (ปิด 30 ต.ค. 09:00 แต่ลงไว้ก่อนเลย)<br>4. ถ่ายฟุตเทจของจริง (ดู shot list ใน `video_script.md`) | ทุกคน |
 | **พฤ. 29 ต.ค. เช้า** | อ่าน Proposal และ Design Doc ในกลุ่ม แก้ส่วนที่ทำเครื่องหมาย `[...]`, ทำ Brochure ใน Canva, อัดเสียงบรรยาย | แบ่งกัน |
 | **พฤ. 29 ต.ค. บ่าย** | ตัดต่อวิดีโอ → **อัปโหลด YouTube แบบ Public ให้เร็วที่สุด** (เผื่อติดลิขสิทธิ์ ดูข้อ 6) → ทำ short link (`youtu.be/...` ใช้ได้เลย) + QR code | ทีมวิดีโอ |
 | **พฤ. 29 ต.ค. เย็น** | ใส่ short link + QR ลงใน Design Doc และ Brochure → Export PDF ทุกไฟล์ → พิมพ์ (Brochure พิมพ์สี หน้า-หลัง) → ใส่ทุกอย่างลงแฟลชไดรฟ์ (ข้อ 4) → ซ้อมเดโม 2 รอบ (`demo_and_qa.md`) | ทุกคน |
@@ -53,7 +53,7 @@
   1. ใช้ตัวนี้เลย (พิมพ์ได้ทันที) หรือ
   2. ทำใหม่ใน Canva (A4 แนวนอน 2 หน้า แบ่ง 3 ช่อง ขนาดช่องดูใน `brochure_text.md`) โดยใช้ข้อความใน `brochure_text.md` และรูปใน `figures/`
      (Canva เปิด PDF ให้แก้ได้ด้วย: Create design → Import file → เลือก PDF แต่ฟอนต์ไทยอาจเพี้ยน)
-* **ส่วนที่ต้องเติมเอง** ทำเครื่องหมายไว้เป็น `[...]` (เหลือ: ชื่อกลุ่ม, รายการเครดิตสื่อ, หน้าที่ของแต่ละคนใน Proposal, ชื่อผู้นำเสนอใน `demo_and_qa.md`) ค้นหาด้วย Ctrl+F คำว่า `[`
+* **ส่วนที่ต้องเติมเอง** ทำเครื่องหมายไว้เป็น `[...]` (เหลือ: รายการเครดิตสื่อ, หน้าที่ของแต่ละคนใน Proposal, ชื่อผู้นำเสนอใน `demo_and_qa.md`) ค้นหาด้วย Ctrl+F คำว่า `[`
 * **ลิงก์**: วิดีโอ https://youtu.be/YtPQ8QKf48c (QR: `figures/qr_video.png`), โค้ด https://github.com/anakom-suvonvorn/FPGA-Tetris
 
 ## 4. สิ่งที่ต้องอยู่ในแฟลชไดรฟ์ (2.6)
@@ -115,7 +115,7 @@ CE_KMITL_Digital_2569_TetrisDuel\
 |---|---|
 | `README.md` | ไฟล์นี้ (แผนการส่งงาน) |
 | `2.1_Proposal/proposal.md` | ข้อความ Proposal ฉบับเต็ม |
-| `2.2_Brochure/brochure.html` | Brochure ตัวอย่าง แผ่นพับ 3 ตอน (A4 แนวนอน ด้านนอก + ด้านใน) → `Brochure_example.pdf`, `Brochure_outside.png`, `Brochure_inside.png` |
+| `2.2_Brochure/brochure.html` | Brochure ตัวอย่าง แผ่นพับ 3 ตอน (A4 แนวนอน ด้านนอก + ด้านใน) → `Brochure.pdf`, `Brochure_outside.png`, `Brochure_inside.png` |
 | `2.2_Brochure/brochure_text.md` | ข้อความ Brochure แยกเป็นช่อง สำหรับ Canva |
 | `2.3_Design_Document/design_document.md` | Design Document ฉบับเต็ม (~75 หน้า: Top-Down ระดับ 0-4, พื้นฐานจากศูนย์, Top-Down ทุกโมดูลพร้อมโค้ดจริง, วิธีสร้างซ้ำ, schematic จาก Vivado; โค้ดเต็มอ้างไปที่ GitHub) แก้ที่ `parts/*.md` แล้วรวมเป็นไฟล์นี้ โค้ดในเอกสารดึงจากไฟล์จริงตอนรัน `python build_docs.py` |
 | `figures/faces_on_bouncers.py` | ภาพหน้าจอสำหรับเอกสาร: ใส่หน้าเพื่อนบนลูกบอลตามกติกาเดียวกับวงจร (ภาพจำลองไม่มีแฟลช) |
