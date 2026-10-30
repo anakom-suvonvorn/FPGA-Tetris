@@ -1,3 +1,4 @@
+<meta charset="utf-8">
 <title>Tetris Duel Backstage</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -94,6 +95,24 @@ input[type=range] { accent-color: var(--accent); flex: 1 1 200px; min-width: 0; 
 .bytes span.on { background: var(--accent-soft); border-color: var(--accent); }
 .bits { font-family: var(--mono); font-size: 22px; letter-spacing: .12em; }
 .bits b { color: var(--warm); }
+.scale { display: grid; gap: 8px; font-size: 13px; }
+.scale .row { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 10px; align-items: center; }
+.scale .bar { height: 18px; background: var(--code-bg); border: 1px solid var(--line); border-radius: 4px; position: relative; overflow: hidden; }
+.scale .bar i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--accent); min-width: 2px; }
+.scale .bar i.w { background: var(--warm); }
+.scale .row span { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.verdict { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.mon { background: #111; border-radius: 8px; border: 4px solid #333; padding: 10px 12px; display: grid; gap: 2px; }
+.mon .who { font-family: var(--mono); font-size: 12px; color: #9aa6b4; }
+.mon .res { font-family: var(--display); font-weight: 800; font-size: 28px; letter-spacing: .06em; }
+.agree { font-weight: 600; }
+.agree.bad { color: var(--warm); }
+.shots { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.shots figure { margin: 0; display: grid; gap: 6px; }
+.shots figcaption { font-size: 13px; color: var(--muted); }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13px; }
+.legend span::before { content: ''; display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; background: var(--sw); }
+@media (max-width: 600px) { .shots { grid-template-columns: minmax(0, 1fr); } .scale .row { grid-template-columns: minmax(0, 1fr); gap: 2px; } }
 @media (max-width: 860px) {
   .wrap { grid-template-columns: minmax(0, 1fr); gap: 24px; }
   nav.toc { position: static; grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -111,12 +130,14 @@ html { scroll-behavior: smooth; }
   <a href="#sim"><span>2</span>Testbenches</a>
   <a href="#jevil"><span>3</span>Jevil's sine path</a>
   <a href="#pc"><span>4</span>The computer side</a>
+  <a href="#result"><span>5</span>Win, lose, draw</a>
+  <a href="#vga"><span>6</span>VGA without a clock</a>
 </nav>
 
 <main>
 <header class="top">
   <h1>Tetris Duel Backstage</h1>
-  <p>Four things that happen out of sight: how all the on-screen text shares one font table, how we test circuits without a board, how Jevil floats around, and what every Python and batch script on the PC does. Every number here comes from the project's real files.</p>
+  <p>Six things that happen out of sight: how all the on-screen text shares one font table, how we test circuits without a board, how Jevil floats around, what every Python and batch script on the PC does, how two boards agree on who won, and how a monitor finds the pixels with no clock wire. Every number here comes from the project's real files.</p>
 </header>
 
 <!-- =============================================================== 1 -->
@@ -409,6 +430,199 @@ y = <span class="h">190</span> + <span class="h">150</span> · sin(2π t / <span
     <p style="font-size:14px;color:var(--muted)">This is what all of pipeline B produces: plain bytes, in an order that <code>media_engine.vhd</code> reads back the same way. Multi-byte numbers are little-endian, so <code>00 82 78</code> reads as 0x788200, the address of the sprite block.</p>
   </div>
 </section>
+
+<!-- =============================================================== 5 -->
+<section id="result">
+  <div class="eyebrow">part 5 · src/game/tetris_core.vhd + versus_link.vhd</div>
+  <h2>Win, lose and draw: a race measured in microseconds</h2>
+  <p>Each board runs its own game and decides its own result. Nobody is in charge, and there is no "DRAW" message. The two boards still always agree, because both follow the same three rules.</p>
+
+  <h3>The three rules</h3>
+  <ol class="steps">
+    <li><div><b>I top out → I show LOSE and tell the other board.</b> Topping out happens in two places in <code>tetris_core</code>: a new piece has no room to appear (<code>S_SPAWN_CHK</code>), or incoming garbage pushes a block out of the top row (<code>S_GARB</code>). In the same clock the board stops playing, sets <code>result = LOSE</code>, sends a one-clock <code>lost_o</code> pulse to the link, and starts a stopwatch: <code>lose_age := 0</code>. From then on <code>lose_age</code> goes up by 1 at every frame tick (60 a second) and stops at 63.</div></li>
+    <li><div><b>The link sends a LOST byte as soon as the wire is free.</b> <code>versus_link</code> remembers the request (<code>lost_p</code>). If the transmitter is in the middle of another byte (usually a heartbeat), LOST waits for it to finish. When several messages wait, the order is START &gt; LOST &gt; ATTACK &gt; GARBAGE &gt; HEARTBEAT.</div></li>
+    <li><div><b>A LOST byte arrives → decide.</b> If I'm still playing, I <b>WIN</b> (and stop). If I already lost <b>and</b> <code>lose_age &lt; 6</code>, my LOSE becomes <b>DRAW</b>. Otherwise nothing changes.</div></li>
+  </ol>
+  <pre><span class="c">-- tetris_core.vhd: the other board lost</span>
+if opp_lost = '1' then
+  if playing_r = '1' then
+    result_r  &lt;= <span class="h">R_WIN</span>;                  <span class="c">-- it lost first: I win</span>
+    playing_r &lt;= '0';  state &lt;= S_IDLE;
+  elsif result_r = R_LOSE and <span class="h">lose_age &lt; 6</span> then
+    result_r  &lt;= <span class="h">R_DRAW</span>;                 <span class="c">-- we both lost at (almost) the same moment</span>
+  end if;
+end if;</pre>
+  <p>Both boards run this same code. If both topped out, each one gets the other's LOST shortly after its own loss, and each turns its own LOSE into DRAW. They end up agreeing without ever discussing it.</p>
+
+  <h3>How long everything takes</h3>
+  <p>The link runs at 115,200 bits a second. One bit lasts 434 clocks at 50 MHz = <b>8.68 µs</b>, and a byte is 10 bits (start + 8 data + stop) = <b>86.8 µs</b>. The receiver says "valid" in the middle of the stop bit, 9.5 bits = <b>82.5 µs</b> after the byte starts. One frame of the screen is 16,800 µs. Next to a frame, the message is tiny:</p>
+  <div class="bench">
+    <div class="label">To scale: one frame vs. the LOST message</div>
+    <div class="scale">
+      <div class="row"><b>one frame</b><div class="bar"><i style="width:100%"></i></div></div>
+      <div class="row"><b>LOST, wire free</b><div class="bar"><i class="w" style="width:0.49%"></i></div></div>
+      <div class="row"><b>LOST, worst case</b><div class="bar"><i class="w" style="width:1.0%"></i></div></div>
+      <div class="row"><span></span><span>16,800 µs · 82.5 µs · 169 µs (a heartbeat had just started, so LOST waits 86.8 µs first)</span></div>
+    </div>
+  </div>
+  <p>So the LOST message always arrives within <b>about 1 % of one frame</b>. That decides everything below.</p>
+
+  <h3>So when is it really a draw?</h3>
+  <p>Say board A tops out at time 0. Its LOST reaches B 82.5 to 169 µs later. At that moment B is either:</p>
+  <ul>
+    <li><b>still playing</b> → B shows WIN and stops. B can never top out after that, so it never sends LOST, and A stays on LOSE.</li>
+    <li><b>already topped out</b> (in the last 82.5 to 169 µs) → B is on LOSE with <code>lose_age</code> 0, so B shows DRAW. B's own LOST reaches A just as fast, A's <code>lose_age</code> is 0 too, so A shows DRAW.</li>
+  </ul>
+  <p class="note">A draw needs both boards to top out within about <b>0.1 ms</b> of each other. If B tops out even 1 ms after A, B has already received A's LOST and won. The 6-frame limit does not make the draw window bigger; it only decides how stale a LOST may be and still count.</p>
+
+  <div class="bench">
+    <div class="label">Try it: the race, to the microsecond</div>
+    <div class="controls">
+      <label for="rGap">B tops out</label>
+      <input type="range" id="rGap" min="-300" max="300" step="1" value="40">
+      <span id="rGapT" class="m"></span>
+    </div>
+    <div class="controls">
+      <label for="rBusyA">A's sender</label>
+      <select id="rBusyA"><option value="0">idle</option><option value="43.4">half-way through a heartbeat</option><option value="86.8">just started a heartbeat</option></select>
+      <label for="rBusyB">B's sender</label>
+      <select id="rBusyB"><option value="0">idle</option><option value="43.4">half-way through a heartbeat</option><option value="86.8">just started a heartbeat</option></select>
+    </div>
+    <div class="controls">
+      <label for="rTick">A's next frame tick</label>
+      <input type="range" id="rTick" min="1" max="400" step="1" value="400">
+      <span id="rTickT" class="m"></span>
+      <label for="rRule">rule</label>
+      <select id="rRule"><option value="1">lose_age &lt; 1</option><option value="2">lose_age &lt; 2</option><option value="6" selected>lose_age &lt; 6 (real)</option></select>
+    </div>
+    <div class="controls">
+      <button type="button" data-r="40,0,0,400,6">Both at nearly the same moment</button>
+      <button type="button" data-r="200,0,0,400,6">B 200 µs later</button>
+      <button type="button" data-r="-120,0,86.8,400,6">B first, B's wire busy</button>
+      <button type="button" data-r="40,0,0,30,1">The "&lt; 1" trap</button>
+    </div>
+    <canvas id="rLine" width="900" height="260" aria-label="Timeline of both boards topping out and the LOST messages"></canvas>
+    <div class="verdict">
+      <div class="mon" id="rMonA"><span class="who">board A shows</span><span class="res"></span></div>
+      <div class="mon" id="rMonB"><span class="who">board B shows</span><span class="res"></span></div>
+    </div>
+    <p id="rText" style="font-size:14px" aria-live="polite"></p>
+  </div>
+
+  <h3>Why "lose_age &lt; 6" and not "&lt; 1"?</h3>
+  <p>You guessed the serial line's time is the reason. It's part of it, but the real reason is that <code>lose_age</code> can only count <b>whole frames</b>: it goes up at the frame tick, once every 16.8 ms, whenever that happens to fall.</p>
+  <ul>
+    <li>"<code>&lt; 1</code>" would mean "no frame tick has happened since I lost".</li>
+    <li>But A's loss can happen a few µs before one of A's frame ticks (the two boards' frames are not lined up with each other). Then A's <code>lose_age</code> is already 1 by the time B's LOST arrives, 100 µs later. With "<code>&lt; 1</code>", A would stay on <b>LOSE</b> while B shows <b>DRAW</b>: the two screens disagree. Press <b>The "&lt; 1" trap</b> above to see it.</li>
+    <li>The LOST can arrive at most about 0.17 ms after my loss, so at most <b>one</b> frame tick can fall in between. "<code>&lt; 2</code>" is already always safe.</li>
+    <li><b>6 frames (0.1 s)</b> is just a comfortable margin. Going bigger changes nothing in real play, because a LOST later than 0.2 ms after my loss can't happen: the other board would have won instead. The limit only protects against a LOST that has nothing to do with my loss.</li>
+  </ul>
+
+  <h3>What each ending looks like</h3>
+  <p>Drawn from the real rules in <code>tetris_render.vhd</code> with the real font: a dark band at y 192 to 239 across the field, the result text at (272, 202) with each font dot 4 × 4 pixels, and a frame around the field. Topping out turns every locked block grey (<code>x"555"</code>) and the frame red. 1.5 s later the cool-down ends and PRESS START appears on a second band.</p>
+  <div class="bench">
+    <div class="shots">
+      <figure><canvas id="shotWin" width="240" height="360" aria-label="The WIN screen"></canvas><figcaption><b>WIN!</b> gold text <code>x"FD3"</code>, gold frame, blocks keep their colours</figcaption></figure>
+      <figure><canvas id="shotLose" width="240" height="360" aria-label="The LOSE screen"></canvas><figcaption><b>LOSE</b> red text <code>x"F44"</code>, red frame, blocks grey</figcaption></figure>
+      <figure><canvas id="shotDraw" width="240" height="360" aria-label="The DRAW screen"></canvas><figcaption><b>DRAW</b> white text <code>x"DDD"</code>, red frame (I did top out), blocks grey</figcaption></figure>
+    </div>
+  </div>
+  <div class="tscroll"><table>
+    <thead><tr><th>ending</th><th>text</th><th>media clip (media_ctrl)</th><th>jingle (tetris_sound)</th></tr></thead>
+    <tbody>
+      <tr><td>WIN</td><td>WIN! gold</td><td>one of the 4 win clips, at random</td><td>win jingle</td></tr>
+      <tr><td>LOSE</td><td>LOSE red</td><td>one of the 8 lose clips, at random</td><td>lose jingle</td></tr>
+      <tr><td>DRAW</td><td>DRAW white</td><td>a lose clip (see below)</td><td>lose jingle</td></tr>
+    </tbody>
+  </table></div>
+  <p class="note">A draw always passes through LOSE first: 0 → LOSE at the top-out, then LOSE → DRAW about 0.1 ms later. <code>media_ctrl</code> only reacts when the result first changes from 0 (<code>result /= 0 and result_d = 0</code>), so by the time DRAW arrives it has already picked a lose clip. <code>tetris_sound</code> plays the lose jingle for any result 2 and up. So a real draw is white DRAW text over a lose clip, even though the comment in <code>media_ctrl.vhd</code> says "a draw: nothing". It's harmless, and since both players topped out, a lose clip fits.</p>
+</section>
+
+<!-- =============================================================== 6 -->
+<section id="vga">
+  <div class="eyebrow">part 6 · src/common/vga_sync.vhd</div>
+  <h2>How the monitor knows where each pixel goes</h2>
+  <p>The VGA cable carries only five signals that matter: <b>R, G, B</b> (three voltages) and <b>HSYNC, VSYNC</b> (two pulses). There's no clock wire and no pixel address. The monitor still puts every pixel in the right place. Here's how.</p>
+
+  <h3>1. VGA was made for a beam that never needed a clock</h3>
+  <p>VGA comes from CRT monitors. Inside a CRT, an electron beam sweeps across the glass at a steady speed, left to right, and lights up the spot it hits. How brightly depends only on the voltage on the R/G/B wires <b>at that instant</b>. HSYNC says "this line is done, swing back to the left and drop one line"; VSYNC says "the picture is done, go back to the top".</p>
+  <p>So there is no such thing as "sending pixel 37". A pixel is just <b>how long we hold one voltage</b>. We change the colour every 40 ns (the 25 MHz pixel rate), and because the beam moves steadily, 640 changes make 640 dots across one line. The swing back takes time, which is why each line and each frame have invisible "porch" and "sync" time at the end. During that time the colour must be black.</p>
+
+  <div class="bench">
+    <div class="label">Try it: the beam, with the real 800 × 525 timing</div>
+    <div class="controls">
+      <button id="vPlay" type="button">Pause</button>
+      <label for="vSpeed">speed</label>
+      <select id="vSpeed">
+        <option value="0.25">crawl: one pixel at a time</option>
+        <option value="8" selected>slow</option>
+        <option value="800">one line per step</option>
+        <option value="7000">fast</option>
+        <option value="420000">real: a whole frame every 1/60 s</option>
+      </select>
+      <button id="vJumpH" type="button">Jump to the end of a line</button>
+      <button id="vJumpV" type="button">Jump to the bottom</button>
+    </div>
+    <div class="two">
+      <canvas id="vBeam" width="800" height="525" aria-label="The whole 800 by 525 frame with the beam position"></canvas>
+      <dl class="readout" id="vRead"></dl>
+    </div>
+    <div class="legend">
+      <span style="--sw:#5b6b80">front porch / back porch (black, invisible)</span>
+      <span style="--sw:#a3324a">sync pulse (HSYNC or VSYNC = 0)</span>
+      <span style="--sw:#e7ebf0">visible 640 × 480 (bright = already drawn this frame)</span>
+    </div>
+  </div>
+
+  <div class="tscroll"><table>
+    <thead><tr><th>part of a line</th><th>pixels</th><th>part of a frame</th><th>lines</th></tr></thead>
+    <tbody>
+      <tr><td>visible</td><td>640</td><td>visible</td><td>480</td></tr>
+      <tr><td>front porch</td><td>16</td><td>front porch</td><td>10</td></tr>
+      <tr><td>HSYNC pulse</td><td>96</td><td>VSYNC pulse</td><td>2</td></tr>
+      <tr><td>back porch</td><td>48</td><td>back porch</td><td>33</td></tr>
+      <tr><td>total</td><td>800 = 32.0 µs</td><td>total</td><td>525 = 16.8 ms</td></tr>
+    </tbody>
+  </table></div>
+  <p>So HSYNC comes 1 / 32.0 µs = <b>31,250 times a second</b>, and VSYNC 1 / 16.8 ms = <b>59.52 times a second</b>. (That 59.52 is also the number in Jevil's timing.) <code>vga_sync</code> is just two counters: <code>x</code> counts 0 to 799 on every pixel tick, and when it wraps, <code>y</code> counts 0 to 524.</p>
+
+  <h3>2. How 4 bits become a colour</h3>
+  <p>Each colour is 4 bits from the FPGA. The board turns those 4 pins into one voltage with a few resistors (a tiny digital-to-analog converter), from 0 V for 0 to about 0.7 V for 15. That gives 16 levels per colour and 16 × 16 × 16 = 4,096 colours. The monitor sees only that voltage; it has no idea bits were involved.</p>
+
+  <h3>3. How a flat screen finds the pixels again</h3>
+  <p>An LCD has a fixed grid of real pixels, so it can't just "glow wherever the beam is". It has to measure the voltage at exactly the right moments. It works the clock out from HSYNC:</p>
+  <ol class="steps">
+    <li><div><b>Recognise the mode.</b> It measures how often HSYNC and VSYNC come (31.25 kHz, 59.52 Hz), how many lines there are per frame (525) and which way the pulses go (both active-low). That pattern matches the standard 640 × 480 at 60 Hz mode, so it knows a line has <b>800 pixel times</b>.</div></li>
+    <li><div><b>Rebuild the pixel clock.</b> A circuit called a <b>PLL</b> makes a clock that ticks exactly 800 times between two HSYNC pulses. That's our 25 MHz, rebuilt from HSYNC alone. HSYNC is the clock, just 800 times slower.</div></li>
+    <li><div><b>Sample at the right moment.</b> It knows the picture starts 96 + 48 = 144 ticks after the HSYNC edge. Then it reads the voltage once per tick, 640 times, into its 640 pixels. The "Auto adjust" button on a monitor fine-tunes <b>where inside each 40 ns</b> it reads (the "phase"), so it doesn't read while the voltage is still changing between two pixels.</div></li>
+  </ol>
+
+  <div class="bench">
+    <div class="label">Try it: what the monitor reads from one line</div>
+    <div class="controls">
+      <label for="sPhase">sampling phase</label>
+      <input type="range" id="sPhase" min="0" max="0.99" step="0.01" value="0.5">
+      <span id="sPhaseT" class="m"></span>
+    </div>
+    <div class="controls">
+      <label for="sLen">our line length</label>
+      <select id="sLen"><option value="800" selected>800 ticks (correct)</option><option value="804">804 ticks (4 too many)</option><option value="796">796 ticks (4 too few)</option></select>
+      <label for="sSeg">show</label>
+      <select id="sSeg"><option value="0">pixels 0-31 (start of the line)</option><option value="304">pixels 304-335 (middle)</option><option value="608">pixels 608-639 (end of the line)</option></select>
+    </div>
+    <canvas id="vSamp" width="900" height="300" aria-label="Voltage on the red wire, the monitor's sample points, and the pixels it shows"></canvas>
+    <p id="sText" style="font-size:14px" aria-live="polite"></p>
+  </div>
+  <p>Two things to try. Move the <b>phase</b> close to 0: the samples land on the edges between pixels, while the voltage is still changing, and the sharp detail goes wrong. That's the shimmer you see before pressing "Auto adjust". Then pick <b>804 ticks</b>: the monitor still divides the line into 800, so every sample lands a little later than the one before. The start of the line is fine, but by the end it's reading the wrong pixels. That's why <code>vga_sync</code> has to count exactly 800 every line.</p>
+
+  <h3>What this means for our VHDL</h3>
+  <ul>
+    <li><b>Exact counts, every line.</b> The monitor counts along with us. 800 per line and 525 per frame, always.</li>
+    <li><b>Black outside the 640 × 480 area.</b> The monitor uses the blank time to measure what "black" is. That's why every renderer outputs colour only when <code>video_on = '1'</code>.</li>
+    <li><b>Colour and sync must stay lined up.</b> <code>tetris_render</code> takes 2 clocks to work out a pixel's colour (the pipeline), and it passes HSYNC, VSYNC and <code>video_on</code> through the same 2 registers, so the colour for pixel x leaves the chip at the same moment as the sync timing for pixel x. If they were off by one, the whole picture would shift by one pixel.</li>
+    <li><b>25 MHz instead of 25.175 MHz.</b> The standard says 25.175 MHz. We use exactly half of the board's 50 MHz instead, so no special clock is needed; it is 0.7 % slower. The monitor doesn't care about the exact speed, only that HSYNC comes at a steady rate it recognises; its PLL locks onto whatever we send, and every monitor we tried accepts it.</li>
+  </ul>
+</section>
 </main>
 </div>
 
@@ -648,7 +862,287 @@ y = <span class="h">190</span> + <span class="h">150</span> · sin(2π t / <span
   hb.addEventListener('focusin', function (e) { if (e.target.dataset.i) showByte(+e.target.dataset.i); });
   hb.addEventListener('click', function (e) { if (e.target.dataset.i) showByte(+e.target.dataset.i); });
 
+  /* ---------------------------------------------------------- part 5 */
+  var FRAME_US = 16800, VALID = 82.46, BYTE = 86.8;
+  function el(id) { return document.getElementById(id); }
+  // one round of the race; times in µs, A tops out at 0
+  function race(gap, busyA, busyB, tickA, rule) {
+    var b = { A: { t: 0, busy: busyA }, B: { t: gap, busy: busyB } };
+    function age(n, t) { // frame ticks since my loss; B's next tick is far away (8 ms)
+      if (n === 'B') return 0;
+      return t >= tickA ? 1 + Math.floor((t - tickA) / FRAME_US) : 0;
+    }
+    var fn = gap >= 0 ? 'A' : 'B', sn = fn === 'A' ? 'B' : 'A', f = b[fn], s = b[sn];
+    f.top = true; f.send = f.t + f.busy; f.arr = f.send + VALID;
+    if (s.t < f.arr) { // the second board topped out before the first LOST reached it
+      s.top = true; s.send = s.t + s.busy; s.arr = s.send + VALID;
+      f.got = s.arr; s.got = f.arr;
+      [fn, sn].forEach(function (n) { var x = b[n]; x.age = age(n, x.got); x.res = x.age < rule ? 'DRAW' : 'LOSE'; });
+      b.both = true;
+    } else {
+      s.top = false; s.got = f.arr; s.res = 'WIN'; f.res = 'LOSE';
+    }
+    b.first = fn; b.second = sn;
+    return b;
+  }
+  var rc = el('rLine'), rctx = rc.getContext('2d');
+  var RES_COL = { WIN: '#ffdd33', LOSE: '#ff4444', DRAW: '#dddddd' };
+  function us(t) { return (Math.round(t * 10) / 10) + ' µs'; }
+  function drawRace() {
+    var gap = +el('rGap').value, ba = +el('rBusyA').value, bb = +el('rBusyB').value, tk = +el('rTick').value, rule = +el('rRule').value;
+    el('rGapT').textContent = gap === 0 ? 'at the same moment as A' : gap > 0 ? gap + ' µs after A' : (-gap) + ' µs before A';
+    el('rTickT').textContent = tk >= 400 ? '400+ µs after A loses (out of the way)' : tk + ' µs after A loses';
+    var b = race(gap, ba, bb, tk, rule);
+    var ev = [0, gap, b.A.arr || 0, b.B.arr || 0, b.A.got || 0, b.B.got || 0];
+    var t0 = Math.min(0, gap) - 30, t1 = Math.max.apply(null, ev) + 50;
+    if (t1 - t0 < 260) t1 = t0 + 260;
+    var W = 900, L = 90, R = 880;
+    function X(t) { return L + (t - t0) / (t1 - t0) * (R - L); }
+    rctx.fillStyle = css('--panel'); rctx.fillRect(0, 0, W, 260);
+    rctx.font = '12px ' + css('--mono'); rctx.textAlign = 'left';
+    // time axis
+    rctx.strokeStyle = css('--line'); rctx.fillStyle = css('--muted'); rctx.lineWidth = 1;
+    var step = (t1 - t0) > 600 ? 100 : 50;
+    for (var g = Math.ceil(t0 / step) * step; g <= t1; g += step) {
+      rctx.beginPath(); rctx.moveTo(X(g), 30); rctx.lineTo(X(g), 236); rctx.stroke();
+      rctx.textAlign = 'center'; rctx.fillText(g + ' µs', X(g), 252);
+    }
+    var lanes = { A: 85, B: 185 };
+    // A's frame tick
+    if (tk < 400 && tk <= t1) {
+      rctx.setLineDash([5, 4]); rctx.strokeStyle = css('--accent'); rctx.lineWidth = 2;
+      rctx.beginPath(); rctx.moveTo(X(tk), 40); rctx.lineTo(X(tk), 125); rctx.stroke(); rctx.setLineDash([]);
+      rctx.fillStyle = css('--accent'); rctx.textAlign = 'left'; rctx.fillText('A frame tick: lose_age 0→1', X(tk) + 5, 40);
+    }
+    ['A', 'B'].forEach(function (n) {
+      var x = b[n], y = lanes[n], other = lanes[n === 'A' ? 'B' : 'A'];
+      var end = x.top ? x.t : x.got;
+      rctx.fillStyle = css('--ink'); rctx.textAlign = 'left'; rctx.font = 'bold 13px ' + css('--display');
+      rctx.fillText('board ' + n, 8, y + 4); rctx.font = '12px ' + css('--mono');
+      rctx.lineWidth = 4; rctx.strokeStyle = '#2fae5a';
+      rctx.beginPath(); rctx.moveTo(X(t0), y); rctx.lineTo(X(end), y); rctx.stroke();
+      rctx.strokeStyle = css('--line');
+      rctx.beginPath(); rctx.moveTo(X(end), y); rctx.lineTo(X(t1), y); rctx.stroke();
+      rctx.fillStyle = '#2fae5a'; rctx.fillText('playing', X(t0) + 4, y - 8);
+      if (x.top) {
+        rctx.strokeStyle = '#e04444'; rctx.lineWidth = 3; var cx = X(x.t);
+        rctx.beginPath(); rctx.moveTo(cx - 7, y - 7); rctx.lineTo(cx + 7, y + 7); rctx.moveTo(cx + 7, y - 7); rctx.lineTo(cx - 7, y + 7); rctx.stroke();
+        rctx.fillStyle = '#e04444'; rctx.textAlign = 'center'; rctx.fillText('tops out', cx, y - 14);
+        if (x.busy > 0) {
+          rctx.fillStyle = css('--code-bg'); rctx.fillRect(X(x.t), y + 10, X(x.send) - X(x.t), 16);
+          rctx.strokeStyle = css('--muted'); rctx.lineWidth = 1; rctx.strokeRect(X(x.t), y + 10, X(x.send) - X(x.t), 16);
+          rctx.fillStyle = css('--muted'); rctx.fillText('heartbeat', (X(x.t) + X(x.send)) / 2, y + 22);
+        }
+        rctx.fillStyle = css('--warm'); rctx.globalAlpha = 0.85;
+        rctx.fillRect(X(x.send), y + 10, X(x.send + BYTE) - X(x.send), 16); rctx.globalAlpha = 1;
+        rctx.fillStyle = '#fff'; rctx.fillText('LOST byte', (X(x.send) + X(x.send + BYTE)) / 2, y + 22);
+        // arrow to the other board at "valid"
+        var ax = X(x.arr), y1 = y + (other > y ? 28 : -10), y2 = other + (other > y ? -16 : 12);
+        rctx.strokeStyle = css('--warm'); rctx.lineWidth = 2;
+        rctx.beginPath(); rctx.moveTo(ax, y1); rctx.lineTo(ax, y2); rctx.stroke();
+        var d = other > y ? 1 : -1;
+        rctx.beginPath(); rctx.moveTo(ax, y2); rctx.lineTo(ax - 5, y2 - 7 * d); rctx.lineTo(ax + 5, y2 - 7 * d); rctx.closePath();
+        rctx.fillStyle = css('--warm'); rctx.fill();
+      }
+      // the decision when the other board's LOST arrives
+      if (x.got !== undefined) {
+        var txt = x.res === 'WIN' ? '→ WIN (still playing)' : x.res === 'DRAW' ? '→ DRAW (lose_age ' + x.age + ' < ' + rule + ')' : 'stays LOSE (lose_age ' + x.age + ', not < ' + rule + ')';
+        rctx.fillStyle = x.res === 'LOSE' ? '#e04444' : x.res === 'WIN' ? '#c99a00' : css('--ink');
+        rctx.font = 'bold 12px ' + css('--mono');
+        var tx = X(x.got) + 8; rctx.textAlign = tx > 700 ? 'right' : 'left'; if (tx > 700) tx = X(x.got) - 8;
+        rctx.fillText(txt, tx, y + (n === 'A' ? -26 : 44)); rctx.font = '12px ' + css('--mono');
+      }
+    });
+    ['A', 'B'].forEach(function (n) {
+      var m = el('rMon' + n), r = b[n].res;
+      m.querySelector('.res').textContent = r === 'WIN' ? 'WIN!' : r;
+      m.querySelector('.res').style.color = RES_COL[r];
+      m.style.borderColor = r === 'WIN' ? '#ffdd33' : '#cc2222';
+    });
+    var f = b[b.first], s = b[b.second], txt;
+    if (!b.both) txt = 'Board ' + b.first + ' topped out first. Its LOST arrived at ' + b.second + ' at ' + us(f.arr) + ', while ' + b.second + ' was still playing (it would only have topped out at ' + us(s.t) + '). So ' + b.second + ' wins and stops, and never sends a LOST of its own.';
+    else txt = 'Board ' + b.second + ' topped out at ' + us(s.t) + ', before ' + b.first + '\'s LOST arrived at ' + us(f.arr) + '. Both have lost, and each receives the other\'s LOST shortly after its own loss (' + b.first + ' at ' + us(f.got) + ', ' + b.second + ' at ' + us(s.got) + ').';
+    var agree = b.A.res === b.B.res || (b.A.res !== 'DRAW' && b.B.res !== 'DRAW');
+    txt += agree ? ' The screens agree.' : ' The screens DISAGREE: one board saw a frame tick between its loss and the arriving LOST, and this rule is too strict to allow that.';
+    el('rText').innerHTML = txt.replace('DISAGREE', '<b class="agree bad">DISAGREE</b>');
+  }
+  ['rGap', 'rBusyA', 'rBusyB', 'rTick', 'rRule'].forEach(function (id) { el(id).addEventListener('input', drawRace); el(id).addEventListener('change', drawRace); });
+  Array.prototype.forEach.call(document.querySelectorAll('[data-r]'), function (btn) {
+    btn.addEventListener('click', function () {
+      var v = btn.dataset.r.split(',');
+      el('rGap').value = v[0]; el('rBusyA').value = v[1]; el('rBusyB').value = v[2]; el('rTick').value = v[3]; el('rRule').value = v[4];
+      drawRace();
+    });
+  });
+  drawRace();
+
+  // paint text with the real font into ImageData d (width W), offset (ox, oy)
+  function paintText(d, W, H, text, x0, y0, s, rgb, ox, oy) {
+    var sz = 1 << s;
+    for (var ci = 0; ci < text.length; ci++) {
+      var g = FONT[code(text[ci])]; if (!g) continue;
+      for (var r = 0; r < 7; r++) for (var c = 0; c < 5; c++) if (g[5 * r + c] === 'X')
+        for (var yy = 0; yy < sz; yy++) for (var xx = 0; xx < sz; xx++) {
+          var px = x0 + (ci * 6 + c) * sz + xx - ox, py = y0 + r * sz + yy - oy;
+          if (px < 0 || py < 0 || px >= W || py >= H) continue;
+          var i = (py * W + px) * 4; d[i] = rgb[0]; d[i + 1] = rgb[1]; d[i + 2] = rgb[2]; d[i + 3] = 255;
+        }
+    }
+  }
+  function c12(h) { return [parseInt(h[0], 16) * 17, parseInt(h[1], 16) * 17, parseInt(h[2], 16) * 17]; }
+  var PIECES = ['0FF', 'FF0', 'A0F', '0F0', 'F00', '00F', 'F80'];
+  function drawShot(id, result) {
+    var cv = el(id), ctx = cv.getContext('2d'), ox = 200, oy = 60, W = 240, H = 360;
+    var img = ctx.createImageData(W, H), d = img.data;
+    function px(x, y, rgb) { x -= ox; y -= oy; if (x < 0 || y < 0 || x >= W || y >= H) return; var i = (y * W + x) * 4; d[i] = rgb[0]; d[i + 1] = rgb[1]; d[i + 2] = rgb[2]; d[i + 3] = 255; }
+    var bg = c12('113'), fr = c12(result === 'WIN' ? 'FD3' : 'C22');
+    for (var y = oy; y < oy + H; y++) for (var x = ox; x < ox + W; x++) {
+      var inF = x >= 240 && x < 400 && y >= 80 && y < 400, inFr = x >= 236 && x < 404 && y >= 76 && y < 404;
+      if (inF) px(x, y, ((x - 240) % 16 === 0 || (y - 80) % 16 === 0) ? c12('111') : c12('000'));
+      else if (inFr) px(x, y, fr); else px(x, y, bg);
+    }
+    // a stack: deterministic pattern, higher for the boards that topped out
+    var top = result === 'WIN' ? 13 : 1, seed = result === 'WIN' ? 7 : result === 'LOSE' ? 3 : 11;
+    for (var row = top; row < 20; row++) for (var col = 0; col < 10; col++) {
+      seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+      if ((seed >> 8) % 10 < (row === top ? 4 : 8)) {
+        var cc = result === 'WIN' ? c12(PIECES[(seed >> 4) % 7]) : c12('555');
+        for (var yy = 0; yy < 16; yy++) for (var xx = 0; xx < 16; xx++) {
+          var k = (xx === 0 || yy === 0) ? 1.35 : (xx === 15 || yy === 15) ? 0.6 : 1;
+          px(240 + col * 16 + xx, 80 + row * 16 + yy, cc.map(function (v) { return Math.min(255, Math.round(v * k)); }));
+        }
+      }
+    }
+    for (y = 192; y < 240; y++) for (x = 240; x < 400; x++) px(x, y, c12('111'));
+    for (y = 256; y < 288; y++) for (x = 240; x < 400; x++) px(x, y, c12('111'));
+    var txt = { WIN: 'WIN!', LOSE: 'LOSE', DRAW: 'DRAW' }[result], col = c12({ WIN: 'FD3', LOSE: 'F44', DRAW: 'DDD' }[result]);
+    paintText(d, W, H, txt, 272, 202, 2, col, ox, oy);
+    paintText(d, W, H, 'PRESS START', 254, 264, 1, c12('FFF'), ox, oy);
+    ctx.putImageData(img, 0, 0);
+  }
+  drawShot('shotWin', 'WIN'); drawShot('shotLose', 'LOSE'); drawShot('shotDraw', 'DRAW');
+
+  /* ---------------------------------------------------------- part 6 */
+  // the picture: a game-like 640 x 480 frame, drawn with the real font
+  var pic = document.createElement('canvas'); pic.width = 640; pic.height = 480;
+  (function () {
+    var pc = pic.getContext('2d'), img = pc.createImageData(640, 480), d = img.data, bg = c12('113');
+    for (var y = 0; y < 480; y++) for (var x = 0; x < 640; x++) {
+      var i = (y * 640 + x) * 4, c = bg;
+      if (x >= 236 && x < 404 && y >= 76 && y < 404) c = c12('AAA');
+      if (x >= 240 && x < 400 && y >= 80 && y < 400) {
+        c = ((x - 240) % 16 === 0 || (y - 80) % 16 === 0) ? c12('111') : c12('000');
+        var col = (x - 240) >> 4, row = (y - 80) >> 4;
+        if (row >= 15 && ((col * 7 + row * 3) % 5) !== 0) c = c12(PIECES[(col + row) % 7]);
+        if (row >= 3 && row <= 4 && col >= 3 && col <= 5 && !(row === 3 && col !== 4)) c = c12('A0F');
+      }
+      d[i] = c[0]; d[i + 1] = c[1]; d[i + 2] = c[2]; d[i + 3] = 255;
+    }
+    LINES.forEach(function (L, k) { if (k < 7) paintText(d, 640, 480, L.t, L.x, L.y, L.s, c12(k === 5 ? '2C2' : '89B'), 0, 0); });
+    pc.putImageData(img, 0, 0);
+  })();
+  var vb = el('vBeam'), vctx = vb.getContext('2d'), vr = el('vRead');
+  var vp = 0, vRun = !reduce, vLast = 0;
+  if (!vRun) el('vPlay').textContent = 'Play';
+  function region(x, y) {
+    if (y >= 480) return y < 490 ? 'vertical front porch' : y < 492 ? 'VSYNC pulse' : 'vertical back porch';
+    if (x >= 640) return x < 656 ? 'front porch' : x < 752 ? 'HSYNC pulse' : 'back porch';
+    return 'visible';
+  }
+  function drawBeam() {
+    var p = Math.floor(vp), x = p % 800, y = Math.floor(p / 800), speed = +el('vSpeed').value;
+    vctx.fillStyle = '#5b6b80'; vctx.fillRect(0, 0, 800, 525);
+    vctx.fillStyle = '#a3324a'; vctx.fillRect(656, 0, 96, 525); vctx.fillRect(0, 490, 800, 2);
+    vctx.drawImage(pic, 0, 0);
+    vctx.fillStyle = 'rgba(0,0,0,0.62)';
+    if (speed < 420000) {
+      if (y < 480) { vctx.fillRect(Math.min(x, 640), y, 640 - Math.min(x, 640), 1); vctx.fillRect(0, y + 1, 640, 479 - y); }
+      vctx.strokeStyle = '#ffb347'; vctx.lineWidth = 1;
+      vctx.beginPath(); vctx.moveTo(0, y + 0.5); vctx.lineTo(800, y + 0.5); vctx.moveTo(x + 0.5, 0); vctx.lineTo(x + 0.5, 525); vctx.stroke();
+      vctx.fillStyle = '#ffb347'; vctx.beginPath(); vctx.arc(x, y, 6, 0, 7); vctx.fill();
+    }
+    vctx.fillStyle = '#fff'; vctx.font = '13px ' + css('--mono'); vctx.textAlign = 'center';
+    vctx.fillText('HSYNC', 704, 250); vctx.fillText('vertical blanking: 10 + 2 + 33 lines', 320, 512);
+    var vis = x < 640 && y < 480, hs = (x >= 656 && x < 752) ? 0 : 1, vs = (y >= 490 && y < 492) ? 0 : 1, colr = '000';
+    if (vis) { var q = pic.getContext('2d').getImageData(x, y, 1, 1).data; colr = [q[0], q[1], q[2]].map(function (v) { return Math.round(v / 17).toString(16).toUpperCase(); }).join(''); }
+    var rows = [['x', x + ' of 0..799'], ['y', y + ' of 0..524'], ['region', region(x, y)], ['video_on', vis ? 1 : 0],
+      ['HSYNC', hs + (hs ? '' : '  ← pulse')], ['VSYNC', vs + (vs ? '' : '  ← pulse')], ['RGB out', 'x"' + colr + '"' + (vis ? '' : ' (must be black)')],
+      ['time in frame', (p * 0.04).toFixed(2) + ' µs'], ['pixel tick', '40 ns each']];
+    vr.innerHTML = rows.map(function (a) { return '<dt>' + a[0] + '</dt><dd>' + a[1] + '</dd>'; }).join('');
+  }
+  function beamTick(t) {
+    if (vRun && t - vLast > 1000 / 60) { vp = (vp + +el('vSpeed').value) % 420000; vLast = t; drawBeam(); }
+    requestAnimationFrame(beamTick);
+  }
+  el('vPlay').addEventListener('click', function () { vRun = !vRun; el('vPlay').textContent = vRun ? 'Pause' : 'Play'; });
+  el('vSpeed').addEventListener('change', drawBeam);
+  el('vJumpH').addEventListener('click', function () { vp = Math.floor(vp / 800) * 800 + 600; if (vp >= 480 * 800) vp = 600; el('vSpeed').value = '8'; drawBeam(); });
+  el('vJumpV').addEventListener('click', function () { vp = 477 * 800 + 400; el('vSpeed').value = '800'; drawBeam(); });
+  drawBeam(); requestAnimationFrame(beamTick);
+
+  // the sampler: one line of the red wire, as the monitor reads it
+  var PAT = [15, 15, 0, 0, 15, 0, 15, 0, 10, 10, 10, 10, 0, 15, 15, 15, 5, 5, 0, 0, 15, 0, 0, 0, 12, 12, 12, 0, 0, 0, 8, 15];
+  var EDGE = 0.3;
+  function sent(x) { return (x < 0 || x >= 640) ? 0 : PAT[x % 32]; }
+  function volt(t) { // the wire's level at time t (in pixel times after the visible start)
+    var k = Math.floor(t), f = t - k, cur = sent(k), prev = sent(k - 1);
+    if (f >= EDGE) return cur;
+    var s = f / EDGE; s = s * s * (3 - 2 * s);
+    return prev + (cur - prev) * s;
+  }
+  var sc = el('vSamp'), sctx = sc.getContext('2d');
+  function drawSamp() {
+    var ph = +el('sPhase').value, Ln = +el('sLen').value, s0 = +el('sSeg').value;
+    el('sPhaseT').textContent = ph.toFixed(2) + ' of a pixel' + (ph < EDGE ? ' (on the edge!)' : '');
+    function when(i) { return (144 + i + ph) * Ln / 800 - 144; } // the monitor's sample time for its pixel i
+    function seen(i) { return Math.round(volt(when(i))); }
+    var W = 900, L = 70, R = 880;
+    function X(t) { return L + (t - s0) / 32 * (R - L); }
+    function Y(v) { return 140 - v / 15 * 105; }
+    sctx.fillStyle = css('--panel'); sctx.fillRect(0, 0, W, 300);
+    sctx.font = '11px ' + css('--mono'); sctx.textAlign = 'center';
+    for (var k = 0; k <= 32; k++) {
+      sctx.strokeStyle = css('--line'); sctx.lineWidth = 1;
+      sctx.beginPath(); sctx.moveTo(X(s0 + k), 25); sctx.lineTo(X(s0 + k), 145); sctx.stroke();
+      if (k % 4 === 0 && k < 32) { sctx.fillStyle = css('--muted'); sctx.fillText(s0 + k, X(s0 + k + 0.5), 18); }
+    }
+    sctx.textAlign = 'right'; sctx.fillStyle = css('--muted');
+    sctx.fillText('0.7 V', L - 6, Y(15) + 4); sctx.fillText('0 V', L - 6, Y(0) + 4); sctx.fillText('red wire', L - 6, 80);
+    sctx.strokeStyle = css('--ink'); sctx.lineWidth = 2; sctx.beginPath();
+    for (var t = s0; t <= s0 + 32; t += 0.02) { var yv = Y(volt(t)); if (t === s0) sctx.moveTo(X(t), yv); else sctx.lineTo(X(t), yv); }
+    sctx.stroke();
+    var wrong = 0;
+    for (var i = 0; i < 640; i++) {
+      var ok = seen(i) === sent(i); if (!ok) wrong++;
+      var ti = when(i);
+      if (ti >= s0 && ti < s0 + 32) {
+        sctx.fillStyle = ok ? '#2fae5a' : css('--warm');
+        sctx.beginPath(); sctx.arc(X(ti), Y(volt(ti)), 4.5, 0, 7); sctx.fill();
+      }
+    }
+    var cw = (R - L) / 32;
+    sctx.textAlign = 'right'; sctx.fillStyle = css('--muted');
+    sctx.fillText('we sent', L - 6, 192); sctx.fillText('monitor shows', L - 6, 252);
+    for (k = 0; k < 32; k++) {
+      var a = sent(s0 + k), b = seen(s0 + k);
+      sctx.fillStyle = 'rgb(' + a * 17 + ',' + Math.round(a * 3) + ',' + Math.round(a * 4) + ')';
+      sctx.fillRect(L + k * cw + 1, 172, cw - 2, 32);
+      sctx.fillStyle = 'rgb(' + b * 17 + ',' + Math.round(b * 3) + ',' + Math.round(b * 4) + ')';
+      sctx.fillRect(L + k * cw + 1, 232, cw - 2, 32);
+      if (a !== b) { sctx.strokeStyle = css('--warm'); sctx.lineWidth = 3; sctx.strokeRect(L + k * cw + 2.5, 233.5, cw - 5, 29); }
+    }
+    sctx.fillStyle = css('--muted'); sctx.textAlign = 'left';
+    sctx.fillText('dots = the moments the monitor reads the voltage (green = right value, orange = wrong)', L, 292);
+    var msg;
+    if (Ln !== 800) msg = 'Our line is ' + Ln + ' ticks, but the monitor still splits each HSYNC-to-HSYNC gap into 800. Each of its ticks is ' + (Ln > 800 ? 'a bit too long' : 'a bit too short') + ', so the error grows along the line: ' + wrong + ' of 640 pixels on this line come out wrong. Compare the start of the line with the end.';
+    else if (ph < EDGE) msg = 'The monitor reads within ' + ph.toFixed(2) + ' of a pixel after each change, while the voltage is still moving: ' + wrong + ' of 640 pixels come out wrong, mostly where the colour changes. On screen that looks like shimmering, smeared detail.';
+    else msg = 'Line length right and the phase past the edges: the monitor reads every pixel while the voltage is steady. ' + wrong + ' of 640 pixels wrong.';
+    el('sText').textContent = msg;
+  }
+  ['sPhase', 'sLen', 'sSeg'].forEach(function (id) { el(id).addEventListener('input', drawSamp); el(id).addEventListener('change', drawSamp); });
+  drawSamp();
+
   // redraw canvases when the theme changes
-  if (window.matchMedia) window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function () { drawUart(); drawJevil(); drawGlyph(lookup(440, 60)); });
+  if (window.matchMedia) window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function () { drawUart(); drawJevil(); drawGlyph(lookup(440, 60)); drawRace(); drawSamp(); });
 })();
 </script>
