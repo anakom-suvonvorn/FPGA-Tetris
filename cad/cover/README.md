@@ -5,9 +5,9 @@ mounting hole), its top face 6 mm above the PCB. It works for `main` and for
 `chaos`:
 
 * **push buttons**: 5 printed extenders through round holes, labelled ROTATE,
-  LEFT, RIGHT, HARD DROP (centre, also start) and SOFT DROP. Each is an 8 mm
-  knob (8.4 mm hole) on a wide base that sits in a pocket under the plate, so
-  it can't fall out. The base has flats on top and bottom (the buttons above
+  LEFT, RIGHT, HARD DROP (centre, also start) and SOFT DROP. Each is an 8.2 mm
+  knob (8.4 mm hole, 0.1 mm gap) standing 4 mm above the plate, on a wide
+  base that sits in a pocket under the plate, so it can't fall out. The base has flats on top and bottom (the buttons above
   and below the centre one are only 9.7 mm apart) and a 3.6 mm dimple that
   holds the 3.4 mm blue plunger so the extender can't slide off
 * **slide switches**: one 105 x 17 mm opening for all 16, open to the bottom

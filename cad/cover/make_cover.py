@@ -65,14 +65,14 @@ BUTTON_WINDOW = 10.0              # square per button when BUTTON_CAPS = False
 # Button extenders: a knob through the plate and a wide base that sits in a
 # pocket in the underside of the plate (so it can't fall out). The base has a
 # shallow dimple that sits on the button's plunger.
-CAP_HOLE, CAP_KNOB = 8.4, 8.0     # hole in the plate, knob diameter
+CAP_HOLE, CAP_KNOB = 8.4, 8.2     # hole in the plate, knob diameter (0.1 mm gap all round)
 # The buttons above / below the centre one are only 9.7 mm apart, so the base
 # is a disc with two flats (top and bottom): wide sideways, narrow up / down.
 CAP_BASE, CAP_BASE_FLAT = 11.0, 9.2   # base diameter, width across the flats
 POCKET_CLR = 0.3                  # pocket = base + this all round
 POCKET_H = 0.9                    # pocket depth into the underside (leaves 0.7 mm on top)
 CAP_DIMPLE_D, CAP_DIMPLE_H = 3.6, 0.5   # dimple for the 3.4 mm plunger: base bottom = BUTTON_TOP - 0.5
-CAP_STICK_OUT = 1.5               # knob top above the plate
+CAP_STICK_OUT = 4.0               # knob top above the plate
 LABEL_DEPTH = 0.6                 # inlay depth of the labels (3 layers at 0.2 mm)
 FONT = FontProperties(family="DejaVu Sans", weight="bold")
 LEG_OD, LEG_BORE = 6.0, 3.3       # legs: M3 clearance bore
