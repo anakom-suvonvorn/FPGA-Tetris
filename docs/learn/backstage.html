@@ -1,0 +1,654 @@
+<title>Tetris Duel Backstage</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;800&family=IBM+Plex+Sans:ital,wght@0,400;0,600;1,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: a lab notebook. Sticky contents rail on wide screens, one column of
+   readable text, demos sit in "bench" panels that may run wider. */
+:root {
+  --bg: #f2f4f6;
+  --panel: #ffffff;
+  --ink: #17202b;
+  --muted: #586473;
+  --line: #d4dbe3;
+  --accent: #0d766e;
+  --accent-soft: #dff1ee;
+  --warm: #b4530a;
+  --warm-soft: #fbead9;
+  --code-bg: #eef1f5;
+  --display: 'Archivo', 'Arial Narrow', 'Helvetica Neue', Arial, sans-serif;
+  --body: 'IBM Plex Sans', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --mono: 'JetBrains Mono', Consolas, 'Courier New', monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #10151b; --panel: #18202a; --ink: #e5eaf0; --muted: #95a2b1; --line: #2b3746;
+    --accent: #3cc0b2; --accent-soft: #163a37; --warm: #f0a55e; --warm-soft: #3a2a19; --code-bg: #1d2733;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #10151b; --panel: #18202a; --ink: #e5eaf0; --muted: #95a2b1; --line: #2b3746;
+  --accent: #3cc0b2; --accent-soft: #163a37; --warm: #f0a55e; --warm-soft: #3a2a19; --code-bg: #1d2733;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 16px; line-height: 1.65; }
+.wrap { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 48px; max-width: 1180px; margin: 0 auto;
+  padding-block: 40px 80px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+nav.toc { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 24px); align-self: start; display: grid; gap: 4px; font-size: 14px; }
+nav.toc .k { font-family: var(--display); font-weight: 800; font-size: 13px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+nav.toc a { color: var(--ink); text-decoration: none; padding: 6px 10px; border-radius: 6px; display: grid; grid-template-columns: 22px 1fr; }
+nav.toc a span { font-family: var(--mono); color: var(--accent); }
+nav.toc a:hover, nav.toc a:focus-visible { background: var(--accent-soft); outline: none; }
+main { min-width: 0; display: grid; gap: 72px; }
+header.top h1 { font-family: var(--display); font-weight: 800; font-size: clamp(34px, 5vw, 52px); line-height: 1.05; margin: 0 0 14px; letter-spacing: -.01em; text-wrap: balance; }
+header.top p { margin: 0; max-width: 64ch; color: var(--muted); font-size: 17px; }
+section { display: grid; gap: 18px; scroll-margin-top: 24px; }
+.eyebrow { font-family: var(--mono); font-size: 13px; color: var(--accent); letter-spacing: .04em; }
+h2 { font-family: var(--display); font-weight: 800; font-size: clamp(26px, 3.4vw, 34px); line-height: 1.15; margin: 0; text-wrap: balance; }
+h3 { font-family: var(--display); font-weight: 700; font-size: 20px; margin: 18px 0 0; text-wrap: balance; }
+p, li { max-width: 68ch; }
+p { margin: 0; }
+ul, ol { margin: 0; padding-left: 22px; display: grid; gap: 6px; }
+code, .m { font-family: var(--mono); font-size: .88em; background: var(--code-bg); padding: 1px 5px; border-radius: 4px; }
+pre { margin: 0; font-family: var(--mono); font-size: 13px; line-height: 1.55; background: var(--code-bg); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; overflow-x: auto; }
+pre .c { color: var(--muted); }
+pre .h { color: var(--warm); font-weight: 600; }
+.bench { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 18px; display: grid; gap: 14px; min-width: 0; }
+.bench .label { font-family: var(--display); font-weight: 700; font-size: 13px; letter-spacing: .07em; text-transform: uppercase; color: var(--warm); }
+.note { border-left: 3px solid var(--warm); background: var(--warm-soft); padding: 12px 16px; border-radius: 0 8px 8px 0; max-width: 72ch; }
+.two { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 18px; align-items: start; }
+canvas { width: 100%; height: auto; display: block; border-radius: 6px; border: 1px solid var(--line); background: #0b0f14; image-rendering: pixelated; }
+.readout { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; font-family: var(--mono); font-size: 13px; font-variant-numeric: tabular-nums; align-content: start; }
+.readout dt { color: var(--muted); }
+.readout dd { margin: 0; }
+.steps { counter-reset: s; display: grid; gap: 10px; list-style: none; padding: 0; }
+.steps li { counter-increment: s; display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 10px; }
+.steps li::before { content: counter(s); font-family: var(--display); font-weight: 800; color: var(--accent); font-size: 18px; }
+table { border-collapse: collapse; font-size: 14px; width: 100%; }
+.tscroll { overflow-x: auto; }
+th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-family: var(--display); font-weight: 700; font-size: 13px; letter-spacing: .04em; color: var(--muted); }
+td:first-child { font-family: var(--mono); font-size: 13px; white-space: nowrap; }
+.controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; font-size: 14px; }
+button, input[type=text], select { font: inherit; font-size: 14px; color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 6px 12px; }
+button { cursor: pointer; }
+button:hover { border-color: var(--accent); }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+input[type=range] { accent-color: var(--accent); flex: 1 1 200px; min-width: 0; }
+.flow { display: grid; gap: 10px; }
+.lane { display: grid; gap: 8px; }
+.lane h4 { margin: 0; font-family: var(--display); font-weight: 700; font-size: 15px; }
+.chain { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 13px; }
+.chain .n { font-family: var(--mono); background: var(--accent-soft); border: 1px solid var(--line); border-radius: 6px; padding: 4px 8px; }
+.chain .n.f { background: var(--warm-soft); }
+.chain .a { color: var(--muted); }
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 14px; display: grid; gap: 6px; align-content: start; }
+.card .t { font-family: var(--mono); font-weight: 600; font-size: 14px; color: var(--accent); }
+.card p { font-size: 14px; }
+.card .run { font-family: var(--mono); font-size: 12px; color: var(--muted); overflow-wrap: anywhere; }
+.bytes { display: flex; flex-wrap: wrap; gap: 4px; font-family: var(--mono); font-size: 13px; }
+.bytes span { border: 1px solid var(--line); border-radius: 4px; padding: 3px 6px; cursor: default; }
+.bytes span.on { background: var(--accent-soft); border-color: var(--accent); }
+.bits { font-family: var(--mono); font-size: 22px; letter-spacing: .12em; }
+.bits b { color: var(--warm); }
+@media (max-width: 860px) {
+  .wrap { grid-template-columns: minmax(0, 1fr); gap: 24px; }
+  nav.toc { position: static; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  nav.toc .k { grid-column: 1 / -1; }
+  .two { grid-template-columns: minmax(0, 1fr); }
+}
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+html { scroll-behavior: smooth; }
+</style>
+
+<div class="wrap">
+<nav class="toc" aria-label="Contents">
+  <div class="k">Contents</div>
+  <a href="#font"><span>1</span>One font ROM</a>
+  <a href="#sim"><span>2</span>Testbenches</a>
+  <a href="#jevil"><span>3</span>Jevil's sine path</a>
+  <a href="#pc"><span>4</span>The computer side</a>
+</nav>
+
+<main>
+<header class="top">
+  <h1>Tetris Duel Backstage</h1>
+  <p>Four things that happen out of sight: how all the on-screen text shares one font table, how we test circuits without a board, how Jevil floats around, and what every Python and batch script on the PC does. Every number here comes from the project's real files.</p>
+</header>
+
+<!-- =============================================================== 1 -->
+<section id="font">
+  <div class="eyebrow">part 1 · src/game/text_multi.vhd</div>
+  <h2>"One font ROM": how the text stopped eating the chip</h2>
+
+  <h3>What a ROM is inside an FPGA</h3>
+  <p>A <b>ROM</b> (read-only memory) is a fixed table: give it an address, it gives back the value stored there. In our VHDL the font is a <code>constant</code> array in <code>text_pkg.vhd</code>: 64 characters, each a 5 × 7 picture, so <b>35 bits per character</b>. Bit <code>5·row + column</code> says whether that dot is lit.</p>
+  <p>An FPGA has no ROM chip for this. Vivado builds the table out of <b>LUTs</b> (the small logic blocks, 8,000 of them in our XC7S15). Every separate copy of the table costs its own LUTs, about 45 for the font plus the logic that picks one bit out of the 35.</p>
+
+  <h3>The problem</h3>
+  <p>The first version used a block called <code>text_layer</code>: one block per line of text, each with <b>its own copy of the font</b>. The game has 12 lines of text (9 in <code>tetris_render</code>: NEXT, LEVEL, LINES, the line count, RIVAL, LINKED, PRESS START, WIN!/LOSE/DRAW, GAME OVER; and 3 in <code>chaos_render</code>: two task-panel lines and the banner). That's 12 copies of the same table.</p>
+  <p>When the media layer was added, the first full build used <b>7,566 LUTs (95 %)</b> and Vivado could not place it: the chip was too full to fit the parts in and wire them together.</p>
+
+  <h3>The idea</h3>
+  <p class="note">The screen draws <b>one pixel at a time</b>, and one pixel can only be on <b>one line of text</b> at a time. So at any moment only one character is being looked at, and one copy of the font is enough.</p>
+  <p><code>text_multi</code> does it in two parts, both within the same clock:</p>
+  <ol class="steps">
+    <li><div><b>Which line, which letter, which dot.</b> For every line k it checks "is (x, y) inside line k's box?". That's only cheap comparisons against the line's corner (<code>X0S</code>, <code>Y0S</code>), its length (<code>LENS</code>) and size (<code>SHIFTS</code>: each font dot is 2<sup>SHIFT</sup> screen pixels). For the line that matches, it works out the character number <code>ci = dx / 6</code> (a letter is 5 dots plus 1 gap), the column inside it <code>cc = dx mod 6</code> and the row <code>dy</code>, then picks that character's 6-bit code.</div></li>
+    <li><div><b>Look the code up once.</b> <code>glyph_of(code)</code> gives the 35 bits, and bit <code>5·dy + cc</code> is the answer: lit or not. The result goes out on <code>pix(k)</code>, one bit per line, so <code>tetris_render</code> still knows which line it was and can colour it.</div></li>
+  </ol>
+  <p>The comparisons per line remain (they are small), but the big table now exists once per renderer: 2 copies instead of 12. Together with a second fix (moving the bouncing balls one per clock instead of all at once) the build dropped to <b>6,972 LUTs</b> and placed. The final game is 6,797 LUTs (85 %).</p>
+
+  <div class="bench">
+    <div class="label">Try it: hover or tap a pixel</div>
+    <p style="font-size:14px;color:var(--muted)">This is the real 640 × 480 screen with the real text settings from <code>tetris_render.vhd</code> and the real font from <code>text_pkg.vhd</code>, drawn by the same two steps.</p>
+    <div class="two">
+      <canvas id="fontScreen" width="640" height="480" aria-label="Game screen text, hover to inspect a pixel"></canvas>
+      <div style="display:grid;gap:12px">
+        <dl class="readout" id="fontRead"><dt>pixel</dt><dd>move over the text</dd></dl>
+        <canvas id="glyph" width="120" height="168" style="max-width:150px" aria-label="Font lookup of the chosen character"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <pre><span class="c">-- text_multi.vhd, the heart of it (shortened)</span>
+for k in 0 to N - 1 loop                      <span class="c">-- step 1: every line, in parallel hardware</span>
+  if en(k) = '1' and xi >= X0S(k) and xi &lt; X0S(k) + LENS(k) * 6 * sz
+     and yi >= Y0S(k) and yi &lt; Y0S(k) + 7 * sz then
+    dx := (xi - X0S(k)) / sz;  dy := (yi - Y0S(k)) / sz;
+    ci := dx / 6;  cc := dx mod 6;            <span class="c">-- which letter, which column</span>
+    code := <span class="c">the 6 bits of letter ci</span>;  line := k;
+  end if;
+end loop;
+gl := <span class="h">glyph_of(code)</span>;                       <span class="c">-- step 2: the ONE font look-up</span>
+pix_r(line) &lt;= gl(5 * s_dy + s_cc);</pre>
+  <p>A <code>for</code> loop in VHDL is not a loop in time. Vivado copies its body once per line, so all 9 comparisons are separate circuits working at the same moment. Only the font look-up after the loop exists once.</p>
+</section>
+
+<!-- =============================================================== 2 -->
+<section id="sim">
+  <div class="eyebrow">part 2 · sim/ and tools/sim.bat</div>
+  <h2>Testbenches: testing a circuit without a board</h2>
+
+  <h3>What simulation is</h3>
+  <p>A <b>simulator</b> is a program that pretends to be the chip. It reads the same VHDL and works out the value of every signal at every moment: every clock edge, every flip-flop, every wire. Nothing goes near the board. We use <b>xsim</b>, the simulator inside Vivado.</p>
+  <p>Why bother: building a <code>.bit</code> takes minutes, and on the board you only see the end result. In simulation a run takes seconds, you can see inside every module, and you can set up exact situations (a bouncy switch, a cable that sends garbage at the worst moment) on purpose, every time.</p>
+
+  <h3>What a testbench is</h3>
+  <p>A <b>testbench</b> is a VHDL file that never goes on the board. It is the pretend world around the design. It has no ports (nothing outside it), and inside it:</p>
+  <ul>
+    <li><b>makes the clock</b>: <code>clk &lt;= not clk after 10 ns;</code> flips every 10 ns, so 20 ns per cycle = 50 MHz, like the board's crystal</li>
+    <li><b>places the design being tested</b>: the same <code>u_x : entity work.name port map (...)</code> as in <code>top_tetris</code></li>
+    <li><b>drives the inputs</b> in a process, written like a script: "wait 200 ns, set start to 1, wait one clock, ..." (<code>wait</code> only works in simulation; real hardware can't wait)</li>
+    <li><b>checks the outputs</b> and prints with <code>report</code>. A wrong answer is reported with <code>severity error</code>, and the last line says <code>TEST PASSED</code> or <code>TEST FAILED</code></li>
+  </ul>
+
+  <h3>The smallest one, line by line: tb_uart_loop</h3>
+  <p>It checks <code>uart_tx</code> and <code>uart_rx</code> by wiring the sender's output straight into the receiver ("loopback") and sending 6 bytes.</p>
+  <pre><span class="c">-- 50 MHz clock; it stops when the test is done, so the simulator knows to finish</span>
+clk &lt;= not clk after 10 ns when not done else clk;
+
+u_tx : entity work.uart_tx generic map (CLKS_PER_BIT => 434)
+  port map (clk => clk, data => tx_data, start => tx_start, tx => <span class="h">line</span>, busy => tx_busy);
+u_rx : entity work.uart_rx generic map (CLKS_PER_BIT => 434)
+  port map (clk => clk, rx => <span class="h">line</span>, data => rx_data, valid => rx_valid);
+
+stim : process                                 <span class="c">-- the "sender" script</span>
+begin
+  wait for 200 ns;
+  for i in TEST_BYTES'range loop               <span class="c">-- x"55", x"A3", x"00", x"FF", x"41", x"0D"</span>
+    wait until rising_edge(clk);
+    tx_data &lt;= TEST_BYTES(i);  tx_start &lt;= '1';
+    wait until rising_edge(clk);  tx_start &lt;= '0';
+    wait until rising_edge(clk);
+    wait until tx_busy = '0';                  <span class="c">-- until the byte has gone out</span>
+  end loop;
+  ...
+check : process                                <span class="c">-- the "checker" runs at the same time</span>
+  for i in TEST_BYTES'range loop
+    wait until rising_edge(clk) and rx_valid = '1';
+    if rx_data = TEST_BYTES(i) then report "byte ... ok";
+    else report "byte ... WRONG" severity error; errors := errors + 1; end if;
+  end loop;</pre>
+  <p>And this is what it actually printed when I ran <code>tools\sim.bat tb_uart_loop</code> for this page:</p>
+  <pre>Note: byte 0 ok: 85      Time: 82770 ns
+Note: byte 1 ok: 163     Time: 169610 ns
+Note: byte 2 ok: 0       Time: 256450 ns
+Note: byte 3 ok: 255     Time: 343290 ns
+Note: byte 4 ok: 65      Time: 430130 ns
+Note: byte 5 ok: 13      Time: 516970 ns
+Note: <span class="h">TEST PASSED</span>: all 6 bytes came back correctly</pre>
+  <p>The times check out too. One bit lasts 434 clocks × 20 ns = 8,680 ns, and a byte on the wire is 10 bits (start + 8 data + stop) = 86,800 ns. The bytes arrive 86,840 ns apart: 10 bits plus the 2 clocks the sender script spends starting the next byte. The first one arrives at about 82.8 µs because the receiver says "valid" in the middle of the stop bit (9.5 bits in), after the 200 ns wait.</p>
+
+  <div class="bench">
+    <div class="label">Try it: what the wire carries for one byte</div>
+    <div class="controls">
+      <label for="uartIn">Byte (hex or one letter)</label>
+      <input type="text" id="uartIn" value="A3" size="6">
+      <span id="uartBits" class="bits" aria-live="polite"></span>
+    </div>
+    <canvas id="uartWave" width="900" height="170" aria-label="UART waveform for the chosen byte"></canvas>
+    <p style="font-size:14px;color:var(--muted)">The line rests at 1. A 0 "start bit" says "a byte is coming", then the 8 data bits go out <b>lowest bit first</b>, then a 1 "stop bit". <code>uart_rx</code> waits half a bit after the start edge and then samples every 434 clocks (the dots), right in the middle of each bit where the value is steadiest.</p>
+  </div>
+
+  <h3>How a simulation is run: tools\sim.bat</h3>
+  <ol class="steps">
+    <li><div><b><code>xvhdl -prj sim\tb_uart_loop.prj</code></b>: compile. The <code>.prj</code> file lists the VHDL files in order (packages first, the testbench last). This is where typing mistakes show up.</div></li>
+    <li><div><b><code>xelab tb_uart_loop</code></b>: elaborate. Connect all the pieces into one model starting from the testbench, a "snapshot" ready to run.</div></li>
+    <li><div><b><code>xsim ... -runall</code></b>: run until nothing is left to happen. That's why every testbench stops its clock at the end; a clock that never stops would run forever. It's also why testbenches of the whole game set <code>USE_STARTUP =&gt; false</code>: Xilinx's simulation model of <code>STARTUPE2</code> never goes quiet.</div></li>
+  </ol>
+
+  <h3>How I "read" a simulation</h3>
+  <p>There's a waveform viewer in Vivado, but every testbench here is <b>self-checking</b>: it decides PASS or FAIL itself, so the result can be read as text. There are three kinds of evidence:</p>
+  <div class="cards">
+    <div class="card"><div class="t">1 · report lines</div><p>The testbench knows the right answer and compares. Example: <code>tb_versus</code> wires two boards together and checks that START on A starts B, that garbage sent by one arrives at the other, that one ends on WIN and the other on LOSE, and that a start press during the 1.5 s cool-down is ignored.</p></div>
+    <div class="card"><div class="t">2 · golden files</div><p>For the media, the right answer is too big to write by hand. So Python builds a tiny media file (<code>sim/game_sim.hex</code>, one byte per line) <b>and</b> decodes it with its own Python decoder into <code>game_sim_expect.txt</code>. The testbench feeds the hex file to the circuit and compares its sound samples and pixel colours with the expect file, number by number, using VHDL's file reading (<code>textio</code>). Two independent decoders agreeing is strong evidence both are right.</p></div>
+    <div class="card"><div class="t">3 · screenshots</div><p>The frame testbenches watch the VGA pins for a whole frame and write every pixel into a text picture file (<code>frame.ppm</code>: "P3 640 480 15" then three numbers per pixel). <code>tools\ppm2png.py</code> turns it into a PNG, and I look at it. The screenshots in the design document came from here, not from a camera.</div></div>
+  </div>
+
+  <h3>Tricks the testbenches use</h3>
+  <ul>
+    <li><b>Speeding up time.</b> A real frame is 833,333 clocks. <code>tb_tetris_core</code> makes the frame tick come every 200 clocks, and <code>tb_versus</code> runs the link at 8 clocks per bit, through generics, so a whole game takes under a second of simulation. The logic is unchanged; only the constants differ.</li>
+    <li><b>Robot players.</b> <code>tb_tetris_core</code> has a robot that tries every rotation and column for each piece and presses the buttons like a person. <code>tb_chaos</code> has a "solver" that moves the 8 task switches to finish tasks.</li>
+    <li><b>Pretend parts.</b> <code>sim/flash_model.vhd</code> pretends to be the board's flash chip (S25FL064L). It answers the ID command <code>9F</code> with <code>01 60 17</code> and the READ command <code>03</code> with bytes from the hex file. It is deliberately a bit slower than the real chip (15 ns instead of 8 ns), so the design is tested with some margin.</li>
+    <li><b>Nasty inputs on purpose.</b> <code>tb_switch_filter</code> makes a switch bounce randomly between 0 and 1 for 3 sample periods on every flip, then checks the output changed exactly once per flip.</li>
+  </ul>
+
+  <h3>All 13 testbenches</h3>
+  <div class="tscroll"><table>
+    <thead><tr><th>testbench</th><th>what it proves</th></tr></thead>
+    <tbody>
+      <tr><td>tb_uart_loop</td><td>uart_tx → uart_rx: 6 bytes come back unchanged</td></tr>
+      <tr><td>tb_uart_probe</td><td>test 05 answers on the right pin, with the manual's wiring and with the pins swapped</td></tr>
+      <tr><td>tb_vga_frame</td><td>VGA timing numbers (800 × 525, sync widths) + a screenshot of test 01</td></tr>
+      <tr><td>tb_switch_filter</td><td>bouncy switch flips give exactly one clean change each</td></tr>
+      <tr><td>tb_tetris_core</td><td>a robot plays whole games: pieces, rotation, line clears, game over</td></tr>
+      <tr><td>tb_versus</td><td>two robot boards through the link: START, garbage both ways, WIN on one and LOSE on the other, link_ok, the start cool-down</td></tr>
+      <tr><td>tb_tetris_frame</td><td>screenshots of the whole game, with a pretend PC as the rival</td></tr>
+      <tr><td>tb_chaos</td><td>tasks solved → attacks sent over the link → effects on the other board</td></tr>
+      <tr><td>tb_chaos_core</td><td>each effect inside tetris_core: I-piece next, bad next (S/Z), freeze, speed, sink</td></tr>
+      <tr><td>tb_chaos_frame</td><td>screenshots with CHAOS: task panel, FLIP, BLIND, bouncers</td></tr>
+      <tr><td>tb_flash_read</td><td>test 06's player against the pretend flash, compared with Python's expect file</td></tr>
+      <tr><td>tb_media_engine</td><td>the game's media player: sound samples and pixels equal Python's decoder</td></tr>
+      <tr><td>tb_media_ctrl</td><td>a whole game's media: music, attack video, music resumes, win clip</td></tr>
+    </tbody>
+  </table></div>
+  <p class="note">Simulation proves the logic, not the board. It could not have found that the USB-UART pins on our board are swapped compared with the manual, or that the 7-segment digits are active-high. That is what the 6 hardware test circuits in <code>tests/</code> were for. The design document calls the combination "design top-down, test bottom-up".</p>
+</section>
+
+<!-- =============================================================== 3 -->
+<section id="jevil">
+  <div class="eyebrow">part 3 · src/media/media_mix.vhd</div>
+  <h2>Jevil's sine path</h2>
+  <p>When the Jevil attack hits, he floats around the whole screen in a looping, never-quite-repeating curve. That curve is two sine waves, one moving him left-right and one moving him up-down:</p>
+  <pre>x = <span class="h">272</span> + <span class="h">230</span> · sin(2π t / <span class="h">6.1 s</span>)
+y = <span class="h">190</span> + <span class="h">150</span> · sin(2π t / <span class="h">3.7 s</span> + <span class="h">0.6</span>)</pre>
+
+  <h3>Where every number comes from</h3>
+  <div class="tscroll"><table>
+    <thead><tr><th>number</th><th>meaning</th><th>why this value</th></tr></thead>
+    <tbody>
+      <tr><td>272, 190</td><td>the middle of his path (his top-left corner)</td><td>He is 96 × 100 on screen (48 × 50 pixels drawn 2×). Centred: (640 − 96) / 2 = 272 and (480 − 100) / 2 = 190.</td></tr>
+      <tr><td>230</td><td>how far he swings left and right</td><td>x goes from about 272 − 230 = 42 to 272 + 230 = 502, and 502 + 96 = 598 &lt; 640: he never leaves the screen. (The circuit's whole-number maths actually reaches 43 to 501.)</td></tr>
+      <tr><td>150</td><td>how far he swings up and down</td><td>y goes from about 40 to 340 (really 41 to 339), and 340 + 100 = 440 &lt; 480.</td></tr>
+      <tr><td>6.1 s, 3.7 s</td><td>how long one full swing takes</td><td>Two different speeds that don't divide evenly, so the path takes a long time to repeat. This is called a <b>Lissajous</b> curve. With equal speeds he would just go round one circle or line.</td></tr>
+      <tr><td>0.6</td><td>a head start for the y wave, in radians</td><td>So he doesn't start on a straight diagonal: the two waves are out of step from the first frame.</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>How the hardware does sin() without a calculator</h3>
+  <p>An FPGA has no <code>sin</code> button. The circuit uses three tricks.</p>
+  <ol class="steps">
+    <li><div><b>The angle is a 16-bit counter.</b> 0 to 65,535 stands for one full turn (0 to 2π). Each frame the x angle grows by <b>179</b> and the y angle by <b>295</b>. When a 16-bit number goes past 65,535 it wraps back to 0 by itself, just like an angle wrapping past 360°. So "going round the circle forever" costs nothing.<br>
+    One turn of x: 65,536 / 179 = 366 frames, and at 59.52 frames a second that's <b>6.1 s</b>. One turn of y: 65,536 / 295 = 222 frames = <b>3.7 s</b>. The y angle starts at <b>6,258</b>, which is 0.6 rad × 65,536 / 2π.</div></li>
+    <li><div><b>A table of a quarter of a sine wave.</b> A sine wave is made of 4 mirror-image quarters, so the circuit stores only the first quarter: 128 numbers from 0 to 255, <code>Q(k) = round(255 · sin(2π (k + 0.5) / 512))</code>. The top 2 bits of the angle say which quarter, the next 7 bits pick one of the 128 entries, and the lowest 7 bits are ignored (too fine to matter):
+      <ul style="margin-top:6px">
+        <li>quarter 0: <code>Q(k)</code> (rising)</li>
+        <li>quarter 1: <code>Q(127 − k)</code> (the table read backwards: falling)</li>
+        <li>quarter 2: <code>−Q(k)</code></li>
+        <li>quarter 3: <code>−Q(127 − k)</code></li>
+      </ul>
+      The <code>+ 0.5</code> samples the middle of each slot, so a quarter read backwards fits exactly against the one read forwards.</div></li>
+    <li><div><b>Scale with a multiply and a shift.</b> The table gives −255 to +255, which is almost "sine × 256". So <code>jx = 272 + 230 × sv / 256</code>, and dividing by 256 is just dropping 8 bits. The multiply uses one of the chip's DSP blocks (hardware multipliers), the one listed for <code>media_mix</code> in the resource table.</div></li>
+  </ol>
+  <p><b>How it advances.</b> Nothing moves between frames. Once per frame, at <code>frame_tick</code>, a 3-step sequence runs, one step per clock: <b>step 0</b> adds 179 and 295 to the angles and looks up sin for x; <b>step 1</b> computes <code>jx</code> and looks up sin for y; <b>step 2</b> computes <code>jy</code>. Doing x and y one after the other lets them share <b>one</b> table and <b>one</b> multiplier. Every 4th frame <code>pbase</code> moves to the next of his 8 poses (pose × 2,400, since one pose is 48 × 50 = 2,400 pixels), which makes him flap at 15 poses a second.</p>
+  <p><b>Drawing him.</b> For every screen pixel inside his 96 × 100 box, the circuit asks <code>media_engine</code> for the pixel <code>pbase + (dy / 2) × 48 + dx / 2</code>. The "/ 2" makes each of his pixels 2 × 2 on screen, and × 48 is done as × 32 + × 16 (two shifts and an add), so no second multiplier is needed.</p>
+
+  <div class="bench">
+    <div class="label">Try it: the same integer maths as media_mix.vhd</div>
+    <div class="controls">
+      <button id="jPlay" type="button">Pause</button>
+      <label for="jFrame">frame</label>
+      <input type="range" id="jFrame" min="0" max="3600" value="0">
+      <button id="jReset" type="button">Restart</button>
+    </div>
+    <div class="two">
+      <canvas id="jScreen" width="640" height="480" aria-label="Jevil's path on the 640 by 480 screen"></canvas>
+      <div style="display:grid;gap:12px">
+        <dl class="readout" id="jRead"></dl>
+        <canvas id="jTable" width="320" height="180" aria-label="The quarter sine table with the entry being used"></canvas>
+      </div>
+    </div>
+    <p style="font-size:14px;color:var(--muted)">The box is where he is drawn (96 × 100), and the trail is his last 600 positions. The small chart is the 128-entry quarter table; the marks show which entry x (teal) and y (orange) are using this frame, and the readout shows which quarter flips it.</p>
+  </div>
+</section>
+
+<!-- =============================================================== 4 -->
+<section id="pc">
+  <div class="eyebrow">part 4 · tools/</div>
+  <h2>The computer side: what every script does</h2>
+  <p>The FPGA runs the game, but the PC prepares everything it needs: the circuit file, the media file, and the test data. Python is used where the job is "read some files, do maths, write a file". Batch files (<code>.bat</code>) just run other programs in the right order with the right options.</p>
+
+  <h3>The libraries, in one line each</h3>
+  <ul>
+    <li><b>numpy</b>: maths on big arrays at once (a whole video frame of pixels, a whole song of samples)</li>
+    <li><b>Pillow</b>: open and save pictures, resize, convert colours</li>
+    <li><b>ffmpeg</b>: a separate program the scripts call to decode any video or audio file into raw pixels and samples</li>
+    <li><b>struct</b>: turns numbers into exact bytes, e.g. <code>struct.pack('&lt;H', 1104)</code> → <code>50 04</code> (the <code>&lt;</code> means little-endian: low byte first)</li>
+    <li><b>pyserial</b>: talks to a COM port, here the board's USB-serial chip</li>
+    <li><b>argparse</b>: reads options typed after the script name, like <code>--sim</code></li>
+  </ul>
+
+  <h3>Four pipelines</h3>
+  <div class="bench flow">
+    <div class="lane"><h4>A · VHDL → a running board</h4>
+      <div class="chain"><span class="n f">*.vhd + project.txt + pins.xdc</span><span class="a">→</span><span class="n">build.bat</span><span class="a">→ Vivado batch (build_test.tcl) →</span><span class="n f">build\top_tetris.bit</span><span class="a">→</span><span class="n">program.bat</span><span class="a">→ USB / JTAG →</span><span class="n f">FPGA</span></div>
+      <p style="font-size:14px">Alternative: <code>load_into_builder.py</code> fills the TA's FPGA Builder with the same files and pins, and the Builder does the build and the loading.</p></div>
+    <div class="lane"><h4>B · videos and songs → the flash chip</h4>
+      <div class="chain"><span class="n">media_plan.py</span><span class="a">→</span><span class="n">media_lab.py</span><span class="a">→</span><span class="n">media_page.py</span><span class="a">→ you approve →</span><span class="n">make_game_media.py</span><span class="a">→</span><span class="n f">media\game_media.bin</span><span class="a">→</span><span class="n">flash_media.bat</span><span class="a">→</span><span class="n f">flash at 1 MB</span></div></div>
+    <div class="lane"><h4>C · testing in simulation</h4>
+      <div class="chain"><span class="n">make_game_media.py --sim</span><span class="a">→</span><span class="n f">sim\game_sim.hex + expect.txt</span><span class="a">→</span><span class="n">sim.bat tb_media_engine</span><span class="a">→</span><span class="n f">PASS / FAIL</span><span class="a">·</span><span class="n">ppm2png.py</span><span class="a">→</span><span class="n f">screenshots</span></div></div>
+    <div class="lane"><h4>D · the PC as the second player</h4>
+      <div class="chain"><span class="n">fake_opponent.py COM3</span><span class="a">→ USB-serial 115,200 →</span><span class="n f">board with SW7 on</span></div></div>
+  </div>
+
+  <h3>Each script</h3>
+  <div class="cards">
+    <div class="card"><div class="t">build.bat + build_test.tcl</div><p>Starts Vivado with no window (<code>-mode batch</code>) and gives it a Tcl script: read the VHDL files from <code>project.txt</code>, read <code>pins.xdc</code>, synthesis → implementation → timing report → write the <code>.bit</code>. Takes 1-2 minutes. Logs go to <code>build\vivado.log</code>.</p><div class="run">tools\build.bat game</div></div>
+    <div class="card"><div class="t">program.bat</div><p>Runs <b>openFPGALoader</b> (the loader inside the TA's Builder) to send the <code>.bit</code> over USB into the FPGA. Gone at power-off. With <code>flash</code> it writes the bitstream to the flash instead, so the board loads it at every power-on.</p><div class="run">tools\program.bat game</div></div>
+    <div class="card"><div class="t">load_into_builder.py</div><p>The Builder remembers one project in <code>fpga_builder.json</code>. This reads our <code>project.txt</code> and <code>pins.xdc</code>, writes that JSON (keeping a backup), so you don't add 25 files and 57 pins by hand.</p><div class="run">tools\load_into_builder.bat game</div></div>
+    <div class="card"><div class="t">media_plan.py</div><p>No code that runs anything, just <b>the list</b>: every song, video, picture and sprite, which part of the source file, how many colours (bpp), frames per second, sound rate, display mode (bg, full, over, panel). Everyone edits this one file.</p></div>
+    <div class="card"><div class="t">media_lab.py</div><p>Tries the plan out <b>before</b> anything touches the board. For each item: ffmpeg decodes it, it is shrunk to 160 × 120, reduced to 2-256 colours, the sound is encoded to ADPCM <b>and decoded back</b>. Then it is pasted onto a real game screenshot the way the hardware would draw it. Writes <code>.mp4</code>/<code>.wav</code>/<code>.png</code> renders and a size budget, so you hear and see the real quality.</p><div class="run">python tools\media_lab.py</div></div>
+    <div class="card"><div class="t">media_page.py</div><p>Turns the budget into <code>media/renders/plan.html</code>: a page that plays every render with tick boxes to see if the total fits in the flash. It stays on this PC (friends' photos).</p></div>
+    <div class="card"><div class="t">make_game_media.py</div><p>Builds the real <code>game_media.bin</code> (6,863,360 bytes) with the same encoding as the lab: header, directory, records of picture + sound, sprite block. Every number goes in with <code>struct</code> as little-endian bytes. With <code>--sim</code> it makes the tiny test file and its expect file instead.</p><div class="run">python tools\make_game_media.py</div></div>
+    <div class="card"><div class="t">flash_media.bat</div><p>Writes the media file into the flash starting at 1 MB (<code>-o 0x100000</code>), so the FPGA's own bitstream at address 0 is untouched. The USB cable can't reach the flash directly, so openFPGALoader first loads a tiny helper design (<code>spiOverJtag</code>) into the FPGA that passes data through to the flash pins. That's why you must load the game again afterwards.</p><div class="run">tools\flash_media.bat media\game_media.bin</div></div>
+    <div class="card"><div class="t">make_media.py</div><p>The older, simpler format 1 for test 06 (<code>media.bin</code>, the flash-reading test). <code>make_game_media.py</code> reuses its picture-squeezing helpers.</p></div>
+    <div class="card"><div class="t">sim.bat + ppm2png.py</div><p>Runs one testbench (compile, elaborate, run, as in part 2). If the testbench wrote <code>frame.ppm</code>, ppm2png turns it into a PNG. ppm2png writes the PNG by hand (zlib + the PNG chunk format), so it needs no extra library.</p><div class="run">tools\sim.bat tb_versus</div></div>
+    <div class="card"><div class="t">fake_opponent.py</div><p>Pretends to be the second board over USB (turn SW7 on). Three things run at once (threads): one sends a heartbeat 10 times a second so the board shows LINKED, one prints every byte the board sends, and the main one waits for your commands (<code>s</code> start, <code>g 3</code> garbage, <code>x 4</code> attack, <code>a</code> auto-play).</p><div class="run">python tools\fake_opponent.py COM3</div></div>
+    <div class="card"><div class="t">make_vivado_project.tcl + vivado_gui.bat</div><p>Makes a normal Vivado project and opens the window, for looking at schematics (that's where the Vivado PDFs in the design document came from). Not needed to build.</p></div>
+    <div class="card"><div class="t">remap_doc_lines.py, update_media_visual.py</div><p>Housekeeping for the learning docs: fix "line 123" references after a VHDL file changes, and refresh the code and numbers inside <code>media_visual.html</code>.</p></div>
+  </div>
+
+  <div class="bench">
+    <div class="label">Try it: one versus_link message, as fake_opponent builds it</div>
+    <div class="controls">
+      <label for="mType">type</label>
+      <select id="mType">
+        <option value="0">0 HEARTBEAT (value = stack height)</option>
+        <option value="1" selected>1 GARBAGE (value = lines)</option>
+        <option value="2">2 LOST</option>
+        <option value="3">3 START</option>
+        <option value="4">4 ATTACK (value = attack number)</option>
+      </select>
+      <label for="mVal">value</label>
+      <input type="range" id="mVal" min="0" max="31" value="3" style="flex:0 1 220px">
+      <span id="mValT" class="m">3</span>
+    </div>
+    <div class="bits" id="mBits" aria-live="polite"></div>
+    <p style="font-size:14px;color:var(--muted)" id="mText"></p>
+    <pre>def msg(t, v=0):
+    return bytes([(t &lt;&lt; 5) | (v &amp; 0x1F)])   <span class="c"># type in bits 7..5, value in bits 4..0</span></pre>
+  </div>
+
+  <div class="bench">
+    <div class="label">The real first 32 bytes of game_media.bin (hover a byte)</div>
+    <div class="bytes" id="hdrBytes"></div>
+    <p id="hdrText" style="font-size:14px;min-height:3.2em">Hover or tap a byte to see what it means.</p>
+    <p style="font-size:14px;color:var(--muted)">This is what all of pipeline B produces: plain bytes, in an order that <code>media_engine.vhd</code> reads back the same way. Multi-byte numbers are little-endian, so <code>00 82 78</code> reads as 0x788200, the address of the sprite block.</p>
+  </div>
+</section>
+</main>
+</div>
+
+<script>
+(function () {
+  'use strict';
+  var css = function (n) { return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); };
+
+  /* ---------------------------------------------------------- part 1 */
+  var FONT = {"0":".XXX.X...XX..XXX.X.XXX..XX...X.XXX.","1":"..X...XX....X....X....X....X...XXX.","2":".XXX.X...X....X...X...X...X...XXXXX","3":"XXXXX...X...X.....X.....XX...X.XXX.","4":"...X...XX..X.X.X..X.XXXXX...X....X.","5":"XXXXXX....XXXX.....X....XX...X.XXX.","6":"..XX..X...X....XXXX.X...XX...X.XXX.","7":"XXXXX....X...X...X...X....X....X...","8":".XXX.X...XX...X.XXX.X...XX...X.XXX.","9":".XXX.X...XX...X.XXXX....X...X..XX..","10":".XXX.X...XX...XXXXXXX...XX...XX...X","11":"XXXX.X...XX...XXXXX.X...XX...XXXXX.","12":".XXX.X...XX....X....X....X...X.XXX.","13":"XXX..X..X.X...XX...XX...XX..X.XXX..","14":"XXXXXX....X....XXXX.X....X....XXXXX","15":"XXXXXX....X....XXXX.X....X....X....","16":".XXX.X...XX....X.XXXX...XX...X.XXXX","17":"X...XX...XX...XXXXXXX...XX...XX...X","18":".XXX...X....X....X....X....X...XXX.","19":"..XXX...X....X....X....X.X..X..XX..","20":"X...XX..X.X.X..XX...X.X..X..X.X...X","21":"X....X....X....X....X....X....XXXXX","22":"X...XXX.XXX.X.XX.X.XX...XX...XX...X","23":"X...XX...XXX..XX.X.XX..XXX...XX...X","24":".XXX.X...XX...XX...XX...XX...X.XXX.","25":"XXXX.X...XX...XXXXX.X....X....X....","26":".XXX.X...XX...XX...XX.X.XX..X..XX.X","27":"XXXX.X...XX...XXXXX.X.X..X..X.X...X","28":".XXXXX....X.....XXX.....X....XXXXX.","29":"XXXXX..X....X....X....X....X....X..","30":"X...XX...XX...XX...XX...XX...X.XXX.","31":"X...XX...XX...XX...XX...X.X.X...X..","32":"X...XX...XX...XX.X.XX.X.XX.X.X.X.X.","33":"X...XX...X.X.X...X...X.X.X...XX...X","34":"X...XX...X.X.X...X....X....X....X..","35":"XXXXX....X...X...X...X...X....XXXXX","37":"...............XXXXX...............","38":"..X....X....X....X....X.........X..","39":"......XX...XX........XX...XX.......","40":"..........................XX...XX..","41":".XXX.X...X....X...X...X.........X.."};
+  var LINES = [ // from tetris_render.vhd: X0S, Y0S, LENS, SHIFTS and the text
+    { t: 'NEXT', x: 432, y: 52, s: 1 }, { t: 'LEVEL', x: 432, y: 156, s: 1 },
+    { t: 'LINES', x: 432, y: 224, s: 1 }, { t: '0012', x: 432, y: 244, s: 2 },
+    { t: 'RIVAL', x: 90, y: 52, s: 1 }, { t: ' LINKED', x: 78, y: 412, s: 1 },
+    { t: 'PRESS START', x: 254, y: 264, s: 1 }, { t: 'WIN!', x: 272, y: 202, s: 2 }
+  ];
+  function code(ch) {
+    if (ch >= '0' && ch <= '9') return ch.charCodeAt(0) - 48;
+    if (ch >= 'A' && ch <= 'Z') return ch.charCodeAt(0) - 55;
+    return { ' ': 36, '-': 37, '!': 38, ':': 39, '.': 40, '?': 41 }[ch] !== undefined ? { ' ': 36, '-': 37, '!': 38, ':': 39, '.': 40, '?': 41 }[ch] : 36;
+  }
+  function lookup(x, y) { // the two steps of text_multi
+    for (var k = 0; k < LINES.length; k++) {
+      var L = LINES[k], sz = 1 << L.s;
+      if (x >= L.x && x < L.x + L.t.length * 6 * sz && y >= L.y && y < L.y + 7 * sz) {
+        var dx = Math.floor((x - L.x) / sz), dy = Math.floor((y - L.y) / sz);
+        var ci = Math.floor(dx / 6), cc = dx % 6, c = code(L.t[ci]);
+        var g = FONT[c] || '.'.repeat(35);
+        var lit = cc < 5 && g[5 * dy + cc] === 'X';
+        return { k: k, ci: ci, cc: cc, dy: dy, c: c, ch: L.t[ci], g: g, lit: lit };
+      }
+    }
+    return null;
+  }
+  var fs = document.getElementById('fontScreen'), fctx = fs.getContext('2d');
+  var gl = document.getElementById('glyph'), gctx = gl.getContext('2d');
+  function drawScreen(hx, hy) {
+    fctx.fillStyle = '#1e2a6e'; fctx.fillRect(0, 0, 640, 480);
+    fctx.fillStyle = '#05070b'; fctx.fillRect(240, 80, 160, 320);
+    var img = fctx.getImageData(0, 0, 640, 480), d = img.data;
+    for (var k = 0; k < LINES.length; k++) {
+      var L = LINES[k], sz = 1 << L.s, w = L.t.length * 6 * sz, h = 7 * sz;
+      for (var y = L.y; y < L.y + h; y++) for (var x = L.x; x < L.x + w; x++) {
+        var r = lookup(x, y);
+        if (r && r.lit) { var i = (y * 640 + x) * 4; d[i] = 235; d[i + 1] = 238; d[i + 2] = 245; }
+      }
+    }
+    fctx.putImageData(img, 0, 0);
+    if (hx !== undefined) { fctx.strokeStyle = '#ffb347'; fctx.lineWidth = 2; fctx.strokeRect(hx - 4, hy - 4, 9, 9); }
+  }
+  function drawGlyph(r) {
+    var W = 120, H = 168, cs = 24;
+    gctx.fillStyle = css('--panel'); gctx.fillRect(0, 0, W, H);
+    if (!r) return;
+    for (var row = 0; row < 7; row++) for (var col = 0; col < 5; col++) {
+      var on = r.g[5 * row + col] === 'X', pick = row === r.dy && col === r.cc;
+      gctx.fillStyle = on ? css('--ink') : css('--code-bg');
+      gctx.fillRect(col * cs + 1, row * cs + 1, cs - 2, cs - 2);
+      if (pick) { gctx.strokeStyle = css('--warm'); gctx.lineWidth = 3; gctx.strokeRect(col * cs + 2, row * cs + 2, cs - 4, cs - 4); }
+    }
+  }
+  function fontPos(ev) {
+    var b = fs.getBoundingClientRect(), p = ev.touches ? ev.touches[0] : ev;
+    return [Math.floor((p.clientX - b.left) * 640 / b.width), Math.floor((p.clientY - b.top) * 480 / b.height)];
+  }
+  var fr = document.getElementById('fontRead');
+  function fontMove(ev) {
+    var p = fontPos(ev), r = lookup(p[0], p[1]);
+    drawScreen(p[0], p[1]);
+    drawGlyph(r);
+    var rows = [['pixel (x, y)', p[0] + ', ' + p[1]]];
+    if (!r) rows.push(['line', 'none: no text here, pix = all 0']);
+    else {
+      var L = LINES[r.k];
+      rows.push(['1. line k', r.k + ' ("' + L.t.trim() + '")'], ['   size', '2^' + L.s + ' = ' + (1 << L.s) + ' px per dot'],
+        ['   letter ci', r.ci + ' = "' + r.ch + '"'], ['   code', r.c + ' (6 bits ' + r.c.toString(2).padStart(6, '0') + ')'],
+        ['   column cc', r.cc + (r.cc === 5 ? ' (the gap)' : '')], ['   row dy', r.dy],
+        ['2. bit', r.cc < 5 ? (5 * r.dy + r.cc) + ' of 35' : '-'], ['   pix(' + r.k + ')', r.lit ? '1, lit' : '0, dark']);
+    }
+    fr.innerHTML = rows.map(function (a) { return '<dt>' + a[0] + '</dt><dd>' + a[1] + '</dd>'; }).join('');
+  }
+  fs.addEventListener('mousemove', fontMove);
+  fs.addEventListener('click', fontMove);
+  fs.addEventListener('touchstart', function (e) { fontMove(e); }, { passive: true });
+  drawScreen(); drawGlyph(lookup(440, 60));
+
+  /* ---------------------------------------------------------- part 2 */
+  var uw = document.getElementById('uartWave'), uctx = uw.getContext('2d');
+  var uin = document.getElementById('uartIn'), ubits = document.getElementById('uartBits');
+  function uartByte() {
+    var v = uin.value.trim();
+    if (/^(0x)?[0-9a-fA-F]{1,2}$/.test(v)) return parseInt(v.replace(/^0x/, ''), 16);
+    if (v.length === 1) return v.charCodeAt(0) & 255;
+    return null;
+  }
+  function drawUart() {
+    var b = uartByte(), W = 900, H = 170;
+    uctx.fillStyle = css('--panel'); uctx.fillRect(0, 0, W, H);
+    if (b === null) { ubits.textContent = 'type 00-FF or one letter'; return; }
+    ubits.innerHTML = '0x' + b.toString(16).toUpperCase().padStart(2, '0') + ' = ' + b.toString(2).padStart(8, '0');
+    var seq = [1, 0]; for (var i = 0; i < 8; i++) seq.push((b >> i) & 1); seq.push(1, 1);
+    var names = ['idle', 'start', 'd0', 'd1', 'd2', 'd3', 'd4', 'd5', 'd6', 'd7', 'stop', 'idle'];
+    var bw = W / seq.length, hi = 40, lo = 110;
+    uctx.font = '12px ' + css('--mono'); uctx.textAlign = 'center';
+    for (i = 0; i < seq.length; i++) {
+      uctx.fillStyle = (i >= 2 && i <= 9) ? css('--accent-soft') : css('--code-bg');
+      uctx.fillRect(i * bw + 1, 22, bw - 2, 104);
+      uctx.fillStyle = css('--muted'); uctx.fillText(names[i], i * bw + bw / 2, 145);
+      if (i >= 2 && i <= 9) { uctx.fillStyle = css('--warm'); uctx.fillText(seq[i], i * bw + bw / 2, 162); }
+    }
+    uctx.strokeStyle = css('--ink'); uctx.lineWidth = 3; uctx.beginPath();
+    var y0 = seq[0] ? hi : lo; uctx.moveTo(0, y0);
+    for (i = 0; i < seq.length; i++) {
+      var y = seq[i] ? hi : lo; uctx.lineTo(i * bw, y); uctx.lineTo((i + 1) * bw, y);
+    }
+    uctx.stroke();
+    uctx.fillStyle = css('--warm');
+    for (i = 1; i <= 10; i++) { uctx.beginPath(); uctx.arc(i * bw + bw / 2, seq[i] ? hi : lo, 5, 0, 7); uctx.fill(); }
+    uctx.fillStyle = css('--muted'); uctx.textAlign = 'left';
+    uctx.fillText('1', 4, hi - 6); uctx.fillText('0', 4, lo - 6);
+    uctx.textAlign = 'right'; uctx.fillText('each bit = 434 clocks = 8.68 µs', W - 6, 14);
+  }
+  uin.addEventListener('input', drawUart); drawUart();
+
+  /* ---------------------------------------------------------- part 3 */
+  var Q = []; for (var k = 0; k < 128; k++) Q.push(Math.round(255 * Math.sin(2 * Math.PI * (k + 0.5) / 512)));
+  function sine(ph) {
+    var q = ph >> 14, k = (ph >> 7) & 127;
+    return q === 0 ? Q[k] : q === 1 ? Q[127 - k] : q === 2 ? -Q[k] : -Q[127 - k];
+  }
+  function tdiv(a, b) { return a < 0 ? -Math.floor(-a / b) : Math.floor(a / b); } // VHDL '/' cuts toward zero
+  // state after n frames, exactly the order of media_mix.vhd's 3 steps
+  var path = [];
+  (function build() {
+    var phx = 0, phy = 6258, fc = 0, pose = 0;
+    path.push({ jx: 272, jy: 190, phx: phx, phy: phy, pose: 0, sx: 0, sy: 0 });
+    for (var n = 1; n <= 3600; n++) {
+      var sx = sine(phx);                    // step 0: sin of the OLD x angle
+      phx = (phx + 179) & 65535; phy = (phy + 295) & 65535;
+      if (fc === 3) pose = (pose + 1) % 8; fc = (fc + 1) & 3;
+      var jx = 272 + tdiv(230 * sx, 256);    // step 1
+      var sy = sine(phy);                    // step 1: sin of the NEW y angle
+      var jy = 190 + tdiv(150 * sy, 256);    // step 2
+      path.push({ jx: jx, jy: jy, phx: phx, phy: phy, pose: pose, sx: sx, sy: sy });
+    }
+  })();
+  var js = document.getElementById('jScreen'), jctx = js.getContext('2d');
+  var jt = document.getElementById('jTable'), tctx = jt.getContext('2d');
+  var jr = document.getElementById('jRead'), jf = document.getElementById('jFrame');
+  var jp = document.getElementById('jPlay'), frame = 0, playing = true, last = 0;
+  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (reduce) { playing = false; jp.textContent = 'Play'; }
+  function qinfo(ph) { var q = ph >> 14, k = (ph >> 7) & 127; return { q: q, k: k, e: (q & 1) ? 127 - k : k }; }
+  function drawJevil() {
+    var s = path[frame];
+    jctx.fillStyle = '#0d1b3d'; jctx.fillRect(0, 0, 640, 480);
+    jctx.strokeStyle = 'rgba(255,255,255,0.08)'; jctx.lineWidth = 1;
+    for (var x = 0; x <= 640; x += 80) { jctx.beginPath(); jctx.moveTo(x, 0); jctx.lineTo(x, 480); jctx.stroke(); }
+    for (var y = 0; y <= 480; y += 80) { jctx.beginPath(); jctx.moveTo(0, y); jctx.lineTo(640, y); jctx.stroke(); }
+    jctx.strokeStyle = 'rgba(255,179,71,0.85)'; jctx.lineWidth = 2; jctx.beginPath();
+    var from = Math.max(0, frame - 600);
+    for (var i = from; i <= frame; i++) { var p = path[i]; if (i === from) jctx.moveTo(p.jx + 48, p.jy + 50); else jctx.lineTo(p.jx + 48, p.jy + 50); }
+    jctx.stroke();
+    jctx.fillStyle = 'rgba(181,108,255,0.35)'; jctx.fillRect(s.jx, s.jy, 96, 100);
+    jctx.strokeStyle = '#d7a7ff'; jctx.lineWidth = 2; jctx.strokeRect(s.jx, s.jy, 96, 100);
+    jctx.fillStyle = '#ffffff'; jctx.font = 'bold 22px ' + css('--display'); jctx.textAlign = 'center';
+    jctx.fillText('J', s.jx + 48, s.jy + 46);
+    jctx.font = '14px ' + css('--mono'); jctx.fillText('pose ' + s.pose, s.jx + 48, s.jy + 72);
+    var ix = qinfo(path[Math.max(0, frame - 1)].phx), iy = qinfo(s.phy);
+    var rows = [['frame', frame + ' (' + (frame / 59.52).toFixed(2) + ' s)'],
+      ['x angle', (frame ? path[frame - 1].phx : 0) + ' / 65536'], ['  quarter, k', ix.q + ', ' + ix.k + (ix.q & 1 ? ' → read Q(' + (127 - ix.k) + ')' : '') + (ix.q >= 2 ? ', negative' : '')],
+      ['  sin × 256', s.sx], ['  jx', '272 + 230×' + s.sx + '/256 = ' + s.jx],
+      ['y angle', s.phy + ' / 65536'], ['  quarter, k', iy.q + ', ' + iy.k + (iy.q & 1 ? ' → read Q(' + (127 - iy.k) + ')' : '') + (iy.q >= 2 ? ', negative' : '')],
+      ['  sin × 256', s.sy], ['  jy', '190 + 150×' + s.sy + '/256 = ' + s.jy], ['pose', s.pose + ' (pbase = ' + s.pose * 2400 + ')']];
+    jr.innerHTML = rows.map(function (a) { return '<dt>' + a[0] + '</dt><dd>' + a[1] + '</dd>'; }).join('');
+    var W = 320, H = 180;
+    tctx.fillStyle = css('--panel'); tctx.fillRect(0, 0, W, H);
+    tctx.fillStyle = css('--line');
+    for (k = 0; k < 128; k++) { var h = Q[k] / 255 * 140; tctx.fillRect(10 + k * 2.3, 160 - h, 1.6, h); }
+    function mark(e, col) { var h = Q[e] / 255 * 140; tctx.fillStyle = col; tctx.fillRect(8 + e * 2.3, 160 - h - 4, 6, h + 4); }
+    mark(ix.e, css('--accent')); mark(iy.e, css('--warm'));
+    tctx.fillStyle = css('--muted'); tctx.font = '11px ' + css('--mono'); tctx.textAlign = 'left';
+    tctx.fillText('Q(0) = ' + Q[0], 10, 174); tctx.textAlign = 'right'; tctx.fillText('Q(127) = ' + Q[127], W - 6, 174);
+    tctx.textAlign = 'left'; tctx.fillText('quarter-wave table, 128 entries', 10, 14);
+    jf.value = frame;
+  }
+  function tick(t) {
+    if (playing && t - last > 1000 / 60) { frame = frame >= 3600 ? 0 : frame + 1; last = t; drawJevil(); }
+    requestAnimationFrame(tick);
+  }
+  jp.addEventListener('click', function () { playing = !playing; jp.textContent = playing ? 'Pause' : 'Play'; });
+  document.getElementById('jReset').addEventListener('click', function () { frame = 0; drawJevil(); });
+  jf.addEventListener('input', function () { frame = +jf.value; playing = false; jp.textContent = 'Play'; drawJevil(); });
+  drawJevil(); requestAnimationFrame(tick);
+
+  /* ---------------------------------------------------------- part 4 */
+  var mt = document.getElementById('mType'), mv = document.getElementById('mVal');
+  var NAMES = ['HEARTBEAT', 'GARBAGE', 'LOST', 'START', 'ATTACK'];
+  var ATT = ['MIRROR', 'FLIP', 'BLIND', 'BOUNCERS', 'GARBAGE +3', 'CURSED NEXT', 'SPEED', 'LOCK', 'BAD APPLE', 'OIIA OIIA', 'JEVIL'];
+  function drawMsg() {
+    var t = +mt.value, v = +mv.value, b = (t << 5) | (v & 31);
+    document.getElementById('mValT').textContent = v;
+    document.getElementById('mBits').innerHTML = '<b>' + t.toString(2).padStart(3, '0') + '</b> ' + v.toString(2).padStart(5, '0') +
+      ' = 0x' + b.toString(16).toUpperCase().padStart(2, '0') + ' = ' + b;
+    var what = t === 0 ? 'my stack is ' + v + ' rows high' : t === 1 ? 'add ' + v + ' garbage lines' : t === 2 ? 'I topped out (value unused)' :
+      t === 3 ? 'start a new round (value unused)' : (ATT[v] ? 'attack ' + v + ': ' + ATT[v] : 'attack ' + v + ': no such attack');
+    document.getElementById('mText').textContent = NAMES[t] + ': ' + what + '. The 3 type bits (orange) are shifted up by 5 and OR-ed with the 5 value bits.';
+  }
+  mt.addEventListener('change', drawMsg); mv.addEventListener('input', drawMsg); drawMsg();
+
+  var HDR = '54 44 4D 32 02 11 00 02 02 05 08 0D 04 00 82 78 00 3C 00 00 50 04 00 04 00 02 10 00 00 02 10 80'.split(' ');
+  var MEAN = [
+    [0, 4, '"TDM2": the file\'s name tag. media_engine checks it before trusting anything else.'],
+    [4, 1, 'version 2'], [5, 1, '0x11 = 17 items in the file'],
+    [6, 1, 'item 0 is the first music item'], [7, 1, '2 music items, played in turn'],
+    [8, 1, 'item 2 is the first attack video (Bad Apple, then OIIA, then Jevil)'],
+    [9, 1, 'item 5 is the first lose clip'], [10, 1, '8 lose items (one picked at random)'],
+    [11, 1, 'item 13 (0x0D) is the first win clip'], [12, 1, '4 win items'],
+    [13, 3, 'address of the sprite block, little-endian: 00 82 78 → 0x788200'],
+    [16, 1, 'directory entry of item 0 starts here. bpp 0 = sound only (music)'],
+    [17, 1, 'frame_ticks 0x3C = 60 (not used for items with sound)'], [18, 1, 'mode 0 (bg)'], [19, 1, 'unused (0)'],
+    [20, 2, '50 04 → 0x0450 = 1,104 records'], [22, 2, '00 04 → 0x0400 = 1,024 sound bytes per record (2,048 samples = 0.128 s)'],
+    [24, 3, 'palette address 0x100200 (empty: a sound has no colours)'], [27, 1, 'unused (0)'],
+    [28, 3, 'record 0 starts at 0x100200, right after the 17 directory entries'],
+    [31, 1, 'low water 0x80 × 8 = 1,024: fetch the next record when fewer sound bytes than this wait in the ring']
+  ];
+  var hb = document.getElementById('hdrBytes'), ht = document.getElementById('hdrText');
+  HDR.forEach(function (x, i) {
+    var s = document.createElement('span'); s.textContent = x; s.tabIndex = 0; s.dataset.i = i; hb.appendChild(s);
+  });
+  function showByte(i) {
+    var m = MEAN.filter(function (a) { return i >= a[0] && i < a[0] + a[1]; })[0];
+    Array.prototype.forEach.call(hb.children, function (s, j) { s.className = (m && j >= m[0] && j < m[0] + m[1]) ? 'on' : ''; });
+    ht.textContent = m ? 'bytes ' + m[0] + (m[1] > 1 ? '-' + (m[0] + m[1] - 1) : '') + ': ' + m[2] : '';
+  }
+  hb.addEventListener('mouseover', function (e) { if (e.target.dataset.i) showByte(+e.target.dataset.i); });
+  hb.addEventListener('focusin', function (e) { if (e.target.dataset.i) showByte(+e.target.dataset.i); });
+  hb.addEventListener('click', function (e) { if (e.target.dataset.i) showByte(+e.target.dataset.i); });
+
+  // redraw canvases when the theme changes
+  if (window.matchMedia) window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function () { drawUart(); drawJevil(); drawGlyph(lookup(440, 60)); });
+})();
+</script>
